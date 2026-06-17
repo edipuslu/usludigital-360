@@ -1,10 +1,11 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { Bell, Settings, ChevronRight, Zap, ExternalLink, CheckCircle2, Mail, Clock, Save, Trash2, AlertCircle } from 'lucide-react'
 import Sidebar from '../components/layout/Sidebar'
 import { StatusBadge } from '../components/ui/UIKit'
 import { useAuth } from '../context/AuthContext'
 import { loadCompanies, saveCompanies } from './AdminDashboard'
+import { getCompanies, updateBackendCompany } from '../lib/backendApi'
 import OverviewTab from '../components/tabs/OverviewTab'
 import PlatformsTab from '../components/tabs/PlatformsTab'
 import InboxTab from '../components/tabs/InboxTab'
@@ -157,6 +158,27 @@ export default function CompanyWorkspace() {
   const [workspaces, setWorkspaces] = useState(() => {
     return loadCompanies()
   })
+  const [loading, setLoading] = useState(true)
+  const [syncError, setSyncError] = useState('')
+
+  useEffect(() => {
+    let alive = true
+    getCompanies()
+      .then(data => {
+        if (!alive) return
+        setWorkspaces(data.companies || [])
+        saveCompanies(data.companies || [])
+        setSyncError('')
+      })
+      .catch(err => {
+        if (!alive) return
+        setSyncError(err.message || 'Could not sync this company with the backend.')
+      })
+      .finally(() => alive && setLoading(false))
+    return () => {
+      alive = false
+    }
+  }, [])
 
   const company = useMemo(() => workspaces.find(c => c.id === companyId) || workspaces[0], [companyId, workspaces])
   const updateCompany = updater => {
@@ -165,6 +187,9 @@ export default function CompanyWorkspace() {
       const nextCompany = typeof updater === 'function' ? updater(current) : { ...current, ...updater }
       const next = prev.map(c => c.id === current.id ? nextCompany : c)
       saveCompanies(next)
+      updateBackendCompany(nextCompany)
+        .then(() => setSyncError(''))
+        .catch(err => setSyncError(err.message || 'Saved locally, but backend sync failed.'))
       return next
     })
   }
@@ -177,6 +202,17 @@ export default function CompanyWorkspace() {
         ...(current.notifications || []),
       ],
     }))
+  }
+
+  if (loading && !company) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-slate-50">
+        <div className="text-center">
+          <div className="text-slate-900 font-bold text-xl mb-2">Loading workspace...</div>
+          <div className="text-slate-500 text-sm">Checking the shared backend data.</div>
+        </div>
+      </div>
+    )
   }
 
   if (!company && isAdmin) {
@@ -308,6 +344,11 @@ export default function CompanyWorkspace() {
 
         {/* Tab Content */}
         <main className="flex-1 p-8 animate-fade-in" key={activeTab}>
+          {syncError && (
+            <div className="mb-5 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-medium text-amber-800">
+              {syncError}
+            </div>
+          )}
           {tabContent[activeTab]}
         </main>
       </div>

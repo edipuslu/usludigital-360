@@ -11,6 +11,10 @@ const PORT = Number(process.env.API_PORT || 8787)
 const HOST = process.env.API_HOST || '127.0.0.1'
 const VERIFY_TOKEN = process.env.META_VERIFY_TOKEN || 'change-this-verify-token'
 const OPENAI_MODEL = process.env.OPENAI_MODEL || 'gpt-4o-mini'
+const SUPABASE_URL = process.env.SUPABASE_URL || ''
+const SUPABASE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_ANON_KEY || ''
+const SUPABASE_STORE_TABLE = process.env.SUPABASE_STORE_TABLE || 'ud360_store'
+const SUPABASE_STORE_ID = process.env.SUPABASE_STORE_ID || 'default'
 const GRAPH_BASE_URL = 'https://graph.facebook.com/v20.0'
 const FACEBOOK_OAUTH_URL = 'https://www.facebook.com/v20.0/dialog/oauth'
 const META_SCOPES = [
@@ -91,6 +95,21 @@ async function graphGet(pathname, params = {}) {
 }
 
 async function loadStore() {
+  if (SUPABASE_URL && SUPABASE_KEY) {
+    const url = `${SUPABASE_URL.replace(/\/$/, '')}/rest/v1/${SUPABASE_STORE_TABLE}?id=eq.${encodeURIComponent(SUPABASE_STORE_ID)}&select=data&limit=1`
+    const response = await fetch(url, {
+      headers: {
+        apikey: SUPABASE_KEY,
+        Authorization: `Bearer ${SUPABASE_KEY}`,
+      },
+    })
+    const rows = await response.json().catch(() => [])
+    if (!response.ok) {
+      throw new Error(rows?.message || `Supabase load failed with HTTP ${response.status}`)
+    }
+    return { ...structuredClone(DEFAULT_STORE), ...(rows[0]?.data || {}) }
+  }
+
   await mkdir(DATA_DIR, { recursive: true })
   if (!existsSync(STORE_PATH)) {
     await writeFile(STORE_PATH, JSON.stringify(DEFAULT_STORE, null, 2))
@@ -104,8 +123,36 @@ async function loadStore() {
 }
 
 async function saveStore(store) {
+  if (SUPABASE_URL && SUPABASE_KEY) {
+    const url = `${SUPABASE_URL.replace(/\/$/, '')}/rest/v1/${SUPABASE_STORE_TABLE}`
+    const response = await fetch(url, {
+      method: 'POST',
+      headers: {
+        apikey: SUPABASE_KEY,
+        Authorization: `Bearer ${SUPABASE_KEY}`,
+        'Content-Type': 'application/json',
+        Prefer: 'resolution=merge-duplicates',
+      },
+      body: JSON.stringify({
+        id: SUPABASE_STORE_ID,
+        data: store,
+        updated_at: new Date().toISOString(),
+      }),
+    })
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({}))
+      throw new Error(error?.message || `Supabase save failed with HTTP ${response.status}`)
+    }
+    return
+  }
+
   await mkdir(DATA_DIR, { recursive: true })
   await writeFile(STORE_PATH, JSON.stringify(store, null, 2))
+}
+
+function listCompanies(store) {
+  return Object.values(store.companies || {})
+    .sort((a, b) => String(b.createdAt || '').localeCompare(String(a.createdAt || '')))
 }
 
 function connectionKey(platform, externalId) {
@@ -531,6 +578,46 @@ export async function appHandler(req, res) {
       return json(res, 200, { ok: true, received: saved.length })
     }
 
+    if (req.method === 'GET' && url.pathname === '/api/companies') {
+      return json(res, 200, { companies: listCompanies(store) })
+    }
+
+    if (req.method === 'POST' && url.pathname === '/api/companies') {
+      const body = await readBody(req)
+      if (!body.company?.id) return json(res, 400, { error: 'company.id is required.' })
+      store.companies[body.company.id] = {
+        ...(store.companies[body.company.id] || {}),
+        ...body.company,
+        updatedAt: new Date().toISOString(),
+      }
+      await saveStore(store)
+      return json(res, 200, { ok: true, company: store.companies[body.company.id] })
+    }
+
+    const companyParams = routeParams(url.pathname, '/api/companies/:companyId')
+    if (req.method === 'PUT' && companyParams) {
+      const body = await readBody(req)
+      if (!store.companies[companyParams.companyId]) return json(res, 404, { error: 'Company not found.' })
+      store.companies[companyParams.companyId] = {
+        ...store.companies[companyParams.companyId],
+        ...(body.company || {}),
+        id: companyParams.companyId,
+        updatedAt: new Date().toISOString(),
+      }
+      await saveStore(store)
+      return json(res, 200, { ok: true, company: store.companies[companyParams.companyId] })
+    }
+
+    if (req.method === 'DELETE' && companyParams) {
+      delete store.companies[companyParams.companyId]
+      store.connections = Object.fromEntries(
+        Object.entries(store.connections || {}).filter(([, connection]) => connection.companyId !== companyParams.companyId)
+      )
+      store.items = (store.items || []).filter(item => item.companyId !== companyParams.companyId)
+      await saveStore(store)
+      return json(res, 200, { ok: true })
+    }
+
     const connectionParams = routeParams(url.pathname, '/api/companies/:companyId/connections')
     if (req.method === 'GET' && connectionParams) {
       return json(res, 200, { connections: listConnections(store, connectionParams.companyId) })
@@ -539,6 +626,18 @@ export async function appHandler(req, res) {
     if (req.method === 'POST' && connectionParams) {
       const body = await readBody(req)
       rememberConnection(store, connectionParams.companyId, body.platform, body.connection)
+      await saveStore(store)
+      return json(res, 200, { ok: true })
+    }
+
+    const connectionPlatformParams = routeParams(url.pathname, '/api/companies/:companyId/connections/:platform')
+    if (req.method === 'DELETE' && connectionPlatformParams) {
+      store.connections = Object.fromEntries(
+        Object.entries(store.connections || {}).filter(([, connection]) => (
+          connection.companyId !== connectionPlatformParams.companyId ||
+          connection.platform !== connectionPlatformParams.platform
+        ))
+      )
       await saveStore(store)
       return json(res, 200, { ok: true })
     }

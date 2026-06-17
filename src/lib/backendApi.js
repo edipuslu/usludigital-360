@@ -32,6 +32,30 @@ export function backendUrl(path = '') {
   return `${API_BASE_URL}${path}`
 }
 
+export function getCompanies() {
+  return request('/api/companies')
+}
+
+export function saveBackendCompany(company) {
+  return request('/api/companies', {
+    method: 'POST',
+    body: JSON.stringify({ company }),
+  })
+}
+
+export function updateBackendCompany(company) {
+  return request(`/api/companies/${encodeURIComponent(company.id)}`, {
+    method: 'PUT',
+    body: JSON.stringify({ company }),
+  })
+}
+
+export function deleteBackendCompany(companyId) {
+  return request(`/api/companies/${encodeURIComponent(companyId)}`, {
+    method: 'DELETE',
+  })
+}
+
 // Register platform connection (Instagram, Facebook, YouTube)
 export function registerConnection(companyId, platform, connection) {
   return request(`/api/companies/${encodeURIComponent(companyId)}/connections`, {
@@ -43,6 +67,12 @@ export function registerConnection(companyId, platform, connection) {
 // Get all platform connections for a company
 export function getConnections(companyId) {
   return request(`/api/companies/${encodeURIComponent(companyId)}/connections`)
+}
+
+export function deleteConnection(companyId, platform) {
+  return request(`/api/companies/${encodeURIComponent(companyId)}/connections/${encodeURIComponent(platform)}`, {
+    method: 'DELETE',
+  })
 }
 
 // Fetch growth metrics (followers, posts, engagement)

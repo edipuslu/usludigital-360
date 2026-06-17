@@ -1,7 +1,8 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Building2, Plus, Trash2, LogOut, Zap, X, AlertTriangle, ArrowUpRight, LayoutDashboard } from 'lucide-react'
 import { useAuth } from '../context/AuthContext'
+import { deleteBackendCompany, getCompanies, saveBackendCompany } from '../lib/backendApi'
 import clsx from 'clsx'
 
 const STORAGE_KEY = 'ud360_companies_v2'
@@ -183,8 +184,29 @@ export default function AdminDashboard() {
   const navigate = useNavigate()
   const { user, logout } = useAuth()
   const [companies, setCompanies] = useState(loadCompanies)
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState('')
   const [showCreate, setShowCreate] = useState(false)
   const [deleteCompany, setDeleteCompany] = useState(null)
+
+  useEffect(() => {
+    let alive = true
+    getCompanies()
+      .then(data => {
+        if (!alive) return
+        setCompanies(data.companies || [])
+        saveCompanies(data.companies || [])
+        setError('')
+      })
+      .catch(err => {
+        if (!alive) return
+        setError(err.message || 'Could not load companies from backend.')
+      })
+      .finally(() => alive && setLoading(false))
+    return () => {
+      alive = false
+    }
+  }, [])
 
   const totals = useMemo(() => ({
     companies: companies.length,
@@ -196,16 +218,28 @@ export default function AdminDashboard() {
     saveCompanies(next)
   }
 
-  const create = payload => {
+  const create = async payload => {
     const company = createCompany(payload)
     persist([company, ...companies])
+    try {
+      await saveBackendCompany(company)
+      setError('')
+    } catch (err) {
+      setError(err.message || 'Company was saved on this device, but backend save failed.')
+    }
     setShowCreate(false)
     navigate(`/company/${company.id}`)
   }
 
-  const remove = () => {
+  const remove = async () => {
     const next = companies.filter(c => c.id !== deleteCompany.id)
     persist(next)
+    try {
+      await deleteBackendCompany(deleteCompany.id)
+      setError('')
+    } catch (err) {
+      setError(err.message || 'Company was removed on this device, but backend delete failed.')
+    }
     setDeleteCompany(null)
   }
 
@@ -280,6 +314,12 @@ export default function AdminDashboard() {
         </header>
 
         <main className="flex-1 p-8 space-y-6 animate-fade-in">
+          {error && (
+            <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-medium text-amber-800">
+              {error}
+            </div>
+          )}
+
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div className="card p-5">
               <div className="text-slate-500 text-sm">Companies</div>
@@ -295,7 +335,12 @@ export default function AdminDashboard() {
             </div>
           </div>
 
-          {companies.length === 0 ? (
+          {loading ? (
+            <div className="card p-12 text-center">
+              <div className="text-slate-900 font-bold text-lg">Loading companies...</div>
+              <p className="text-slate-500 text-sm mt-1">Checking the shared backend workspace.</p>
+            </div>
+          ) : companies.length === 0 ? (
             <div className="card p-12 text-center">
               <Building2 size={42} className="text-slate-300 mx-auto mb-4" />
               <div className="text-slate-900 font-bold text-lg">No companies yet</div>

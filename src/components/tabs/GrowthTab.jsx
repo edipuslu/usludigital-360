@@ -1,36 +1,42 @@
 import { useState, useEffect } from 'react'
-import { TrendingUp, Users, Share2, Calendar, Download, Loader, Trash2 } from 'lucide-react'
+import { Loader, LogIn, Trash2 } from 'lucide-react'
 import { SectionHeader, PlatformIcon } from '../ui/UIKit'
-import { backendUrl, getConnections } from '../../lib/backendApi'
+import { backendUrl, deleteConnection, getConnections } from '../../lib/backendApi'
 
 const PLATFORMS_CONFIG = {
   instagram: {
     label: 'Instagram',
     color: '#E1306C',
     bg: '#FDE8F1',
-    description: 'Track followers, posts, and engagement'
+    description: 'Login with Meta to connect the Instagram Business account.',
+    oauth: true,
+    cta: 'Login with Instagram'
   },
   facebook: {
     label: 'Facebook',
     color: '#1877F2',
     bg: '#E8F1FD',
-    description: 'Monitor page metrics and interactions'
+    description: 'Login with Meta to connect the Facebook Page.',
+    oauth: true,
+    cta: 'Login with Facebook'
   },
   youtube: {
     label: 'YouTube',
     color: '#FF0000',
     bg: '#FFE8E8',
-    description: 'Track channel growth and views'
+    description: 'YouTube OAuth is not connected in this build yet.',
+    oauth: false,
+    cta: 'Coming soon'
   }
 }
 
-function PlatformCard({ platform, isConnected, onConnect, onDisconnect, companyId }) {
+function PlatformCard({ platform, isConnected, onDisconnect, companyId }) {
   const config = PLATFORMS_CONFIG[platform]
   const [loading, setLoading] = useState(false)
 
   const handleConnect = async () => {
+    if (!config.oauth) return
     setLoading(true)
-    // Redirect to OAuth flow
     window.location.href = backendUrl(`/oauth/${platform}/authorize?company_id=${encodeURIComponent(companyId)}&redirect_uri=${encodeURIComponent(window.location.href)}`)
   }
 
@@ -54,6 +60,7 @@ function PlatformCard({ platform, isConnected, onConnect, onDisconnect, companyI
           </div>
           <button
             onClick={onDisconnect}
+            title={`Disconnect ${config.label}`}
             className="p-2 hover:bg-red-50 rounded-lg cursor-pointer transition-colors text-red-500"
           >
             <Trash2 size={16} />
@@ -62,12 +69,12 @@ function PlatformCard({ platform, isConnected, onConnect, onDisconnect, companyI
       ) : (
         <button
           onClick={handleConnect}
-          disabled={loading}
+          disabled={loading || !config.oauth}
           className="text-white font-semibold py-2 px-6 rounded-lg text-sm flex items-center gap-2 disabled:opacity-50"
-          style={{ backgroundColor: config.color }}
+          style={{ backgroundColor: config.oauth ? config.color : '#64748B' }}
         >
-          {loading ? <Loader size={14} className="animate-spin" /> : '✓'}
-          {loading ? 'Connecting...' : 'Connect'}
+          {loading ? <Loader size={14} className="animate-spin" /> : <LogIn size={14} />}
+          {loading ? 'Opening login...' : config.cta}
         </button>
       )}
     </div>
@@ -99,6 +106,9 @@ export default function GrowthTab({ company }) {
   }
 
   const handleDisconnect = async (platform) => {
+    await deleteConnection(company.id, platform).catch(err => {
+      console.error('Failed to disconnect platform:', err)
+    })
     setConnections(prev => {
       const newConns = { ...prev }
       delete newConns[platform]
@@ -136,7 +146,6 @@ export default function GrowthTab({ company }) {
             key={platform}
             platform={platform}
             isConnected={!!connections[platform]}
-            onConnect={() => {}}
             onDisconnect={() => handleDisconnect(platform)}
             companyId={company.id}
           />
@@ -146,7 +155,7 @@ export default function GrowthTab({ company }) {
       {!allConnected && (
         <div className="card p-6 bg-blue-50 border-blue-200">
           <div className="text-blue-900 text-sm leading-relaxed">
-            <strong>📊 Getting Started:</strong> Click "Connect" on any platform above. You'll be redirected to sign in. Once authorized, we'll sync your real data automatically every day.
+            <strong>Getting Started:</strong> Click the Instagram or Facebook login button above. You will sign in with Meta, choose the Page/Instagram Business account, then return here connected.
           </div>
         </div>
       )}
