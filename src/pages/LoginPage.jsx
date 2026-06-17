@@ -60,7 +60,7 @@ export default function LoginPage() {
         />
 
         <div className="relative z-10 flex flex-col h-full">
-          <div className="flex items-center gap-3 mb-16">
+          <div className="flex items-center gap-3 mb-8">
             <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-blue-500 to-blue-700 flex items-center justify-center shadow-glow-blue">
               <Zap size={20} className="text-white" fill="white" />
             </div>
@@ -73,42 +73,8 @@ export default function LoginPage() {
             </div>
           </div>
 
-          <div className="flex-1">
-            <div className="mb-3">
-              <span className="inline-flex items-center gap-1.5 bg-blue-600/15 border border-blue-500/30 rounded-full px-3 py-1 text-blue-400 text-xs font-medium">
-                <span className="w-1.5 h-1.5 rounded-full bg-blue-400 animate-pulse-slow" />
-                AI-Powered Automation
-              </span>
-            </div>
-            <h1 className="text-4xl font-bold text-white leading-tight mb-4">
-              The smartest way to<br />
-              <span className="text-transparent bg-clip-text" style={{ backgroundImage: 'linear-gradient(135deg, #60A5FA 0%, #818CF8 100%)' }}>
-                run social support
-              </span>
-            </h1>
-            <p className="text-slate-400 text-base leading-relaxed mb-10 max-w-md">
-              Connect Instagram, Facebook, YouTube, and WhatsApp, then manage AI replies, automation, and alerts from one workspace.
-            </p>
-
-            <div className="space-y-5 mb-10">
-              <Feature icon={Brain} title="Context-Aware AI Replies" desc="AI trained on your actual products, tone and goals — never generic responses." />
-              <Feature icon={Zap} title="Multi-Platform Automation" desc="Instagram, Facebook, YouTube and WhatsApp — managed simultaneously in one workspace." />
-              <Feature icon={BarChart3} title="Real-Time Analytics" desc="Track replies, WhatsApp clicks, response rates and conversions with live dashboards." />
-              <Feature icon={Shield} title="Strict Guardrails" desc="AI never invents prices, products or promises. Falls back to WhatsApp when uncertain." />
-            </div>
-
-            <div className="mt-12 rounded-xl overflow-hidden border border-blue-500/20">
-              <img src="/images/IMAGE_homepage.png" alt="Usludigital 360 Dashboard" className="w-full h-auto object-cover" />
-            </div>
-          </div>
-
-          <div className="flex items-center gap-6">
-            {['Instagram', 'Facebook', 'YouTube', 'WhatsApp'].map(platform => (
-              <div key={platform}>
-                <div className="text-white text-xl font-bold">Ready</div>
-                <div className="text-slate-500 text-xs">{platform}</div>
-              </div>
-            ))}
+          <div className="flex-1 flex items-center justify-center">
+            <img src="/images/IMAGE_homepage.png" alt="Usludigital 360 Dashboard" className="w-full h-auto object-contain rounded-xl" />
           </div>
         </div>
       </div>
