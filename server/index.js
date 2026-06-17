@@ -695,7 +695,7 @@ export async function appHandler(req, res) {
       return json(res, 200, { ok: true, service: 'usludigital-360-api' })
     }
 
-    const oauthAuthorize = url.pathname.match(/^\/oauth\/([^/]+)\/authorize$/)
+    const oauthAuthorize = url.pathname.match(/^\/(?:api\/)?oauth\/([^/]+)\/authorize$/)
     if (req.method === 'GET' && oauthAuthorize) {
       const platform = oauthAuthorize[1]
       if (platform !== 'instagram' && platform !== 'facebook') {
@@ -727,7 +727,7 @@ export async function appHandler(req, res) {
       return redirect(res, authUrl.toString())
     }
 
-    const oauthCallback = url.pathname.match(/^\/oauth\/([^/]+)\/callback$/)
+    const oauthCallback = url.pathname.match(/^\/(?:api\/)?oauth\/([^/]+)\/callback$/)
     if (req.method === 'GET' && oauthCallback) {
       const platform = oauthCallback[1]
       const state = decodeState(url.searchParams.get('state'))

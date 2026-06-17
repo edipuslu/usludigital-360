@@ -4,7 +4,7 @@
   "framework": "vite",
   "rewrites": [
     { "source": "/api/(.*)", "destination": "/api" },
-    { "source": "/oauth/(.*)", "destination": "/api" },
+    { "source": "/oauth/(.*)", "destination": "/api/oauth/$1" },
     { "source": "/health", "destination": "/api" },
     { "source": "/meta/webhook", "destination": "/api" },
     { "source": "/(.*)", "destination": "/index.html" }
