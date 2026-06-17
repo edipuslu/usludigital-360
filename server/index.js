@@ -134,12 +134,35 @@ function redirect(res, location) {
   res.end()
 }
 
+function html(res, status, body) {
+  res.writeHead(status, {
+    'Content-Type': 'text/html; charset=utf-8',
+    'Access-Control-Allow-Origin': '*',
+  })
+  res.end(body)
+}
+
+function escapeHtml(value) {
+  return String(value || '')
+    .replaceAll('&', '&amp;')
+    .replaceAll('<', '&lt;')
+    .replaceAll('>', '&gt;')
+    .replaceAll('"', '&quot;')
+    .replaceAll("'", '&#039;')
+}
+
 async function readBody(req) {
   const chunks = []
   for await (const chunk of req) chunks.push(chunk)
   const raw = Buffer.concat(chunks).toString('utf8')
   if (!raw) return {}
   return JSON.parse(raw)
+}
+
+async function readFormBody(req) {
+  const chunks = []
+  for await (const chunk of req) chunks.push(chunk)
+  return new URLSearchParams(Buffer.concat(chunks).toString('utf8'))
 }
 
 function baseUrlFromRequest(req) {
@@ -400,38 +423,96 @@ function listConnections(store, companyId) {
     }))
 }
 
-async function saveInstagramOAuthConnection(store, companyId, tokenData) {
-  const accessToken = tokenData.access_token
+async function getInstagramAccountOptions(accessToken) {
   const accounts = await graphGet('/me/accounts', {
     fields: 'id,name,access_token,instagram_business_account{id,username,name}',
     access_token: accessToken,
   })
 
-  const page = accounts.data?.find(account => account.instagram_business_account)
-  if (!page?.instagram_business_account?.id) {
-    throw new Error('No Instagram Business account found. Connect Instagram Business/Creator to a Facebook Page first.')
-  }
+  return (accounts.data || [])
+    .filter(account => account.instagram_business_account?.id)
+    .map(account => ({
+      pageId: account.id,
+      pageName: account.name || `Facebook Page ${account.id}`,
+      pageAccessToken: account.access_token,
+      instagram: account.instagram_business_account,
+    }))
+}
 
-  const instagram = page.instagram_business_account
-  const expiresAt = tokenData.expires_in ? new Date(Date.now() + tokenData.expires_in * 1000).toISOString() : null
+function renderInstagramAccountChooser(res, { tokenData, companyId, redirectUri, options }) {
+  const rows = options.map(option => `
+    <label class="option">
+      <input type="radio" name="page_id" value="${escapeHtml(option.pageId)}" required>
+      <span>
+        <strong>@${escapeHtml(option.instagram.username || option.instagram.name || option.instagram.id)}</strong>
+        <small>${escapeHtml(option.pageName)}</small>
+      </span>
+    </label>
+  `).join('')
+
+  return html(res, 200, `<!doctype html>
+    <html>
+      <head>
+        <meta charset="utf-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1">
+        <title>Choose Instagram account</title>
+        <style>
+          body{font-family:Inter,Arial,sans-serif;background:#f8fafc;color:#0f172a;margin:0;padding:32px}
+          .wrap{max-width:640px;margin:0 auto;background:white;border:1px solid #e2e8f0;border-radius:16px;box-shadow:0 18px 50px rgba(15,23,42,.08);overflow:hidden}
+          .head{padding:24px;border-bottom:1px solid #e2e8f0}
+          h1{font-size:22px;margin:0 0 8px}
+          p{margin:0;color:#64748b;line-height:1.5}
+          form{padding:20px 24px 24px}
+          .option{display:flex;gap:12px;align-items:center;border:1px solid #e2e8f0;border-radius:12px;padding:14px;margin-bottom:10px;cursor:pointer}
+          .option:hover{border-color:#2563eb;background:#eff6ff}
+          input[type=radio]{width:18px;height:18px}
+          strong{display:block;font-size:15px}
+          small{display:block;color:#64748b;margin-top:3px}
+          button{width:100%;border:0;background:#2563eb;color:white;font-weight:700;border-radius:10px;padding:13px 16px;margin-top:12px;cursor:pointer}
+        </style>
+      </head>
+      <body>
+        <div class="wrap">
+          <div class="head">
+            <h1>Choose the Instagram account for this company</h1>
+            <p>Select Codeclipse or the exact Instagram Business account you want to save in Usludigital 360.</p>
+          </div>
+          <form method="post" action="/api/oauth/instagram/choose">
+            <input type="hidden" name="company_id" value="${escapeHtml(companyId)}">
+            <input type="hidden" name="redirect_uri" value="${escapeHtml(redirectUri)}">
+            <input type="hidden" name="access_token" value="${escapeHtml(tokenData.access_token)}">
+            <input type="hidden" name="token_type" value="${escapeHtml(tokenData.token_type || '')}">
+            <input type="hidden" name="expires_in" value="${escapeHtml(tokenData.expires_in || '')}">
+            ${rows}
+            <button type="submit">Connect selected account</button>
+          </form>
+        </div>
+      </body>
+    </html>`)
+}
+
+function saveSelectedInstagramOAuthConnection(store, companyId, tokenData, option) {
+  const accessToken = tokenData.access_token
+  const instagram = option.instagram
+  const expiresAt = tokenData.expires_in ? new Date(Date.now() + Number(tokenData.expires_in) * 1000).toISOString() : null
 
   rememberConnection(store, companyId, 'instagram', {
     verifiedId: instagram.id,
     handle: instagram.username || instagram.name || `Instagram ${instagram.id}`,
     credentials: {
       accessToken,
-      pageId: page.id,
-      pageAccessToken: page.access_token,
+      pageId: option.pageId,
+      pageAccessToken: option.pageAccessToken,
       tokenType: tokenData.token_type,
       expiresAt,
     },
   })
 
   rememberConnection(store, companyId, 'facebook', {
-    verifiedId: page.id,
-    handle: page.name || `Facebook Page ${page.id}`,
+    verifiedId: option.pageId,
+    handle: option.pageName || `Facebook Page ${option.pageId}`,
     credentials: {
-      accessToken: page.access_token || accessToken,
+      accessToken: option.pageAccessToken || accessToken,
       userAccessToken: accessToken,
       tokenType: tokenData.token_type,
       expiresAt,
@@ -440,8 +521,19 @@ async function saveInstagramOAuthConnection(store, companyId, tokenData) {
 
   return {
     instagram,
-    page: { id: page.id, name: page.name },
+    page: { id: option.pageId, name: option.pageName },
   }
+}
+
+async function saveInstagramOAuthConnection(store, companyId, tokenData, selectedPageId = '') {
+  const accessToken = tokenData.access_token
+  const options = await getInstagramAccountOptions(accessToken)
+  if (!options.length) {
+    throw new Error('No Instagram Business account found. Connect Instagram Business/Creator to a Facebook Page first.')
+  }
+
+  const option = options.find(item => item.pageId === selectedPageId) || options[0]
+  return saveSelectedInstagramOAuthConnection(store, companyId, tokenData, option)
 }
 
 function findCompanyId(store, candidates) {
@@ -1002,11 +1094,55 @@ export async function appHandler(req, res) {
         code,
       })
 
-      const connected = await saveInstagramOAuthConnection(store, state.companyId, tokenData)
+      const options = await getInstagramAccountOptions(tokenData.access_token)
+      if (platform === 'instagram' && options.length > 1) {
+        return renderInstagramAccountChooser(res, {
+          tokenData,
+          companyId: state.companyId,
+          redirectUri: fallbackRedirect,
+          options,
+        })
+      }
+
+      const connected = options.length === 1
+        ? saveSelectedInstagramOAuthConnection(store, state.companyId, tokenData, options[0])
+        : await saveInstagramOAuthConnection(store, state.companyId, tokenData)
       await saveStore(store)
 
       const success = new URL(fallbackRedirect)
       success.searchParams.set('platform', platform)
+      success.searchParams.set('connected', 'true')
+      success.searchParams.set('instagram_id', connected.instagram.id)
+      return redirect(res, success.toString())
+    }
+
+    if (req.method === 'POST' && url.pathname === '/api/oauth/instagram/choose') {
+      const body = await readFormBody(req)
+      const companyId = body.get('company_id')
+      const selectedPageId = body.get('page_id')
+      const redirectUri = body.get('redirect_uri') || '/'
+      const accessToken = body.get('access_token')
+
+      if (!companyId || !selectedPageId || !accessToken) {
+        return json(res, 400, { error: 'Missing selected Instagram account details.' })
+      }
+      if (SUPABASE_URL && !isUuid(companyId)) {
+        return json(res, 400, { error: 'Open a real company from the dashboard and connect Instagram again.' })
+      }
+
+      const options = await getInstagramAccountOptions(accessToken)
+      const selected = options.find(option => option.pageId === selectedPageId)
+      if (!selected) return json(res, 400, { error: 'Selected Instagram account was not found in Meta response.' })
+
+      const connected = saveSelectedInstagramOAuthConnection(store, companyId, {
+        access_token: accessToken,
+        token_type: body.get('token_type') || '',
+        expires_in: body.get('expires_in') || '',
+      }, selected)
+      await saveStore(store)
+
+      const success = new URL(redirectUri)
+      success.searchParams.set('platform', 'instagram')
       success.searchParams.set('connected', 'true')
       success.searchParams.set('instagram_id', connected.instagram.id)
       return redirect(res, success.toString())
