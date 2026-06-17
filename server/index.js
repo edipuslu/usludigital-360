@@ -439,6 +439,21 @@ async function getInstagramAccountOptions(accessToken) {
     }))
 }
 
+async function getFacebookPageOptions(accessToken) {
+  const accounts = await graphGet('/me/accounts', {
+    fields: 'id,name,access_token,fan_count,followers_count',
+    access_token: accessToken,
+  })
+
+  return (accounts.data || []).map(account => ({
+    pageId: account.id,
+    pageName: account.name || `Facebook Page ${account.id}`,
+    pageAccessToken: account.access_token,
+    followers: account.followers_count || account.fan_count || null,
+    pageLikes: account.fan_count || null,
+  }))
+}
+
 function renderInstagramAccountChooser(res, { tokenData, companyId, redirectUri, options }) {
   const rows = options.map(option => `
     <label class="option">
@@ -491,6 +506,58 @@ function renderInstagramAccountChooser(res, { tokenData, companyId, redirectUri,
     </html>`)
 }
 
+function renderFacebookPageChooser(res, { tokenData, companyId, redirectUri, options }) {
+  const rows = options.map(option => `
+    <label class="option">
+      <input type="radio" name="page_id" value="${escapeHtml(option.pageId)}" required>
+      <span>
+        <strong>${escapeHtml(option.pageName)}</strong>
+        <small>Facebook Page ID ${escapeHtml(option.pageId)}</small>
+      </span>
+    </label>
+  `).join('')
+
+  return html(res, 200, `<!doctype html>
+    <html>
+      <head>
+        <meta charset="utf-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1">
+        <title>Choose Facebook Page</title>
+        <style>
+          body{font-family:Inter,Arial,sans-serif;background:#f8fafc;color:#0f172a;margin:0;padding:32px}
+          .wrap{max-width:640px;margin:0 auto;background:white;border:1px solid #e2e8f0;border-radius:16px;box-shadow:0 18px 50px rgba(15,23,42,.08);overflow:hidden}
+          .head{padding:24px;border-bottom:1px solid #e2e8f0}
+          h1{font-size:22px;margin:0 0 8px}
+          p{margin:0;color:#64748b;line-height:1.5}
+          form{padding:20px 24px 24px}
+          .option{display:flex;gap:12px;align-items:center;border:1px solid #e2e8f0;border-radius:12px;padding:14px;margin-bottom:10px;cursor:pointer}
+          .option:hover{border-color:#2563eb;background:#eff6ff}
+          input[type=radio]{width:18px;height:18px}
+          strong{display:block;font-size:15px}
+          small{display:block;color:#64748b;margin-top:3px}
+          button{width:100%;border:0;background:#2563eb;color:white;font-weight:700;border-radius:10px;padding:13px 16px;margin-top:12px;cursor:pointer}
+        </style>
+      </head>
+      <body>
+        <div class="wrap">
+          <div class="head">
+            <h1>Choose the Facebook Page for this company</h1>
+            <p>Select the exact Facebook Page you want to save in Usludigital 360.</p>
+          </div>
+          <form method="post" action="/api/oauth/facebook/choose">
+            <input type="hidden" name="company_id" value="${escapeHtml(companyId)}">
+            <input type="hidden" name="redirect_uri" value="${escapeHtml(redirectUri)}">
+            <input type="hidden" name="access_token" value="${escapeHtml(tokenData.access_token)}">
+            <input type="hidden" name="token_type" value="${escapeHtml(tokenData.token_type || '')}">
+            <input type="hidden" name="expires_in" value="${escapeHtml(tokenData.expires_in || '')}">
+            ${rows}
+            <button type="submit">Connect selected page</button>
+          </form>
+        </div>
+      </body>
+    </html>`)
+}
+
 function saveSelectedInstagramOAuthConnection(store, companyId, tokenData, option) {
   const accessToken = tokenData.access_token
   const instagram = option.instagram
@@ -508,6 +575,16 @@ function saveSelectedInstagramOAuthConnection(store, companyId, tokenData, optio
     },
   })
 
+  return {
+    instagram,
+    page: { id: option.pageId, name: option.pageName },
+  }
+}
+
+function saveSelectedFacebookOAuthConnection(store, companyId, tokenData, option) {
+  const accessToken = tokenData.access_token
+  const expiresAt = tokenData.expires_in ? new Date(Date.now() + Number(tokenData.expires_in) * 1000).toISOString() : null
+
   rememberConnection(store, companyId, 'facebook', {
     verifiedId: option.pageId,
     handle: option.pageName || `Facebook Page ${option.pageId}`,
@@ -520,8 +597,7 @@ function saveSelectedInstagramOAuthConnection(store, companyId, tokenData, optio
   })
 
   return {
-    instagram,
-    page: { id: option.pageId, name: option.pageName },
+    facebook: { id: option.pageId, name: option.pageName },
   }
 }
 
@@ -534,6 +610,17 @@ async function saveInstagramOAuthConnection(store, companyId, tokenData, selecte
 
   const option = options.find(item => item.pageId === selectedPageId) || options[0]
   return saveSelectedInstagramOAuthConnection(store, companyId, tokenData, option)
+}
+
+async function saveFacebookOAuthConnection(store, companyId, tokenData, selectedPageId = '') {
+  const accessToken = tokenData.access_token
+  const options = await getFacebookPageOptions(accessToken)
+  if (!options.length) {
+    throw new Error('No Facebook Page found for this Meta account.')
+  }
+
+  const option = options.find(item => item.pageId === selectedPageId) || options[0]
+  return saveSelectedFacebookOAuthConnection(store, companyId, tokenData, option)
 }
 
 function findCompanyId(store, candidates) {
@@ -776,6 +863,19 @@ function youtubeGrowthMetrics(store, companyId) {
     error: connection
       ? 'YouTube growth needs YouTube Data API credentials before live channel metrics can load.'
       : 'YouTube is not connected yet.',
+    summary: null,
+    recentPosts: [],
+  }
+}
+
+function whatsappGrowthMetrics(store, companyId) {
+  const connection = findCompanyConnection(store, companyId, 'whatsapp')
+  return {
+    platform: 'whatsapp',
+    connected: Boolean(connection),
+    error: connection
+      ? 'WhatsApp message analytics need WhatsApp Business webhook events before live growth data can load.'
+      : 'WhatsApp Business is not connected yet.',
     summary: null,
     recentPosts: [],
   }
@@ -1094,25 +1194,41 @@ export async function appHandler(req, res) {
         code,
       })
 
-      const options = await getInstagramAccountOptions(tokenData.access_token)
-      if (platform === 'instagram' && options.length > 1) {
-        return renderInstagramAccountChooser(res, {
-          tokenData,
-          companyId: state.companyId,
-          redirectUri: fallbackRedirect,
-          options,
-        })
+      let connected
+      if (platform === 'instagram') {
+        const options = await getInstagramAccountOptions(tokenData.access_token)
+        if (options.length > 1) {
+          return renderInstagramAccountChooser(res, {
+            tokenData,
+            companyId: state.companyId,
+            redirectUri: fallbackRedirect,
+            options,
+          })
+        }
+        connected = options.length === 1
+          ? saveSelectedInstagramOAuthConnection(store, state.companyId, tokenData, options[0])
+          : await saveInstagramOAuthConnection(store, state.companyId, tokenData)
+      } else {
+        const options = await getFacebookPageOptions(tokenData.access_token)
+        if (options.length > 1) {
+          return renderFacebookPageChooser(res, {
+            tokenData,
+            companyId: state.companyId,
+            redirectUri: fallbackRedirect,
+            options,
+          })
+        }
+        connected = options.length === 1
+          ? saveSelectedFacebookOAuthConnection(store, state.companyId, tokenData, options[0])
+          : await saveFacebookOAuthConnection(store, state.companyId, tokenData)
       }
-
-      const connected = options.length === 1
-        ? saveSelectedInstagramOAuthConnection(store, state.companyId, tokenData, options[0])
-        : await saveInstagramOAuthConnection(store, state.companyId, tokenData)
       await saveStore(store)
 
       const success = new URL(fallbackRedirect)
       success.searchParams.set('platform', platform)
       success.searchParams.set('connected', 'true')
-      success.searchParams.set('instagram_id', connected.instagram.id)
+      if (connected.instagram?.id) success.searchParams.set('instagram_id', connected.instagram.id)
+      if (connected.facebook?.id) success.searchParams.set('facebook_id', connected.facebook.id)
       return redirect(res, success.toString())
     }
 
@@ -1145,6 +1261,38 @@ export async function appHandler(req, res) {
       success.searchParams.set('platform', 'instagram')
       success.searchParams.set('connected', 'true')
       success.searchParams.set('instagram_id', connected.instagram.id)
+      return redirect(res, success.toString())
+    }
+
+    if (req.method === 'POST' && url.pathname === '/api/oauth/facebook/choose') {
+      const body = await readFormBody(req)
+      const companyId = body.get('company_id')
+      const selectedPageId = body.get('page_id')
+      const redirectUri = body.get('redirect_uri') || '/'
+      const accessToken = body.get('access_token')
+
+      if (!companyId || !selectedPageId || !accessToken) {
+        return json(res, 400, { error: 'Missing selected Facebook Page details.' })
+      }
+      if (SUPABASE_URL && !isUuid(companyId)) {
+        return json(res, 400, { error: 'Open a real company from the dashboard and connect Facebook again.' })
+      }
+
+      const options = await getFacebookPageOptions(accessToken)
+      const selected = options.find(option => option.pageId === selectedPageId)
+      if (!selected) return json(res, 400, { error: 'Selected Facebook Page was not found in Meta response.' })
+
+      const connected = saveSelectedFacebookOAuthConnection(store, companyId, {
+        access_token: accessToken,
+        token_type: body.get('token_type') || '',
+        expires_in: body.get('expires_in') || '',
+      }, selected)
+      await saveStore(store)
+
+      const success = new URL(redirectUri)
+      success.searchParams.set('platform', 'facebook')
+      success.searchParams.set('connected', 'true')
+      success.searchParams.set('facebook_id', connected.facebook.id)
       return redirect(res, success.toString())
     }
 
@@ -1251,13 +1399,15 @@ export async function appHandler(req, res) {
         summary: null,
       }))
       const youtube = youtubeGrowthMetrics(store, growthParams.companyId)
+      const whatsapp = whatsappGrowthMetrics(store, growthParams.companyId)
       return json(res, 200, {
         connectedPlatforms: connections.length,
         connections,
         instagram,
         facebook,
         youtube,
-        platforms: { instagram, facebook, youtube },
+        whatsapp,
+        platforms: { instagram, facebook, youtube, whatsapp },
         metrics: instagram.summary || {
           followers: 0,
           following: 0,

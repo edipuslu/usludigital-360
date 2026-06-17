@@ -1,179 +1,316 @@
-import { useState, useEffect } from 'react'
-import { BarChart3, ExternalLink, Loader, LogIn, MessageCircle, RefreshCw, Send, Trash2, TrendingUp, UserPlus, Users } from 'lucide-react'
+import { useEffect, useMemo, useState } from 'react'
+import { BarChart3, ExternalLink, Eye, FileText, Loader, LogIn, MessageCircle, RefreshCw, Trash2, UserPlus, Users } from 'lucide-react'
 import { SectionHeader, PlatformIcon } from '../ui/UIKit'
 import { backendUrl, deleteConnection, fetchGrowthMetrics, getConnections } from '../../lib/backendApi'
+
+const PLATFORM_ORDER = ['instagram', 'facebook', 'youtube', 'whatsapp']
 
 const PLATFORMS_CONFIG = {
   instagram: {
     label: 'Instagram',
     color: '#E1306C',
     bg: '#FDE8F1',
-    description: 'Connect the Instagram Business account through its linked Meta/Facebook Page.',
+    description: 'Followers, following, posts, comments, and monthly growth for the selected Instagram Business account.',
     oauth: true,
-    cta: 'Connect Instagram via Meta',
+    cta: 'Connect Instagram',
+    empty: 'Connect Instagram to load followers, following, post count, comments, and monthly progress.',
   },
   facebook: {
     label: 'Facebook',
     color: '#1877F2',
     bg: '#E8F1FD',
-    description: 'Connect the Facebook Page for page followers, posts, and comments.',
+    description: 'Followers, page likes, page posts, comments, and monthly growth for the selected Facebook Page.',
     oauth: true,
-    cta: 'Connect Facebook Page',
+    cta: 'Connect Facebook',
+    empty: 'Connect Facebook to load page followers, page likes, posts, comments, and monthly progress.',
   },
   youtube: {
     label: 'YouTube',
     color: '#FF0000',
     bg: '#FFE8E8',
-    description: 'YouTube growth is prepared, but OAuth/API credentials are not connected yet.',
+    description: 'Subscribers, videos, comments, and channel growth will appear here after YouTube OAuth is added.',
     oauth: false,
-    cta: 'Coming soon',
+    cta: 'Setup not ready',
+    empty: 'YouTube connection is visible here, but YouTube OAuth/API is not added yet.',
+  },
+  whatsapp: {
+    label: 'WhatsApp',
+    color: '#25D366',
+    bg: '#E8FBF0',
+    description: 'DM volume and message activity for WhatsApp Business will appear here after webhook data arrives.',
+    oauth: false,
+    cta: 'Setup in Platforms',
+    empty: 'Connect WhatsApp Business in Platforms first. Growth needs webhook messages before analytics can load.',
   },
 }
 
-function PlatformCard({ platform, isConnected, accounts, onDisconnect, companyId }) {
-  const config = PLATFORMS_CONFIG[platform]
-  const [loading, setLoading] = useState(false)
+const formatNumber = value => Number(value || 0).toLocaleString()
 
-  const handleConnect = async () => {
-    if (!config.oauth) return
-    setLoading(true)
-    window.location.href = backendUrl(`/api/oauth/${platform}/authorize?company_id=${encodeURIComponent(companyId)}&redirect_uri=${encodeURIComponent(window.location.href)}`)
+function platformStats(platform, data) {
+  const summary = data?.summary
+  const profile = data?.profile || {}
+
+  if (!summary) {
+    return [
+      { key: 'followers', label: platform === 'youtube' ? 'Subscribers' : 'Followers', value: '0', icon: Users, muted: 'Not loaded yet' },
+      { key: 'following', label: platform === 'facebook' ? 'Page likes' : platform === 'whatsapp' ? 'Contacts' : 'Following', value: '0', icon: UserPlus, muted: 'Not loaded yet' },
+      { key: 'posts', label: platform === 'youtube' ? 'Videos' : platform === 'whatsapp' ? 'Messages' : 'Posts', value: '0', icon: FileText, muted: 'Not loaded yet' },
+      { key: 'comments', label: platform === 'whatsapp' ? 'DMs' : 'Comments', value: '0', icon: MessageCircle, muted: 'Not loaded yet' },
+    ]
   }
 
-  return (
-    <div className="card p-5" style={{ borderLeft: `4px solid ${config.color}` }}>
-      <div className="flex items-start justify-between gap-4">
-        <div className="flex items-center gap-4 min-w-0">
-          <div className="w-11 h-11 rounded-lg flex items-center justify-center flex-shrink-0" style={{ backgroundColor: config.bg }}>
-            <PlatformIcon platform={platform} size={22} connected={true} />
-          </div>
-          <div className="min-w-0">
-            <h3 className="text-slate-900 font-bold text-sm">{config.label}</h3>
-            <p className="text-slate-500 text-xs mt-1 leading-relaxed">{config.description}</p>
-            {accounts.length > 0 && (
-              <div className="mt-3 space-y-1">
-                {accounts.map(account => (
-                  <div key={`${account.platform}-${account.externalId}`} className="text-xs text-slate-600 truncate">
-                    Connected: <span className="font-semibold">{account.handle || account.externalId}</span>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-        </div>
-
-        {isConnected ? (
-          <button
-            onClick={onDisconnect}
-            title={`Disconnect ${config.label}`}
-            className="p-2 hover:bg-red-50 rounded-lg cursor-pointer transition-colors text-red-500 flex-shrink-0"
-          >
-            <Trash2 size={16} />
-          </button>
-        ) : (
-          <button
-            onClick={handleConnect}
-            disabled={loading || !config.oauth}
-            className="text-white font-semibold py-2 px-4 rounded-lg text-xs flex items-center gap-2 disabled:opacity-50 flex-shrink-0"
-            style={{ backgroundColor: config.oauth ? config.color : '#64748B' }}
-          >
-            {loading ? <Loader size={14} className="animate-spin" /> : <LogIn size={14} />}
-            {loading ? 'Opening...' : config.cta}
-          </button>
-        )}
-      </div>
-    </div>
-  )
+  return [
+    {
+      key: 'followers',
+      label: platform === 'youtube' ? 'Subscribers' : 'Followers',
+      value: formatNumber(summary.followers),
+      icon: Users,
+      muted: profile.username ? `@${profile.username}` : profile.name || 'Connected account',
+    },
+    {
+      key: 'following',
+      label: platform === 'facebook' ? 'Page likes' : platform === 'whatsapp' ? 'Contacts' : 'Following',
+      value: formatNumber(summary.following ?? summary.pageLikes ?? 0),
+      icon: UserPlus,
+      muted: platform === 'instagram' ? 'Accounts followed' : platform === 'facebook' ? 'Page likes' : 'Available after connection',
+    },
+    {
+      key: 'posts',
+      label: platform === 'youtube' ? 'Videos' : platform === 'whatsapp' ? 'Messages' : 'Posts',
+      value: formatNumber(summary.totalPosts ?? profile.totalPosts ?? summary.postsThisMonth ?? 0),
+      icon: FileText,
+      change: summary.postsChange,
+      muted: `${formatNumber(summary.postsThisMonth)} this month`,
+    },
+    {
+      key: 'comments',
+      label: platform === 'whatsapp' ? 'DMs' : 'Comments',
+      value: formatNumber(summary.commentsThisMonth),
+      icon: MessageCircle,
+      change: summary.commentsChange,
+      muted: `vs ${summary.previousMonthLabel || 'previous month'}`,
+    },
+  ]
 }
 
-function StatCard({ icon: Icon, label, value, change, muted }) {
-  const numericChange = Number(change || 0)
+function MetricButton({ stat, color, active, onClick }) {
+  const Icon = stat.icon
+  const numericChange = Number(stat.change || 0)
+
   return (
-    <div className="card p-5">
+    <button
+      type="button"
+      onClick={onClick}
+      className={`text-left rounded-lg border p-4 transition-all cursor-pointer focus:outline-none focus:ring-2 focus:ring-offset-2 ${active ? 'bg-white shadow-sm' : 'bg-slate-50 hover:bg-white hover:border-slate-300'}`}
+      style={{ borderColor: active ? color : undefined, '--tw-ring-color': color }}
+    >
       <div className="flex items-center justify-between gap-3">
-        <div className="w-10 h-10 rounded-lg bg-slate-100 flex items-center justify-center text-slate-600">
+        <div className="w-10 h-10 rounded-lg bg-white border border-slate-200 flex items-center justify-center text-slate-600">
           <Icon size={18} />
         </div>
-        {change !== undefined && (
+        {stat.change !== undefined && (
           <div className={numericChange >= 0 ? 'text-emerald-600 text-xs font-bold' : 'text-red-600 text-xs font-bold'}>
             {numericChange >= 0 ? '+' : ''}{numericChange}
           </div>
         )}
       </div>
-      <div className="text-2xl font-bold text-slate-900 mt-4">{value}</div>
-      <div className="text-slate-500 text-sm mt-1">{label}</div>
-      {muted && <div className="text-slate-400 text-xs mt-2">{muted}</div>}
-    </div>
+      <div className="text-2xl font-bold text-slate-900 mt-4">{stat.value}</div>
+      <div className="text-slate-600 text-sm font-semibold mt-1">{stat.label}</div>
+      {stat.muted && <div className="text-slate-400 text-xs mt-2 truncate">{stat.muted}</div>}
+    </button>
   )
 }
 
-function AnalyticsPanel({ platform, data }) {
+function DetailPanel({ platform, type, data }) {
   const config = PLATFORMS_CONFIG[platform]
   const summary = data?.summary
   const profile = data?.profile || {}
   const recentPosts = data?.recentPosts || []
-  const formatNumber = value => Number(value || 0).toLocaleString()
+
+  if (!summary) {
+    return (
+      <div className="rounded-lg border border-slate-200 bg-white p-5">
+        <div className="text-slate-900 font-bold text-sm">{config.label} {type} details</div>
+        <p className="text-slate-500 text-sm mt-1">{data?.error || config.empty}</p>
+      </div>
+    )
+  }
+
+  if (type === 'followers' || type === 'following') {
+    const count = type === 'followers' ? summary.followers : summary.following ?? summary.pageLikes ?? 0
+    const label = type === 'followers'
+      ? platform === 'youtube' ? 'Subscribers' : 'Followers'
+      : platform === 'facebook' ? 'Page likes' : platform === 'whatsapp' ? 'Contacts' : 'Following'
+
+    return (
+      <div className="rounded-lg border border-slate-200 bg-white p-5">
+        <div className="flex items-center justify-between gap-4">
+          <div>
+            <div className="text-slate-900 font-bold text-sm">{label}</div>
+            <div className="text-slate-500 text-sm mt-1">{profile.username ? `@${profile.username}` : profile.name || config.label}</div>
+          </div>
+          <div className="text-2xl font-bold text-slate-900">{formatNumber(count)}</div>
+        </div>
+        <div className="mt-4 rounded-lg bg-slate-50 border border-slate-200 p-4 text-sm text-slate-600">
+          {platform === 'instagram' || platform === 'facebook'
+            ? 'Meta gives the count here. It does not provide the full list of individual followers through this API.'
+            : 'The account list will appear here when this platform analytics API is connected.'}
+        </div>
+      </div>
+    )
+  }
+
+  if (type === 'comments') {
+    return (
+      <div className="rounded-lg border border-slate-200 bg-white p-5">
+        <div className="flex items-center justify-between gap-4 mb-4">
+          <div>
+            <div className="text-slate-900 font-bold text-sm">{platform === 'whatsapp' ? 'DMs' : 'Comments'} this month</div>
+            <div className="text-slate-500 text-sm mt-1">{formatNumber(summary.commentsThisMonth)} total across this month&apos;s content</div>
+          </div>
+          <MessageCircle size={18} className="text-slate-400" />
+        </div>
+        {recentPosts.length === 0 ? (
+          <div className="py-8 text-center text-slate-500 text-sm">No comment details found for this month yet.</div>
+        ) : (
+          <div className="space-y-3">
+            {recentPosts.map(post => (
+              <PostRow key={post.id} post={post} platform={platform} showFocus="comments" />
+            ))}
+          </div>
+        )}
+      </div>
+    )
+  }
 
   return (
-    <div className="space-y-4">
-      <div className="flex items-center gap-2">
-        <PlatformIcon platform={platform} size={18} connected={Boolean(summary)} />
-        <h3 className="text-slate-900 font-bold text-base">{config.label} analytics</h3>
+    <div className="rounded-lg border border-slate-200 bg-white p-5">
+      <div className="flex items-center justify-between gap-4 mb-4">
+        <div>
+          <div className="text-slate-900 font-bold text-sm">{platform === 'youtube' ? 'Videos' : platform === 'whatsapp' ? 'Messages' : 'Posts'} this month</div>
+          <div className="text-slate-500 text-sm mt-1">{formatNumber(summary.postsThisMonth)} this month, {formatNumber(summary.postsPreviousMonth)} last month</div>
+        </div>
+        <BarChart3 size={18} className="text-slate-400" />
       </div>
-
-      {summary ? (
-        <>
-          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-5 gap-4">
-            <StatCard icon={Users} label="Followers" value={formatNumber(summary.followers)} muted={profile.username ? `@${profile.username}` : profile.name || ''} />
-            <StatCard icon={UserPlus} label={platform === 'instagram' ? 'Following' : 'Page likes'} value={formatNumber(summary.following ?? summary.pageLikes ?? 0)} />
-            <StatCard icon={Send} label={`Posts in ${summary.currentMonthLabel}`} value={formatNumber(summary.postsThisMonth)} change={summary.postsChange} muted={`Total posts: ${formatNumber(summary.totalPosts ?? profile.totalPosts ?? 0)}`} />
-            <StatCard icon={MessageCircle} label={`Comments in ${summary.currentMonthLabel}`} value={formatNumber(summary.commentsThisMonth)} change={summary.commentsChange} muted={`vs ${summary.previousMonthLabel}`} />
-            <StatCard icon={TrendingUp} label="Engagement rate" value={`${summary.engagementRate}%`} muted="likes plus comments divided by followers" />
-          </div>
-
-          <div className="card p-6">
-            <div className="flex items-center justify-between gap-4 mb-5">
-              <div>
-                <h4 className="text-slate-900 font-bold text-sm flex items-center gap-2">
-                  <BarChart3 size={16} className="text-slate-400" /> This month posts
-                </h4>
-                <p className="text-slate-500 text-sm mt-1">Latest posts with likes and comments for month-end progress review.</p>
-              </div>
-              {summary.lastSync && <div className="text-slate-400 text-xs">Last sync {new Date(summary.lastSync).toLocaleString()}</div>}
-            </div>
-
-            {recentPosts.length === 0 ? (
-              <div className="py-10 text-center text-slate-500 text-sm">No posts found for this month yet.</div>
-            ) : (
-              <div className="space-y-3">
-                {recentPosts.map(post => (
-                  <div key={post.id} className="flex items-center justify-between gap-4 rounded-lg border border-slate-200 p-4">
-                    <div className="min-w-0">
-                      <div className="text-slate-800 text-sm font-semibold truncate">{post.caption || post.mediaType || `${config.label} post`}</div>
-                      <div className="text-slate-400 text-xs mt-1">{new Date(post.timestamp).toLocaleDateString()}</div>
-                    </div>
-                    <div className="flex items-center gap-4 text-sm text-slate-600 flex-shrink-0">
-                      <span>{formatNumber(post.likes)} likes</span>
-                      <span>{formatNumber(post.comments)} comments</span>
-                      {post.permalink && (
-                        <a href={post.permalink} target="_blank" rel="noreferrer" className="text-blue-600 hover:text-blue-700">
-                          <ExternalLink size={16} />
-                        </a>
-                      )}
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-        </>
+      {recentPosts.length === 0 ? (
+        <div className="py-8 text-center text-slate-500 text-sm">No posts found for this month yet.</div>
       ) : (
-        <div className="card p-6">
-          <div className="text-slate-900 font-bold text-sm">No {config.label} growth data yet</div>
-          <p className="text-slate-500 text-sm mt-1">{data?.error || `Connect ${config.label} to show growth data.`}</p>
+        <div className="space-y-3">
+          {recentPosts.map(post => (
+            <PostRow key={post.id} post={post} platform={platform} />
+          ))}
         </div>
       )}
     </div>
+  )
+}
+
+function PostRow({ post, platform, showFocus }) {
+  const title = post.caption || post.mediaType || `${PLATFORMS_CONFIG[platform].label} post`
+
+  return (
+    <div className="flex items-center justify-between gap-4 rounded-lg border border-slate-200 p-4">
+      <div className="min-w-0">
+        <div className="text-slate-800 text-sm font-semibold truncate">{title}</div>
+        <div className="text-slate-400 text-xs mt-1">{post.timestamp ? new Date(post.timestamp).toLocaleDateString() : 'No date'}</div>
+      </div>
+      <div className="flex items-center gap-4 text-sm text-slate-600 flex-shrink-0">
+        {showFocus !== 'comments' && <span>{formatNumber(post.likes)} likes</span>}
+        <span>{formatNumber(post.comments)} comments</span>
+        {post.permalink && (
+          <a href={post.permalink} target="_blank" rel="noreferrer" className="text-blue-600 hover:text-blue-700" title="Open post">
+            <ExternalLink size={16} />
+          </a>
+        )}
+      </div>
+    </div>
+  )
+}
+
+function PlatformSection({ platform, data, accounts, companyId, activeDetail, onDetailChange, onDisconnect }) {
+  const config = PLATFORMS_CONFIG[platform]
+  const [loading, setLoading] = useState(false)
+  const isConnected = accounts.length > 0 || Boolean(data?.connected)
+  const stats = platformStats(platform, data)
+
+  const handleConnect = () => {
+    if (!config.oauth) {
+      onDetailChange(platform, 'posts')
+      return
+    }
+    setLoading(true)
+    window.location.href = backendUrl(`/api/oauth/${platform}/authorize?company_id=${encodeURIComponent(companyId)}&redirect_uri=${encodeURIComponent(window.location.href)}`)
+  }
+
+  return (
+    <section className="rounded-lg border border-slate-200 bg-white overflow-hidden">
+      <div className="p-5 border-b border-slate-200" style={{ borderTop: `4px solid ${config.color}` }}>
+        <div className="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-4">
+          <div className="flex items-start gap-4 min-w-0">
+            <div className="w-12 h-12 rounded-lg flex items-center justify-center flex-shrink-0" style={{ backgroundColor: config.bg }}>
+              <PlatformIcon platform={platform} size={24} connected={isConnected} />
+            </div>
+            <div className="min-w-0">
+              <h3 className="text-slate-900 font-bold text-base">{config.label} Growth</h3>
+              <p className="text-slate-500 text-sm mt-1 leading-relaxed">{config.description}</p>
+              {accounts.length > 0 && (
+                <div className="mt-3 flex flex-wrap gap-2">
+                  {accounts.map(account => (
+                    <span key={`${account.platform}-${account.externalId}`} className="inline-flex max-w-full items-center gap-1 rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-700">
+                      <Eye size={12} className="flex-shrink-0" />
+                      <span className="truncate">{account.handle || account.externalId}</span>
+                    </span>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+
+          <div className="flex items-center gap-2 flex-shrink-0">
+            {isConnected && (
+              <button
+                type="button"
+                onClick={onDisconnect}
+                title={`Disconnect ${config.label}`}
+                className="h-10 w-10 inline-flex items-center justify-center rounded-lg border border-red-200 text-red-500 hover:bg-red-50 cursor-pointer transition-colors"
+              >
+                <Trash2 size={16} />
+              </button>
+            )}
+            <button
+              type="button"
+              onClick={handleConnect}
+              disabled={loading}
+              className="h-10 inline-flex items-center gap-2 rounded-lg px-4 text-xs font-bold text-white cursor-pointer disabled:opacity-60"
+              style={{ backgroundColor: config.oauth ? config.color : '#475569' }}
+            >
+              {loading ? <Loader size={14} className="animate-spin" /> : <LogIn size={14} />}
+              {loading ? 'Opening...' : isConnected && config.oauth ? `Reconnect ${config.label}` : config.cta}
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <div className="p-5 space-y-5">
+        <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
+          {stats.map(stat => (
+            <MetricButton
+              key={stat.key}
+              stat={stat}
+              color={config.color}
+              active={activeDetail.platform === platform && activeDetail.type === stat.key}
+              onClick={() => onDetailChange(platform, stat.key)}
+            />
+          ))}
+        </div>
+
+        <DetailPanel platform={platform} type={activeDetail.platform === platform ? activeDetail.type : 'posts'} data={data} />
+
+        {data?.summary?.lastSync && (
+          <div className="text-slate-400 text-xs">Last sync {new Date(data.summary.lastSync).toLocaleString()}</div>
+        )}
+      </div>
+    </section>
   )
 }
 
@@ -182,6 +319,7 @@ export default function GrowthTab({ company }) {
   const [growth, setGrowth] = useState(null)
   const [loading, setLoading] = useState(true)
   const [refreshing, setRefreshing] = useState(false)
+  const [activeDetail, setActiveDetail] = useState({ platform: 'instagram', type: 'posts' })
 
   useEffect(() => {
     loadConnections()
@@ -225,6 +363,13 @@ export default function GrowthTab({ company }) {
     }
   }
 
+  const platformData = useMemo(() => growth?.platforms || {
+    instagram: growth?.instagram,
+    facebook: growth?.facebook,
+    youtube: growth?.youtube,
+    whatsapp: growth?.whatsapp,
+  }, [growth])
+
   if (loading) {
     return (
       <div className="flex items-center justify-center py-16">
@@ -233,49 +378,32 @@ export default function GrowthTab({ company }) {
     )
   }
 
-  const platformData = growth?.platforms || {
-    instagram: growth?.instagram,
-    facebook: growth?.facebook,
-    youtube: growth?.youtube,
-  }
-
   return (
     <div className="space-y-8 animate-slide-in">
-      <div className="flex items-start justify-between gap-4">
+      <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
         <SectionHeader
-          title="Growth Analytics"
-          description="View followers, following/page likes, post counts, comments, and monthly progress by platform."
+          title="Growth"
+          description="Each platform is separate: connect it, view its followers, posts, comments, and open the detail behind every metric."
         />
-        <button onClick={refreshGrowth} disabled={refreshing} className="btn-secondary">
+        <button onClick={refreshGrowth} disabled={refreshing} className="btn-secondary self-start">
           <RefreshCw size={14} className={refreshing ? 'animate-spin' : ''} />
           Refresh
         </button>
       </div>
 
-      <div className="space-y-7">
-        {['instagram', 'facebook', 'youtube'].map(platform => (
-          <AnalyticsPanel key={platform} platform={platform} data={platformData?.[platform]} />
+      <div className="space-y-6">
+        {PLATFORM_ORDER.map(platform => (
+          <PlatformSection
+            key={platform}
+            platform={platform}
+            data={platformData?.[platform]}
+            accounts={connections[platform] || []}
+            companyId={company.id}
+            activeDetail={activeDetail}
+            onDetailChange={(nextPlatform, type) => setActiveDetail({ platform: nextPlatform, type })}
+            onDisconnect={() => handleDisconnect(platform)}
+          />
         ))}
-      </div>
-
-      <div className="space-y-4">
-        <div>
-          <h2 className="text-slate-900 font-bold text-lg">Growth Connections</h2>
-          <p className="text-slate-500 text-sm mt-1">Use this section only to connect, reconnect, or remove platform accounts.</p>
-        </div>
-
-        <div className="grid grid-cols-1 gap-4">
-          {Object.keys(PLATFORMS_CONFIG).map(platform => (
-            <PlatformCard
-              key={platform}
-              platform={platform}
-              accounts={connections[platform] || []}
-              isConnected={Boolean(connections[platform]?.length)}
-              onDisconnect={() => handleDisconnect(platform)}
-              companyId={company.id}
-            />
-          ))}
-        </div>
       </div>
     </div>
   )
