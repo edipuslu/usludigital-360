@@ -96,6 +96,10 @@ export default function LoginPage() {
               <Feature icon={BarChart3} title="Real-Time Analytics" desc="Track replies, WhatsApp clicks, response rates and conversions with live dashboards." />
               <Feature icon={Shield} title="Strict Guardrails" desc="AI never invents prices, products or promises. Falls back to WhatsApp when uncertain." />
             </div>
+
+            <div className="mt-12 rounded-xl overflow-hidden border border-blue-500/20">
+              <img src="/images/IMAGE_homepage.png" alt="Usludigital 360 Dashboard" className="w-full h-auto object-cover" />
+            </div>
           </div>
 
           <div className="flex items-center gap-6">
