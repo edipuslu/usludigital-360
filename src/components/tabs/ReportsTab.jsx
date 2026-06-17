@@ -351,7 +351,7 @@ function ReportSchedule() {
   )
 }
 
-export default function ReportsTab({ company, isAdmin, onUpdate, onNotify }) {
+export default function ReportsTab({ company, isAdmin = true, onUpdate, onNotify }) {
   const [generating, setGenerating] = useState(false)
   const [cooldown, setCooldown] = useState(0)
 

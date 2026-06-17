@@ -227,7 +227,7 @@ function PostRow({ post, platform, showFocus }) {
   )
 }
 
-function PlatformSection({ platform, data, accounts, companyId, activeDetail, onDetailChange, onDisconnect }) {
+function PlatformSection({ platform, data, accounts, companyId, activeDetail, onDetailChange, onDisconnect, isAdmin = true }) {
   const config = PLATFORMS_CONFIG[platform]
   const [loading, setLoading] = useState(false)
   const isConnected = accounts.length > 0 || Boolean(data?.connected)
@@ -266,28 +266,30 @@ function PlatformSection({ platform, data, accounts, companyId, activeDetail, on
             </div>
           </div>
 
-          <div className="flex items-center gap-2 flex-shrink-0">
-            {isConnected && (
+          {isAdmin && (
+            <div className="flex items-center gap-2 flex-shrink-0">
+              {isConnected && (
+                <button
+                  type="button"
+                  onClick={onDisconnect}
+                  title={`Disconnect ${config.label}`}
+                  className="h-10 w-10 inline-flex items-center justify-center rounded-lg border border-red-200 text-red-500 hover:bg-red-50 cursor-pointer transition-colors"
+                >
+                  <Trash2 size={16} />
+                </button>
+              )}
               <button
                 type="button"
-                onClick={onDisconnect}
-                title={`Disconnect ${config.label}`}
-                className="h-10 w-10 inline-flex items-center justify-center rounded-lg border border-red-200 text-red-500 hover:bg-red-50 cursor-pointer transition-colors"
+                onClick={handleConnect}
+                disabled={loading}
+                className="h-10 inline-flex items-center gap-2 rounded-lg px-4 text-xs font-bold text-white cursor-pointer disabled:opacity-60"
+                style={{ backgroundColor: config.oauth ? config.color : '#475569' }}
               >
-                <Trash2 size={16} />
+                {loading ? <Loader size={14} className="animate-spin" /> : <LogIn size={14} />}
+                {loading ? 'Opening...' : isConnected && config.oauth ? `Reconnect ${config.label}` : config.cta}
               </button>
-            )}
-            <button
-              type="button"
-              onClick={handleConnect}
-              disabled={loading}
-              className="h-10 inline-flex items-center gap-2 rounded-lg px-4 text-xs font-bold text-white cursor-pointer disabled:opacity-60"
-              style={{ backgroundColor: config.oauth ? config.color : '#475569' }}
-            >
-              {loading ? <Loader size={14} className="animate-spin" /> : <LogIn size={14} />}
-              {loading ? 'Opening...' : isConnected && config.oauth ? `Reconnect ${config.label}` : config.cta}
-            </button>
-          </div>
+            </div>
+          )}
         </div>
       </div>
 
@@ -314,7 +316,7 @@ function PlatformSection({ platform, data, accounts, companyId, activeDetail, on
   )
 }
 
-export default function GrowthTab({ company, platform }) {
+export default function GrowthTab({ company, platform, isAdmin = true }) {
   const [connections, setConnections] = useState({})
   const [growth, setGrowth] = useState(null)
   const [loading, setLoading] = useState(true)
@@ -405,6 +407,7 @@ export default function GrowthTab({ company, platform }) {
             activeDetail={activeDetail}
             onDetailChange={(nextPlatform, type) => setActiveDetail({ platform: nextPlatform, type })}
             onDisconnect={() => handleDisconnect(plt)}
+            isAdmin={isAdmin}
           />
         ))}
       </div>

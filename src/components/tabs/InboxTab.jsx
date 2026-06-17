@@ -6,7 +6,7 @@ import clsx from 'clsx'
 const PLATFORMS = ['instagram', 'facebook', 'youtube', 'whatsapp']
 const PLATFORM_LABELS = { instagram: 'Instagram', facebook: 'Facebook', youtube: 'YouTube', whatsapp: 'WhatsApp' }
 
-function MessageCard({ msg, onReply, isReply = false }) {
+function MessageCard({ msg, onReply, isReply = false, isAdmin = true }) {
   const [showReplyBox, setShowReplyBox] = useState(false)
   const [replyText, setReplyText] = useState('')
   const [sending, setSending] = useState(false)
@@ -57,7 +57,7 @@ function MessageCard({ msg, onReply, isReply = false }) {
           ))}
         </div>
       )}
-      {!isReply && !msg.aiReplied && (
+      {!isReply && !msg.aiReplied && isAdmin && (
         <>
           {!showReplyBox ? (
             <button onClick={() => setShowReplyBox(true)} className="text-blue-600 hover:text-blue-700 text-xs font-semibold cursor-pointer flex items-center gap-1">
@@ -109,14 +109,14 @@ function PlatformSection({ platform, messages, onReply, isDM = false }) {
         </div>
       ) : (
         <div className="space-y-3">
-          {filtered.map(msg => <MessageCard key={msg.id} msg={msg} onReply={onReply} />)}
+          {filtered.map(msg => <MessageCard key={msg.id} msg={msg} onReply={onReply} isAdmin={isAdmin} />)}
         </div>
       )}
     </div>
   )
 }
 
-export default function InboxTab({ company }) {
+export default function InboxTab({ company, isAdmin = true }) {
   const [activeSection, setActiveSection] = useState('comments')
   const [messages, setMessages] = useState([
     { id: 'msg-1', platform: 'instagram', isDM: false, authorName: 'Ali K.', authorUrl: 'https://instagram.com/alik', content: 'Beautiful collection! Do you ship internationally?', date: 'Today', likes: 3, aiReplied: false, replies: [] },

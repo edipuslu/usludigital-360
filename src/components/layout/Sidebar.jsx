@@ -85,16 +85,20 @@ export default function Sidebar({ companyId, companyName, onNavigate, currentSec
 
   const [growthExpanded, setGrowthExpanded] = useState(false)
 
-  const companyNav = [
-    { icon: LayoutDashboard, label: 'Overview', key: 'overview' },
-    { icon: Globe, label: 'Platforms', key: 'platforms' },
-    { icon: Inbox, label: 'Inbox', key: 'inbox' },
-    { icon: TrendingUp, label: 'Growth', key: 'growth', submenu: true },
-    { icon: Brain, label: 'AI Training', key: 'ai-training' },
-    { icon: Zap, label: 'Automation', key: 'automation' },
-    { icon: BarChart3, label: 'Analytics', key: 'analytics' },
-    { icon: FileText, label: 'Reports', key: 'reports' },
+  // Role-based navigation
+  const allTabs = [
+    { icon: LayoutDashboard, label: 'Overview', key: 'overview', roles: ['admin', 'client'] },
+    { icon: Globe, label: 'Platforms', key: 'platforms', roles: ['admin'] },
+    { icon: Inbox, label: 'Inbox', key: 'inbox', roles: ['admin', 'client'] },
+    { icon: TrendingUp, label: 'Growth', key: 'growth', submenu: true, roles: ['admin', 'client'] },
+    { icon: Brain, label: 'AI Training', key: 'ai-training', roles: ['admin'] },
+    { icon: Zap, label: 'Automation', key: 'automation', roles: ['admin'] },
+    { icon: BarChart3, label: 'Analytics', key: 'analytics', roles: ['admin', 'client'] },
+    { icon: FileText, label: 'Reports', key: 'reports', roles: ['admin', 'client'] },
   ]
+
+  const userRole = user?.email === 'admin@usludigital.com' ? 'admin' : 'client'
+  const companyNav = allTabs.filter(tab => tab.roles.includes(userRole))
 
   const platformGrowth = [
     { icon: '📷', label: 'Instagram Growth', key: 'growth-instagram', platform: 'instagram' },
