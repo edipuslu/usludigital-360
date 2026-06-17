@@ -34,6 +34,10 @@ const DEFAULT_STORE = {
   items: [],
 }
 
+function isUuid(value) {
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(String(value || ''))
+}
+
 const emptyDaily = Array.from({ length: 30 }, (_, i) => ({ day: i + 1, date: `Day ${i + 1}`, clicks: 0, replies: 0 }))
 const emptyHeatmap = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'].map(day => ({
   day,
@@ -711,6 +715,9 @@ export async function appHandler(req, res) {
       if (!companyId) {
         return json(res, 400, { error: 'company_id is required.' })
       }
+      if (SUPABASE_URL && !isUuid(companyId)) {
+        return json(res, 400, { error: 'Open a real company from the dashboard first, then start Instagram login from Growth. The test-company link cannot be saved to Supabase.' })
+      }
 
       const callbackUrl = `${baseUrlFromRequest(req)}/api/oauth/${platform}/callback`
       const state = encodeState({
@@ -745,6 +752,9 @@ export async function appHandler(req, res) {
 
       if (!code || !state.companyId) {
         return json(res, 400, { error: 'OAuth callback is missing code or company state.' })
+      }
+      if (SUPABASE_URL && !isUuid(state.companyId)) {
+        return json(res, 400, { error: 'This OAuth login used a test company ID. Open a real company from the dashboard and click Login with Instagram again.' })
       }
 
       const appId = process.env.META_APP_ID
