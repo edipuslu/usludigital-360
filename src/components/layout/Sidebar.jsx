@@ -83,15 +83,24 @@ export default function Sidebar({ companyId, companyName, onNavigate, currentSec
     navigate('/login')
   }
 
+  const [growthExpanded, setGrowthExpanded] = useState(false)
+
   const companyNav = [
     { icon: LayoutDashboard, label: 'Overview', key: 'overview' },
     { icon: Globe, label: 'Platforms', key: 'platforms' },
     { icon: Inbox, label: 'Inbox', key: 'inbox' },
-    { icon: TrendingUp, label: 'Growth', key: 'growth' },
+    { icon: TrendingUp, label: 'Growth', key: 'growth', submenu: true },
     { icon: Brain, label: 'AI Training', key: 'ai-training' },
     { icon: Zap, label: 'Automation', key: 'automation' },
     { icon: BarChart3, label: 'Analytics', key: 'analytics' },
     { icon: FileText, label: 'Reports', key: 'reports' },
+  ]
+
+  const platformGrowth = [
+    { icon: '📷', label: 'Instagram Growth', key: 'growth-instagram', platform: 'instagram' },
+    { icon: '👥', label: 'Facebook Growth', key: 'growth-facebook', platform: 'facebook' },
+    { icon: '▶️', label: 'YouTube Growth', key: 'growth-youtube', platform: 'youtube' },
+    { icon: '💬', label: 'WhatsApp Growth', key: 'growth-whatsapp', platform: 'whatsapp' },
   ]
 
   const bottomNav = [
@@ -135,14 +144,41 @@ export default function Sidebar({ companyId, companyName, onNavigate, currentSec
 
           <NavSection label="Company Dashboard" collapsed={collapsed}>
             {companyNav.map(item => (
-              <NavItem
-                key={item.key}
-                icon={item.icon}
-                label={item.label}
-                collapsed={collapsed}
-                active={currentSection === item.key}
-                onClick={() => onNavigate?.(item.key)}
-              />
+              <div key={item.key}>
+                <NavItem
+                  icon={item.icon}
+                  label={item.label}
+                  collapsed={collapsed}
+                  active={currentSection === item.key || (item.submenu && currentSection?.startsWith('growth'))}
+                  onClick={() => {
+                    if (item.submenu) {
+                      setGrowthExpanded(!growthExpanded)
+                    } else {
+                      onNavigate?.(item.key)
+                    }
+                  }}
+                />
+                {item.submenu && growthExpanded && !collapsed && (
+                  <div className="bg-white/5 rounded-lg mt-1 p-2 space-y-1 ml-2 border-l border-blue-500/20">
+                    {platformGrowth.map(platform => (
+                      <button
+                        key={platform.key}
+                        onClick={() => onNavigate?.(platform.key)}
+                        className={clsx(
+                          'w-full flex items-center gap-2 text-xs font-medium cursor-pointer transition-colors rounded px-2 py-1.5',
+                          currentSection === platform.key
+                            ? 'bg-blue-600/30 text-blue-300'
+                            : 'text-slate-400 hover:bg-white/5 hover:text-slate-200'
+                        )}
+                        title={platform.label}
+                      >
+                        <span>{platform.icon}</span>
+                        <span className="flex-1 text-left text-xs">{platform.label}</span>
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
             ))}
           </NavSection>
         </>

@@ -236,11 +236,22 @@ export default function CompanyWorkspace() {
     return null
   }
 
+  const platformMap = {
+    'growth-instagram': 'instagram',
+    'growth-facebook': 'facebook',
+    'growth-youtube': 'youtube',
+    'growth-whatsapp': 'whatsapp',
+  }
+
   const tabContent = {
     overview: <OverviewTab company={company} />,
     platforms: <PlatformsTab company={company} onUpdate={updateCompany} onNotify={addNotification} />,
     inbox: <InboxTab company={company} onNotify={addNotification} />,
     growth: <GrowthTab company={company} />,
+    'growth-instagram': <GrowthTab company={company} platform="instagram" />,
+    'growth-facebook': <GrowthTab company={company} platform="facebook" />,
+    'growth-youtube': <GrowthTab company={company} platform="youtube" />,
+    'growth-whatsapp': <GrowthTab company={company} platform="whatsapp" />,
     'ai-training': <AITrainingTab company={company} onUpdate={updateCompany} onNotify={addNotification} />,
     automation: <AutomationTab company={company} onUpdate={updateCompany} onNotify={addNotification} />,
     analytics: <AnalyticsTab company={company} />,

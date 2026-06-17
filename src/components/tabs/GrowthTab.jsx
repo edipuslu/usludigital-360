@@ -314,12 +314,12 @@ function PlatformSection({ platform, data, accounts, companyId, activeDetail, on
   )
 }
 
-export default function GrowthTab({ company }) {
+export default function GrowthTab({ company, platform }) {
   const [connections, setConnections] = useState({})
   const [growth, setGrowth] = useState(null)
   const [loading, setLoading] = useState(true)
   const [refreshing, setRefreshing] = useState(false)
-  const [activeDetail, setActiveDetail] = useState({ platform: 'instagram', type: 'posts' })
+  const [activeDetail, setActiveDetail] = useState({ platform: platform || 'instagram', type: 'posts' })
 
   useEffect(() => {
     loadConnections()
@@ -378,12 +378,15 @@ export default function GrowthTab({ company }) {
     )
   }
 
+  const platformsToShow = platform ? [platform] : PLATFORM_ORDER
+  const config = platform ? PLATFORMS_CONFIG[platform] : null
+
   return (
     <div className="space-y-8 animate-slide-in">
       <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
         <SectionHeader
-          title="Growth"
-          description="Each platform is separate: connect it, view its followers, posts, comments, and open the detail behind every metric."
+          title={platform ? `${config.label} Growth` : 'Growth'}
+          description={platform ? config.description : 'Each platform is separate: connect it, view its followers, posts, comments, and open the detail behind every metric.'}
         />
         <button onClick={refreshGrowth} disabled={refreshing} className="btn-secondary self-start">
           <RefreshCw size={14} className={refreshing ? 'animate-spin' : ''} />
@@ -392,16 +395,16 @@ export default function GrowthTab({ company }) {
       </div>
 
       <div className="space-y-6">
-        {PLATFORM_ORDER.map(platform => (
+        {platformsToShow.map(plt => (
           <PlatformSection
-            key={platform}
-            platform={platform}
-            data={platformData?.[platform]}
-            accounts={connections[platform] || []}
+            key={plt}
+            platform={plt}
+            data={platformData?.[plt]}
+            accounts={connections[plt] || []}
             companyId={company.id}
             activeDetail={activeDetail}
             onDetailChange={(nextPlatform, type) => setActiveDetail({ platform: nextPlatform, type })}
-            onDisconnect={() => handleDisconnect(platform)}
+            onDisconnect={() => handleDisconnect(plt)}
           />
         ))}
       </div>
