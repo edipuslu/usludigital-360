@@ -545,6 +545,8 @@ async function instagramGrowthMetrics(store, companyId) {
     },
     summary: {
       followers,
+      following: Number(profile.follows_count || 0),
+      totalPosts: Number(profile.media_count || 0),
       postsThisMonth: thisMonthPosts.length,
       postsPreviousMonth: previousMonthPosts.length,
       postsChange: thisMonthPosts.length - previousMonthPosts.length,
@@ -569,6 +571,121 @@ async function instagramGrowthMetrics(store, companyId) {
         permalink: item.permalink || '',
         mediaType: item.media_type || '',
       })),
+  }
+}
+
+async function fetchFacebookPosts(connection, token, previousMonthStart) {
+  const posts = []
+  let after = ''
+
+  for (let page = 0; page < 8; page += 1) {
+    const data = await graphGet(`/${connection.externalId}/posts`, {
+      fields: 'id,message,created_time,permalink_url,comments.summary(true),likes.summary(true)',
+      limit: 100,
+      after,
+      access_token: token,
+    })
+
+    const batch = data.data || []
+    posts.push(...batch)
+
+    const oldest = batch
+      .map(item => new Date(item.created_time))
+      .filter(date => !Number.isNaN(date.getTime()))
+      .sort((a, b) => a - b)[0]
+
+    after = data.paging?.cursors?.after || ''
+    if (!after || (oldest && oldest < previousMonthStart)) break
+  }
+
+  return posts
+}
+
+async function facebookGrowthMetrics(store, companyId) {
+  const connection = findCompanyConnection(store, companyId, 'facebook')
+  if (!connection) {
+    return {
+      platform: 'facebook',
+      connected: false,
+      error: 'Facebook Page is not connected yet.',
+      summary: null,
+    }
+  }
+
+  const token = connection.credentials?.accessToken
+  if (!token) {
+    return {
+      platform: 'facebook',
+      connected: true,
+      error: 'Facebook is connected, but the saved token is missing. Reconnect from Growth.',
+      summary: null,
+    }
+  }
+
+  const profile = await graphGet(`/${connection.externalId}`, {
+    fields: 'id,name,fan_count,followers_count',
+    access_token: token,
+  })
+
+  const { previousMonthStart, thisMonthStart, nextMonthStart } = monthWindows()
+  const posts = await fetchFacebookPosts(connection, token, previousMonthStart)
+  const thisMonthPosts = posts.filter(item => inRange(new Date(item.created_time), thisMonthStart, nextMonthStart))
+  const previousMonthPosts = posts.filter(item => inRange(new Date(item.created_time), previousMonthStart, thisMonthStart))
+  const commentsThisMonth = thisMonthPosts.reduce((total, item) => total + Number(item.comments?.summary?.total_count || 0), 0)
+  const commentsPreviousMonth = previousMonthPosts.reduce((total, item) => total + Number(item.comments?.summary?.total_count || 0), 0)
+  const likesThisMonth = thisMonthPosts.reduce((total, item) => total + Number(item.likes?.summary?.total_count || 0), 0)
+  const followers = Number(profile.followers_count || profile.fan_count || 0)
+
+  return {
+    platform: 'facebook',
+    connected: true,
+    error: '',
+    profile: {
+      id: profile.id,
+      name: profile.name || connection.handle,
+      followers,
+      pageLikes: Number(profile.fan_count || 0),
+    },
+    summary: {
+      followers,
+      pageLikes: Number(profile.fan_count || 0),
+      postsThisMonth: thisMonthPosts.length,
+      postsPreviousMonth: previousMonthPosts.length,
+      postsChange: thisMonthPosts.length - previousMonthPosts.length,
+      commentsThisMonth,
+      commentsPreviousMonth,
+      commentsChange: commentsThisMonth - commentsPreviousMonth,
+      likesThisMonth,
+      engagementRate: followers ? Number((((likesThisMonth + commentsThisMonth) / followers) * 100).toFixed(2)) : 0,
+      currentMonthLabel: thisMonthStart.toLocaleString('en', { month: 'long', year: 'numeric' }),
+      previousMonthLabel: previousMonthStart.toLocaleString('en', { month: 'long', year: 'numeric' }),
+      lastSync: new Date().toISOString(),
+    },
+    recentPosts: thisMonthPosts
+      .sort((a, b) => new Date(b.created_time) - new Date(a.created_time))
+      .slice(0, 8)
+      .map(item => ({
+        id: item.id,
+        caption: item.message || '',
+        timestamp: item.created_time,
+        comments: Number(item.comments?.summary?.total_count || 0),
+        likes: Number(item.likes?.summary?.total_count || 0),
+        permalink: item.permalink_url || '',
+        mediaType: 'post',
+      })),
+  }
+}
+
+function youtubeGrowthMetrics(store, companyId) {
+  const connection = findCompanyConnection(store, companyId, 'youtube')
+  return {
+    platform: 'youtube',
+    connected: Boolean(connection),
+    error: connection
+      ? 'YouTube growth needs YouTube Data API credentials before live channel metrics can load.'
+      : 'YouTube is not connected yet.',
+    summary: null,
+    recentPosts: [],
   }
 }
 
@@ -991,12 +1108,24 @@ export async function appHandler(req, res) {
         error: err.message || 'Could not load Instagram growth data.',
         summary: null,
       }))
+      const facebook = await facebookGrowthMetrics(store, growthParams.companyId).catch(err => ({
+        platform: 'facebook',
+        connected: Boolean(findCompanyConnection(store, growthParams.companyId, 'facebook')),
+        error: err.message || 'Could not load Facebook growth data.',
+        summary: null,
+      }))
+      const youtube = youtubeGrowthMetrics(store, growthParams.companyId)
       return json(res, 200, {
         connectedPlatforms: connections.length,
         connections,
         instagram,
+        facebook,
+        youtube,
+        platforms: { instagram, facebook, youtube },
         metrics: instagram.summary || {
           followers: 0,
+          following: 0,
+          totalPosts: 0,
           postsThisMonth: 0,
           postsPreviousMonth: 0,
           postsChange: 0,
