@@ -59,23 +59,8 @@ export default function LoginPage() {
           }}
         />
 
-        <div className="relative z-10 flex flex-col h-full">
-          <div className="flex items-center gap-3 mb-8">
-            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-blue-500 to-blue-700 flex items-center justify-center shadow-glow-blue">
-              <Zap size={20} className="text-white" fill="white" />
-            </div>
-            <div>
-              <div className="text-white font-bold text-lg leading-tight">Usludigital</div>
-              <div className="flex items-center gap-1.5">
-                <span className="bg-blue-600 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-md">360</span>
-                <span className="text-slate-500 text-[10px] uppercase tracking-widest font-medium">Platform</span>
-              </div>
-            </div>
-          </div>
-
-          <div className="flex-1 flex items-center justify-center">
-            <img src="/images/IMAGE_homepage.png" alt="Usludigital 360 Dashboard" className="w-full h-auto object-contain rounded-xl" />
-          </div>
+        <div className="relative z-10 flex flex-col h-full items-center justify-center">
+          <img src="/images/IMAGE_homepage.png" alt="Usludigital 360 Dashboard" className="w-full h-full object-cover rounded-xl" />
         </div>
       </div>
 
