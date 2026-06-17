@@ -37,7 +37,7 @@ function PlatformCard({ platform, isConnected, onDisconnect, companyId }) {
   const handleConnect = async () => {
     if (!config.oauth) return
     setLoading(true)
-    window.location.href = backendUrl(`/oauth/${platform}/authorize?company_id=${encodeURIComponent(companyId)}&redirect_uri=${encodeURIComponent(window.location.href)}`)
+    window.location.href = backendUrl(`/api/oauth/${platform}/authorize?company_id=${encodeURIComponent(companyId)}&redirect_uri=${encodeURIComponent(window.location.href)}`)
   }
 
   return (

@@ -712,7 +712,7 @@ export async function appHandler(req, res) {
         return json(res, 400, { error: 'company_id is required.' })
       }
 
-      const callbackUrl = `${baseUrlFromRequest(req)}/oauth/${platform}/callback`
+      const callbackUrl = `${baseUrlFromRequest(req)}/api/oauth/${platform}/callback`
       const state = encodeState({
         companyId,
         redirectUri: url.searchParams.get('redirect_uri') || '',
@@ -753,7 +753,7 @@ export async function appHandler(req, res) {
         return json(res, 500, { error: 'META_APP_ID and META_APP_SECRET are required for OAuth callback.' })
       }
 
-      const callbackUrl = `${baseUrlFromRequest(req)}/oauth/${platform}/callback`
+      const callbackUrl = `${baseUrlFromRequest(req)}/api/oauth/${platform}/callback`
       const tokenData = await graphGet('/oauth/access_token', {
         client_id: appId,
         client_secret: appSecret,
