@@ -42,12 +42,38 @@ export default function LoginPage() {
   return (
     <div className="h-screen flex overflow-hidden" style={{ background: '#060912' }}>
       {/* Left panel */}
-      <div className="hidden lg:flex w-[52%] overflow-hidden">
-        <img src="/images/IMAGE_homepage.png" alt="Usludigital 360 Dashboard" className="w-full h-full object-cover" />
+      <div className="hidden lg:flex flex-col w-[52%] relative overflow-hidden p-12">
+        <div className="relative z-10 flex flex-col h-full">
+          {/* Logo */}
+          <div className="flex items-center gap-3 mb-8">
+            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-blue-500 to-blue-700 flex items-center justify-center shadow-glow-blue">
+              <Zap size={20} className="text-white" fill="white" />
+            </div>
+            <div>
+              <div className="text-white font-bold text-lg leading-tight">Usludigital</div>
+              <div className="flex items-center gap-1.5">
+                <span className="bg-blue-600 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-md">360</span>
+                <span className="text-slate-500 text-[10px] uppercase tracking-widest font-medium">Platform</span>
+              </div>
+            </div>
+          </div>
+
+          {/* Image + Text Container */}
+          <div className="flex-1 flex items-center justify-center">
+            <img src="/images/IMAGE_homepage.png" alt="Usludigital 360 Dashboard" className="max-h-96 w-auto object-contain rounded-lg shadow-lg" />
+          </div>
+
+          {/* Footer text */}
+          <div className="mt-8">
+            <p className="text-slate-300 text-sm leading-relaxed">
+              AI-powered social media automation for Instagram, Facebook, YouTube, and WhatsApp
+            </p>
+          </div>
+        </div>
       </div>
 
       {/* Right panel */}
-      <div className="flex-1 flex items-center justify-center p-6 lg:p-12 overflow-y-auto" style={{ background: '#F8FAFC' }}>
+      <div className="flex-1 flex items-center justify-center p-6 lg:p-12" style={{ background: '#F8FAFC' }}>
         <div className="w-full max-w-md">
           <div className="lg:hidden flex items-center gap-3 mb-8">
             <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-blue-500 to-blue-700 flex items-center justify-center">
