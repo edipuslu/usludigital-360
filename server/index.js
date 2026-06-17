@@ -193,20 +193,46 @@ async function loadStore() {
       throw new Error(rows?.message || `Supabase load failed with HTTP ${response.status}`)
     }
 
-    const companiesResponse = await fetch(`${base}/rest/v1/companies?select=*&order=created_at.desc`, {
-      headers: {
-        apikey: SUPABASE_KEY,
-        Authorization: `Bearer ${SUPABASE_KEY}`,
-      },
-    })
+    const companiesResponse = await fetch(`${base}/rest/v1/companies?select=*&order=created_at.desc`, { headers })
     const companyRows = await companiesResponse.json().catch(() => [])
     if (!companiesResponse.ok) {
       throw new Error(companyRows?.message || `Supabase companies load failed with HTTP ${companiesResponse.status}`)
     }
 
+    const connectionsResponse = await fetch(`${base}/rest/v1/platform_connections?select=*&is_active=eq.true&order=created_at.desc`, { headers })
+    const connectionRows = await connectionsResponse.json().catch(() => [])
+    if (!connectionsResponse.ok && connectionsResponse.status !== 404) {
+      throw new Error(connectionRows?.message || `Supabase connections load failed with HTTP ${connectionsResponse.status}`)
+    }
+
+    const companies = Object.fromEntries(companyRows.map(row => [row.id, companyDefaults(row)]))
+    const connections = {}
+    for (const row of Array.isArray(connectionRows) ? connectionRows : []) {
+      if (!row.company_id || !row.platform || !row.account_id) continue
+      const key = connectionKey(row.platform, row.account_id)
+      if (connections[key]) continue
+      connections[key] = {
+        companyId: row.company_id,
+        platform: row.platform,
+        externalId: row.account_id,
+        handle: row.account_id,
+        credentials: { accessToken: row.access_token },
+        updatedAt: row.created_at || new Date().toISOString(),
+      }
+      if (companies[row.company_id]?.platforms?.[row.platform]) {
+        companies[row.company_id].platforms[row.platform] = {
+          ...companies[row.company_id].platforms[row.platform],
+          connected: true,
+          handle: row.account_id,
+          lastSync: row.created_at || null,
+        }
+      }
+    }
+
     return {
       ...structuredClone(DEFAULT_STORE),
-      companies: Object.fromEntries(companyRows.map(row => [row.id, companyDefaults(row)])),
+      companies,
+      connections,
     }
   }
 
@@ -274,6 +300,29 @@ async function saveStore(store) {
       const error = await upsertResponse.json().catch(() => ({}))
       throw new Error(error?.message || `Supabase companies save failed with HTTP ${upsertResponse.status}`)
     }
+
+    for (const connection of Object.values(store.connections || {})) {
+      if (!connection.companyId || !connection.platform || !connection.externalId) continue
+      await fetch(`${base}/rest/v1/platform_connections?company_id=eq.${encodeURIComponent(connection.companyId)}&platform=eq.${encodeURIComponent(connection.platform)}`, {
+        method: 'DELETE',
+        headers,
+      })
+      const connectionResponse = await fetch(`${base}/rest/v1/platform_connections`, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({
+          company_id: connection.companyId,
+          platform: connection.platform,
+          access_token: connection.credentials?.accessToken || connection.credentials?.pageAccessToken || '',
+          account_id: connection.externalId,
+          is_active: true,
+        }),
+      })
+      if (!connectionResponse.ok && connectionResponse.status !== 404) {
+        const error = await connectionResponse.json().catch(() => ({}))
+        throw new Error(error?.message || `Supabase connection save failed with HTTP ${connectionResponse.status}`)
+      }
+    }
     return
   }
 
@@ -298,6 +347,22 @@ async function deleteCompanyFromSupabase(companyId) {
   if (!response.ok && response.status !== 404) {
     const error = await response.json().catch(() => ({}))
     throw new Error(error?.message || `Supabase company delete failed with HTTP ${response.status}`)
+  }
+  return response.ok
+}
+
+async function deleteConnectionFromSupabase(companyId, platform) {
+  if (!SUPABASE_URL || !SUPABASE_KEY) return false
+  const response = await fetch(`${SUPABASE_URL.replace(/\/$/, '')}/rest/v1/platform_connections?company_id=eq.${encodeURIComponent(companyId)}&platform=eq.${encodeURIComponent(platform)}`, {
+    method: 'DELETE',
+    headers: {
+      apikey: SUPABASE_KEY,
+      Authorization: `Bearer ${SUPABASE_KEY}`,
+    },
+  })
+  if (!response.ok && response.status !== 404) {
+    const error = await response.json().catch(() => ({}))
+    throw new Error(error?.message || `Supabase connection delete failed with HTTP ${response.status}`)
   }
   return response.ok
 }
@@ -787,7 +852,9 @@ export async function appHandler(req, res) {
           connection.platform !== connectionPlatformParams.platform
         ))
       )
-      await saveStore(store)
+      if (!(await deleteConnectionFromSupabase(connectionPlatformParams.companyId, connectionPlatformParams.platform))) {
+        await saveStore(store)
+      }
       return json(res, 200, { ok: true })
     }
 
