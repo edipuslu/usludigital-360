@@ -40,32 +40,14 @@ export default function LoginPage() {
   const fillDemo = (email, password) => setForm({ email, password })
 
   return (
-    <div className="min-h-screen flex" style={{ background: '#060912' }}>
+    <div className="h-screen flex overflow-hidden" style={{ background: '#060912' }}>
       {/* Left panel */}
-      <div className="hidden lg:flex flex-col w-[52%] relative overflow-hidden p-12">
-        <div
-          className="absolute inset-0 opacity-30"
-          style={{
-            backgroundImage: `radial-gradient(circle at 20% 50%, rgba(37,99,235,0.4) 0%, transparent 50%),
-              radial-gradient(circle at 80% 20%, rgba(99,102,241,0.2) 0%, transparent 40%),
-              radial-gradient(circle at 60% 80%, rgba(37,99,235,0.15) 0%, transparent 40%)`,
-          }}
-        />
-        <div
-          className="absolute inset-0 opacity-5"
-          style={{
-            backgroundImage: `linear-gradient(rgba(37,99,235,0.5) 1px, transparent 1px), linear-gradient(90deg, rgba(37,99,235,0.5) 1px, transparent 1px)`,
-            backgroundSize: '60px 60px',
-          }}
-        />
-
-        <div className="relative z-10 flex flex-col h-full items-center justify-center">
-          <img src="/images/IMAGE_homepage.png" alt="Usludigital 360 Dashboard" className="w-full h-full object-cover rounded-xl" />
-        </div>
+      <div className="hidden lg:flex w-[52%] overflow-hidden">
+        <img src="/images/IMAGE_homepage.png" alt="Usludigital 360 Dashboard" className="w-full h-full object-cover" />
       </div>
 
       {/* Right panel */}
-      <div className="flex-1 flex items-center justify-center p-6 lg:p-12" style={{ background: '#F8FAFC' }}>
+      <div className="flex-1 flex items-center justify-center p-6 lg:p-12 overflow-y-auto" style={{ background: '#F8FAFC' }}>
         <div className="w-full max-w-md">
           <div className="lg:hidden flex items-center gap-3 mb-8">
             <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-blue-500 to-blue-700 flex items-center justify-center">
