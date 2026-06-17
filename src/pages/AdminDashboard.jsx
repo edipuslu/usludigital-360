@@ -16,7 +16,7 @@ const emptyHeatmap = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'].map(day =
 export function createCompany({ name, industry }) {
   const id = name.toLowerCase().trim().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || `company-${Date.now()}`
   return {
-    id: `${id}-${Date.now().toString(36)}`,
+    id: crypto.randomUUID ? crypto.randomUUID() : `${id}-${Date.now().toString(36)}`,
     name,
     slug: id,
     industry,

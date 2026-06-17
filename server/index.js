@@ -34,6 +34,84 @@ const DEFAULT_STORE = {
   items: [],
 }
 
+const emptyDaily = Array.from({ length: 30 }, (_, i) => ({ day: i + 1, date: `Day ${i + 1}`, clicks: 0, replies: 0 }))
+const emptyHeatmap = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'].map(day => ({
+  day,
+  hours: Array.from({ length: 24 }, (_, h) => ({ hour: h, value: 0 })),
+}))
+
+function companyDefaults(row = {}) {
+  const name = row.name || 'Company'
+  const slug = name.toLowerCase().trim().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'company'
+  return {
+    id: row.id || crypto.randomUUID(),
+    name,
+    slug,
+    industry: row.industry || '',
+    clientEmail: '',
+    clientName: '',
+    status: row.status || 'needs_update',
+    createdAt: row.created_at || row.createdAt || new Date().toISOString(),
+    initials: name.split(/\s+/).map(w => w[0]).join('').slice(0, 2).toUpperCase() || 'CO',
+    accentColor: '#2563EB',
+    platforms: {
+      instagram: { connected: false, handle: null, followers: null, lastSync: null, error: null },
+      facebook: { connected: false, handle: null, followers: null, lastSync: null, error: null },
+      youtube: { connected: false, handle: null, followers: null, lastSync: null, error: null },
+      whatsapp: { connected: false, handle: null, followers: null, lastSync: null, error: null },
+    },
+    goal: 'push_to_whatsapp',
+    whatsappLink: '',
+    aiTraining: {
+      status: 'needs_update',
+      lastTrained: null,
+      progress: 0,
+      documents: [],
+      websiteUrl: row.website_url || '',
+      guardrails: true,
+      fallbackMessage: 'For more info, please contact us directly.',
+      description: '',
+      tone: 'professional',
+    },
+    automation: {
+      instagram: { dmReply: false, commentReply: false, tone: 'professional', blacklist: [] },
+      facebook: { dmReply: false, commentReply: false, tone: 'professional', blacklist: [] },
+      youtube: { dmReply: false, commentReply: false, tone: 'professional', blacklist: [] },
+      whatsapp: { dmReply: false, commentReply: false, tone: 'professional', blacklist: [] },
+    },
+    metrics: {
+      thisMonth: {
+        totalReplies: 0,
+        waClicks: 0,
+        responseRate: 0,
+        avgReplyTime: '—',
+        change: { replies: 0, waClicks: 0, responseRate: 0, avgReplyTime: 0 },
+      },
+      byPlatform: [
+        { platform: 'Instagram', replies: 0, waClicks: 0, color: '#E1306C' },
+        { platform: 'Facebook', replies: 0, waClicks: 0, color: '#1877F2' },
+        { platform: 'YouTube', replies: 0, waClicks: 0, color: '#FF0000' },
+        { platform: 'WhatsApp', replies: 0, waClicks: 0, color: '#25D366' },
+      ],
+      daily: emptyDaily,
+      heatmap: emptyHeatmap,
+      topPosts: [],
+      funnel: { reached: 0, replied: 0, clickedWA: 0, converted: 0 },
+    },
+    reports: [],
+    notifications: [],
+    settings: {
+      workspaceName: name,
+      notificationEmail: 'admin@usludigital.com',
+      timezone: 'Africa/Casablanca',
+      adminAlerts: true,
+      clientAlerts: true,
+      monthlyReportEmail: true,
+      spikeAlerts: true,
+    },
+  }
+}
+
 function json(res, status, body) {
   res.writeHead(status, {
     'Content-Type': 'application/json',
@@ -96,18 +174,40 @@ async function graphGet(pathname, params = {}) {
 
 async function loadStore() {
   if (SUPABASE_URL && SUPABASE_KEY) {
-    const url = `${SUPABASE_URL.replace(/\/$/, '')}/rest/v1/${SUPABASE_STORE_TABLE}?id=eq.${encodeURIComponent(SUPABASE_STORE_ID)}&select=data&limit=1`
-    const response = await fetch(url, {
+    const base = SUPABASE_URL.replace(/\/$/, '')
+    const headers = {
+      apikey: SUPABASE_KEY,
+      Authorization: `Bearer ${SUPABASE_KEY}`,
+    }
+
+    const storeUrl = `${base}/rest/v1/${SUPABASE_STORE_TABLE}?id=eq.${encodeURIComponent(SUPABASE_STORE_ID)}&select=data&limit=1`
+    const response = await fetch(storeUrl, {
+      headers,
+    })
+    const rows = await response.json().catch(() => [])
+    if (response.ok) {
+      return { ...structuredClone(DEFAULT_STORE), ...(rows[0]?.data || {}) }
+    }
+
+    if (response.status !== 404) {
+      throw new Error(rows?.message || `Supabase load failed with HTTP ${response.status}`)
+    }
+
+    const companiesResponse = await fetch(`${base}/rest/v1/companies?select=*&order=created_at.desc`, {
       headers: {
         apikey: SUPABASE_KEY,
         Authorization: `Bearer ${SUPABASE_KEY}`,
       },
     })
-    const rows = await response.json().catch(() => [])
-    if (!response.ok) {
-      throw new Error(rows?.message || `Supabase load failed with HTTP ${response.status}`)
+    const companyRows = await companiesResponse.json().catch(() => [])
+    if (!companiesResponse.ok) {
+      throw new Error(companyRows?.message || `Supabase companies load failed with HTTP ${companiesResponse.status}`)
     }
-    return { ...structuredClone(DEFAULT_STORE), ...(rows[0]?.data || {}) }
+
+    return {
+      ...structuredClone(DEFAULT_STORE),
+      companies: Object.fromEntries(companyRows.map(row => [row.id, companyDefaults(row)])),
+    }
   }
 
   await mkdir(DATA_DIR, { recursive: true })
@@ -124,13 +224,17 @@ async function loadStore() {
 
 async function saveStore(store) {
   if (SUPABASE_URL && SUPABASE_KEY) {
-    const url = `${SUPABASE_URL.replace(/\/$/, '')}/rest/v1/${SUPABASE_STORE_TABLE}`
-    const response = await fetch(url, {
+    const base = SUPABASE_URL.replace(/\/$/, '')
+    const headers = {
+      apikey: SUPABASE_KEY,
+      Authorization: `Bearer ${SUPABASE_KEY}`,
+      'Content-Type': 'application/json',
+    }
+    const storeUrl = `${base}/rest/v1/${SUPABASE_STORE_TABLE}`
+    const response = await fetch(storeUrl, {
       method: 'POST',
       headers: {
-        apikey: SUPABASE_KEY,
-        Authorization: `Bearer ${SUPABASE_KEY}`,
-        'Content-Type': 'application/json',
+        ...headers,
         Prefer: 'resolution=merge-duplicates',
       },
       body: JSON.stringify({
@@ -139,9 +243,36 @@ async function saveStore(store) {
         updated_at: new Date().toISOString(),
       }),
     })
-    if (!response.ok) {
+    if (response.ok) {
+      return
+    }
+
+    if (response.status !== 404) {
       const error = await response.json().catch(() => ({}))
       throw new Error(error?.message || `Supabase save failed with HTTP ${response.status}`)
+    }
+
+    const companies = Object.values(store.companies || {})
+    if (!companies.length) return
+
+    const upsertResponse = await fetch(`${base}/rest/v1/companies`, {
+      method: 'POST',
+      headers: {
+        ...headers,
+        Prefer: 'resolution=merge-duplicates',
+      },
+      body: JSON.stringify(companies.map(company => ({
+        id: company.id,
+        name: company.name || 'Company',
+        industry: company.industry || '',
+        status: company.status || 'needs_update',
+        website_url: company.aiTraining?.websiteUrl || null,
+        created_at: company.createdAt || new Date().toISOString(),
+      }))),
+    })
+    if (!upsertResponse.ok) {
+      const error = await upsertResponse.json().catch(() => ({}))
+      throw new Error(error?.message || `Supabase companies save failed with HTTP ${upsertResponse.status}`)
     }
     return
   }
@@ -153,6 +284,22 @@ async function saveStore(store) {
 function listCompanies(store) {
   return Object.values(store.companies || {})
     .sort((a, b) => String(b.createdAt || '').localeCompare(String(a.createdAt || '')))
+}
+
+async function deleteCompanyFromSupabase(companyId) {
+  if (!SUPABASE_URL || !SUPABASE_KEY) return false
+  const response = await fetch(`${SUPABASE_URL.replace(/\/$/, '')}/rest/v1/companies?id=eq.${encodeURIComponent(companyId)}`, {
+    method: 'DELETE',
+    headers: {
+      apikey: SUPABASE_KEY,
+      Authorization: `Bearer ${SUPABASE_KEY}`,
+    },
+  })
+  if (!response.ok && response.status !== 404) {
+    const error = await response.json().catch(() => ({}))
+    throw new Error(error?.message || `Supabase company delete failed with HTTP ${response.status}`)
+  }
+  return response.ok
 }
 
 function connectionKey(platform, externalId) {
@@ -614,7 +761,9 @@ export async function appHandler(req, res) {
         Object.entries(store.connections || {}).filter(([, connection]) => connection.companyId !== companyParams.companyId)
       )
       store.items = (store.items || []).filter(item => item.companyId !== companyParams.companyId)
-      await saveStore(store)
+      if (!(await deleteCompanyFromSupabase(companyParams.companyId))) {
+        await saveStore(store)
+      }
       return json(res, 200, { ok: true })
     }
 
