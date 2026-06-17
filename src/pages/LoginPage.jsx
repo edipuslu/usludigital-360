@@ -43,7 +43,7 @@ export default function LoginPage() {
     <div className="h-screen flex overflow-hidden" style={{ background: '#060912' }}>
       {/* Left panel */}
       <div className="hidden lg:flex w-[52%] items-center justify-center overflow-hidden">
-        <img src="/images/IMAGE_homepage.png" alt="Usludigital 360 Dashboard" className="w-full h-[85vh] object-cover" />
+        <img src="/images/IMAGE_homepage.png" alt="Usludigital 360 Dashboard" className="max-h-[85vh] max-w-full object-contain" />
       </div>
 
       {/* Right panel */}
