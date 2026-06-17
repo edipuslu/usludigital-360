@@ -60,7 +60,7 @@ export default function LoginPage() {
 
           {/* Image + Text Container */}
           <div className="flex-1 flex items-center justify-center">
-            <img src="/images/IMAGE_homepage.png" alt="Usludigital 360 Dashboard" className="max-h-72 max-w-sm object-contain rounded-lg shadow-lg" />
+            <img src="/images/IMAGE_homepage.png" alt="Usludigital 360 Dashboard" className="max-h-96 max-w-lg object-contain rounded-lg shadow-lg" />
           </div>
 
           {/* Footer text */}
