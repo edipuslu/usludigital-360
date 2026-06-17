@@ -317,7 +317,7 @@ async function saveStore(store) {
         body: JSON.stringify({
           company_id: connection.companyId,
           platform: connection.platform,
-          access_token: connection.credentials?.accessToken || connection.credentials?.pageAccessToken || '',
+          access_token: connection.credentials?.pageAccessToken || connection.credentials?.accessToken || '',
           account_id: connection.externalId,
           is_active: true,
         }),
@@ -456,6 +456,120 @@ function findCompanyId(store, candidates) {
 
 function findCompanyConnection(store, companyId, platform) {
   return Object.values(store.connections).find(connection => connection.companyId === companyId && connection.platform === platform)
+}
+
+function monthWindows(now = new Date()) {
+  const thisMonthStart = new Date(now.getFullYear(), now.getMonth(), 1)
+  const nextMonthStart = new Date(now.getFullYear(), now.getMonth() + 1, 1)
+  const previousMonthStart = new Date(now.getFullYear(), now.getMonth() - 1, 1)
+  return { previousMonthStart, thisMonthStart, nextMonthStart }
+}
+
+function inRange(date, start, end) {
+  return date >= start && date < end
+}
+
+async function fetchInstagramMedia(connection, token, previousMonthStart) {
+  const media = []
+  let after = ''
+
+  for (let page = 0; page < 10; page += 1) {
+    const data = await graphGet(`/${connection.externalId}/media`, {
+      fields: 'id,caption,timestamp,comments_count,like_count,permalink,media_type',
+      limit: 100,
+      after,
+      access_token: token,
+    })
+
+    const batch = data.data || []
+    media.push(...batch)
+
+    const oldest = batch
+      .map(item => new Date(item.timestamp))
+      .filter(date => !Number.isNaN(date.getTime()))
+      .sort((a, b) => a - b)[0]
+
+    after = data.paging?.cursors?.after || ''
+    if (!after || (oldest && oldest < previousMonthStart)) break
+  }
+
+  return media
+}
+
+async function instagramGrowthMetrics(store, companyId) {
+  const connection = findCompanyConnection(store, companyId, 'instagram')
+  if (!connection) {
+    return {
+      platform: 'instagram',
+      connected: false,
+      error: 'Instagram is not connected yet.',
+      summary: null,
+    }
+  }
+
+  const token = connection.credentials?.pageAccessToken || connection.credentials?.accessToken
+  if (!token) {
+    return {
+      platform: 'instagram',
+      connected: true,
+      error: 'Instagram is connected, but the saved token is missing. Reconnect Instagram from Growth.',
+      summary: null,
+    }
+  }
+
+  const profile = await graphGet(`/${connection.externalId}`, {
+    fields: 'id,username,name,followers_count,follows_count,media_count',
+    access_token: token,
+  })
+
+  const { previousMonthStart, thisMonthStart, nextMonthStart } = monthWindows()
+  const media = await fetchInstagramMedia(connection, token, previousMonthStart)
+  const thisMonthPosts = media.filter(item => inRange(new Date(item.timestamp), thisMonthStart, nextMonthStart))
+  const previousMonthPosts = media.filter(item => inRange(new Date(item.timestamp), previousMonthStart, thisMonthStart))
+  const sum = (items, key) => items.reduce((total, item) => total + Number(item[key] || 0), 0)
+  const commentsThisMonth = sum(thisMonthPosts, 'comments_count')
+  const commentsPreviousMonth = sum(previousMonthPosts, 'comments_count')
+  const likesThisMonth = sum(thisMonthPosts, 'like_count')
+  const followers = Number(profile.followers_count || 0)
+
+  return {
+    platform: 'instagram',
+    connected: true,
+    error: '',
+    profile: {
+      id: profile.id,
+      username: profile.username || profile.name || connection.handle,
+      followers,
+      following: Number(profile.follows_count || 0),
+      totalPosts: Number(profile.media_count || 0),
+    },
+    summary: {
+      followers,
+      postsThisMonth: thisMonthPosts.length,
+      postsPreviousMonth: previousMonthPosts.length,
+      postsChange: thisMonthPosts.length - previousMonthPosts.length,
+      commentsThisMonth,
+      commentsPreviousMonth,
+      commentsChange: commentsThisMonth - commentsPreviousMonth,
+      likesThisMonth,
+      engagementRate: followers ? Number((((likesThisMonth + commentsThisMonth) / followers) * 100).toFixed(2)) : 0,
+      currentMonthLabel: thisMonthStart.toLocaleString('en', { month: 'long', year: 'numeric' }),
+      previousMonthLabel: previousMonthStart.toLocaleString('en', { month: 'long', year: 'numeric' }),
+      lastSync: new Date().toISOString(),
+    },
+    recentPosts: thisMonthPosts
+      .sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp))
+      .slice(0, 8)
+      .map(item => ({
+        id: item.id,
+        caption: item.caption || '',
+        timestamp: item.timestamp,
+        comments: Number(item.comments_count || 0),
+        likes: Number(item.like_count || 0),
+        permalink: item.permalink || '',
+        mediaType: item.media_type || '',
+      })),
+  }
 }
 
 function makePostLink(platform, value) {
@@ -871,12 +985,24 @@ export async function appHandler(req, res) {
     const growthParams = routeParams(url.pathname, '/api/companies/:companyId/growth')
     if (req.method === 'GET' && growthParams) {
       const connections = listConnections(store, growthParams.companyId)
+      const instagram = await instagramGrowthMetrics(store, growthParams.companyId).catch(err => ({
+        platform: 'instagram',
+        connected: Boolean(findCompanyConnection(store, growthParams.companyId, 'instagram')),
+        error: err.message || 'Could not load Instagram growth data.',
+        summary: null,
+      }))
       return json(res, 200, {
         connectedPlatforms: connections.length,
         connections,
-        metrics: {
+        instagram,
+        metrics: instagram.summary || {
           followers: 0,
-          posts: 0,
+          postsThisMonth: 0,
+          postsPreviousMonth: 0,
+          postsChange: 0,
+          commentsThisMonth: 0,
+          commentsPreviousMonth: 0,
+          commentsChange: 0,
           engagementRate: 0,
           lastSync: connections[0]?.updatedAt || null,
         },
