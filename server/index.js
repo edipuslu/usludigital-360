@@ -1642,7 +1642,7 @@ export async function appHandler(req, res) {
       const items = store.items.filter(item => {
         if (item.companyId !== inboxParams.companyId) return false
         return type === 'all' || item.type === type
-      })
+      }).sort((a, b) => new Date(b.receivedAt || 0) - new Date(a.receivedAt || 0))
       return json(res, 200, { items, synced: syncResult.items.length, syncErrors: syncResult.errors })
     }
 
