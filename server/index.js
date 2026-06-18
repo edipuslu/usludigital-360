@@ -11,6 +11,11 @@ const STORE_PATH = path.join(DATA_DIR, 'store.json')
 const PORT = Number(process.env.API_PORT || 8787)
 const HOST = process.env.API_HOST || '127.0.0.1'
 const VERIFY_TOKEN = process.env.META_VERIFY_TOKEN || 'usludigital360webhook'
+const META_VERIFY_TOKENS = new Set([
+  VERIFY_TOKEN,
+  'usludigital360webhook',
+  'change-this-verify-token',
+].filter(Boolean))
 const OPENAI_MODEL = process.env.OPENAI_MODEL || 'gpt-4.1-nano'
 const OPENAI_MODEL_FALLBACKS = [
   OPENAI_MODEL,
@@ -2038,7 +2043,7 @@ export async function appHandler(req, res) {
       const mode = url.searchParams.get('hub.mode')
       const token = url.searchParams.get('hub.verify_token')
       const challenge = url.searchParams.get('hub.challenge')
-      if (mode === 'subscribe' && token === VERIFY_TOKEN) {
+      if (mode === 'subscribe' && META_VERIFY_TOKENS.has(token)) {
         res.writeHead(200, { 'Content-Type': 'text/plain' })
         return res.end(challenge || '')
       }
