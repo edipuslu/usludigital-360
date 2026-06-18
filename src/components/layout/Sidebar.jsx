@@ -148,32 +148,25 @@ export default function Sidebar({ companyName, onNavigate, currentSection, notif
         </div>
       </div>
 
-      <div className="hidden w-[260px] flex-col bg-slate-50/70 px-5 py-6 lg:flex">
-        <div className="mb-6">
-          <div className="text-[11px] font-bold uppercase tracking-widest text-slate-400">Workspace</div>
-          <div className="mt-1 truncate text-xl font-bold text-slate-950">{selected?.label || 'Dashboard'}</div>
-          {companyName && <div className="mt-1 truncate text-sm text-slate-500">{companyName}</div>}
+      <div className="hidden w-[260px] flex-col bg-slate-50/70 px-7 py-7 lg:flex">
+        <div className={clsx('mb-6', !showInboxMenu && 'mb-0')}>
+          <div className="truncate text-3xl font-extrabold tracking-tight text-slate-950">
+            {selected?.label || 'Dashboard'}
+          </div>
         </div>
 
-        <div className="space-y-1">
-          {showInboxMenu ? (
-            INBOX_NAV.map(item => (
+        {showInboxMenu && (
+          <div className="space-y-1">
+            {INBOX_NAV.map(item => (
               <TextNavItem
                 key={item.key}
                 label={item.label}
                 active={currentSection === item.key}
                 onClick={() => onNavigate?.(item.key)}
               />
-            ))
-          ) : (
-            <TextNavItem
-              label={selected?.label || 'Dashboard'}
-              badge={selected?.key === 'notifications' ? notificationCount || null : null}
-              active
-              onClick={() => selected?.key && onNavigate?.(selected.key)}
-            />
-          )}
-        </div>
+            ))}
+          </div>
+        )}
       </div>
     </aside>
   )
