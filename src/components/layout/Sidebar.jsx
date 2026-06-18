@@ -102,10 +102,10 @@ export default function Sidebar({ companyId, companyName, onNavigate, currentSec
   const companyNav = allTabs.filter(tab => tab.roles.includes(userRole))
 
   const platformGrowth = [
-    { icon: '📷', label: 'Instagram Analytics', key: 'growth-instagram', platform: 'instagram' },
-    { icon: '👥', label: 'Facebook Analytics', key: 'growth-facebook', platform: 'facebook' },
-    { icon: '▶️', label: 'YouTube Analytics', key: 'growth-youtube', platform: 'youtube' },
-    { icon: '💬', label: 'WhatsApp Analytics', key: 'growth-whatsapp', platform: 'whatsapp' },
+    { label: 'Instagram Analytics', key: 'growth-instagram', platform: 'instagram' },
+    { label: 'Facebook Analytics', key: 'growth-facebook', platform: 'facebook' },
+    { label: 'YouTube Analytics', key: 'growth-youtube', platform: 'youtube' },
+    { label: 'WhatsApp Analytics', key: 'growth-whatsapp', platform: 'whatsapp' },
   ]
 
   const platformInbox = [
@@ -206,7 +206,6 @@ export default function Sidebar({ companyId, companyName, onNavigate, currentSec
                         )}
                         title={platform.label}
                       >
-                        <span>{platform.icon}</span>
                         <span className="flex-1 text-left text-xs">{platform.label}</span>
                       </button>
                     ))}

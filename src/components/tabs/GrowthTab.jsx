@@ -1,8 +1,8 @@
 import { useEffect, useMemo, useState } from 'react'
-import { BarChart3, ExternalLink, Eye, FileText, Loader, LogIn, MessageCircle, RefreshCw, Trash2, UserPlus, Users } from 'lucide-react'
+import { BarChart3, ExternalLink, FileText, Loader, MessageCircle, RefreshCw, UserPlus, Users } from 'lucide-react'
 import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
 import { SectionHeader, PlatformIcon } from '../ui/UIKit'
-import { backendUrl, deleteConnection, fetchGrowthMetrics, getConnections } from '../../lib/backendApi'
+import { fetchGrowthMetrics } from '../../lib/backendApi'
 
 const PLATFORM_ORDER = ['instagram', 'facebook', 'youtube', 'whatsapp']
 
@@ -12,36 +12,28 @@ const PLATFORMS_CONFIG = {
     color: '#E1306C',
     bg: '#FDE8F1',
     description: 'Followers, following, posts, comments, and monthly analytics for the selected Instagram Business account.',
-    oauth: true,
-    cta: 'Connect Instagram',
-    empty: 'Connect Instagram to load followers, following, post count, comments, and monthly progress.',
+    empty: 'No Instagram analytics data yet.',
   },
   facebook: {
     label: 'Facebook',
     color: '#1877F2',
     bg: '#E8F1FD',
     description: 'Followers, page likes, page posts, comments, and monthly analytics for the selected Facebook Page.',
-    oauth: true,
-    cta: 'Connect Facebook',
-    empty: 'Connect Facebook to load page followers, page likes, posts, comments, and monthly progress.',
+    empty: 'No Facebook analytics data yet.',
   },
   youtube: {
     label: 'YouTube',
     color: '#FF0000',
     bg: '#FFE8E8',
-    description: 'Subscribers, videos, comments, and channel analytics will appear here after YouTube OAuth is added.',
-    oauth: false,
-    cta: 'Setup not ready',
-    empty: 'YouTube connection is visible here, but YouTube OAuth/API is not added yet.',
+    description: 'Subscribers, videos, comments, and channel analytics.',
+    empty: 'No YouTube analytics data yet.',
   },
   whatsapp: {
     label: 'WhatsApp',
     color: '#25D366',
     bg: '#E8FBF0',
-    description: 'DM volume and message activity for WhatsApp Business will appear here after webhook data arrives.',
-    oauth: false,
-    cta: 'Setup in Platforms',
-    empty: 'Connect WhatsApp Business in Platforms first. Analytics needs webhook messages before data can load.',
+    description: 'DM volume and message activity for WhatsApp Business.',
+    empty: 'No WhatsApp analytics data yet.',
   },
 }
 
@@ -133,7 +125,7 @@ function AnalyticsGraph({ platform, data }) {
           <BarChart3 size={16} className="text-slate-400" />
           Monthly trend graph
         </div>
-        <p className="text-slate-500 text-sm mt-2">Connect {config.label} to show the increase or decrease visually.</p>
+        <p className="text-slate-500 text-sm mt-2">Analytics will appear here after platform data is synced.</p>
       </div>
     )
   }
@@ -305,69 +297,22 @@ function PostRow({ post, platform, showFocus }) {
   )
 }
 
-function PlatformSection({ platform, data, accounts, companyId, activeDetail, onDetailChange, onDisconnect, isAdmin = true }) {
+function PlatformSection({ platform, data, activeDetail, onDetailChange }) {
   const config = PLATFORMS_CONFIG[platform]
-  const [loading, setLoading] = useState(false)
-  const isConnected = accounts.length > 0 || Boolean(data?.connected)
+  const hasData = Boolean(data?.summary)
   const stats = platformStats(platform, data)
-
-  const handleConnect = () => {
-    if (!config.oauth) {
-      onDetailChange(platform, 'posts')
-      return
-    }
-    setLoading(true)
-    window.location.href = backendUrl(`/api/oauth/${platform}/authorize?company_id=${encodeURIComponent(companyId)}&redirect_uri=${encodeURIComponent(window.location.href)}`)
-  }
 
   return (
     <section className="rounded-lg border border-slate-200 bg-white overflow-hidden">
       <div className="p-5 border-b border-slate-200" style={{ borderTop: `4px solid ${config.color}` }}>
-        <div className="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-4">
-          <div className="flex items-start gap-4 min-w-0">
-            <div className="w-12 h-12 rounded-lg flex items-center justify-center flex-shrink-0" style={{ backgroundColor: config.bg }}>
-              <PlatformIcon platform={platform} size={24} connected={isConnected} />
-            </div>
-            <div className="min-w-0">
-              <h3 className="text-slate-900 font-bold text-base">{config.label} Analytics</h3>
-              <p className="text-slate-500 text-sm mt-1 leading-relaxed">{config.description}</p>
-              {accounts.length > 0 && (
-                <div className="mt-3 flex flex-wrap gap-2">
-                  {accounts.map(account => (
-                    <span key={`${account.platform}-${account.externalId}`} className="inline-flex max-w-full items-center gap-1 rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-700">
-                      <Eye size={12} className="flex-shrink-0" />
-                      <span className="truncate">{account.handle || account.externalId}</span>
-                    </span>
-                  ))}
-                </div>
-              )}
-            </div>
+        <div className="flex items-start gap-4 min-w-0">
+          <div className="w-12 h-12 rounded-lg flex items-center justify-center flex-shrink-0" style={{ backgroundColor: config.bg }}>
+            <PlatformIcon platform={platform} size={24} connected={hasData} />
           </div>
-
-          {isAdmin && (
-            <div className="flex items-center gap-2 flex-shrink-0">
-              {isConnected && (
-                <button
-                  type="button"
-                  onClick={onDisconnect}
-                  title={`Disconnect ${config.label}`}
-                  className="h-10 w-10 inline-flex items-center justify-center rounded-lg border border-red-200 text-red-500 hover:bg-red-50 cursor-pointer transition-colors"
-                >
-                  <Trash2 size={16} />
-                </button>
-              )}
-              <button
-                type="button"
-                onClick={handleConnect}
-                disabled={loading}
-                className="h-10 inline-flex items-center gap-2 rounded-lg px-4 text-xs font-bold text-white cursor-pointer disabled:opacity-60"
-                style={{ backgroundColor: config.oauth ? config.color : '#475569' }}
-              >
-                {loading ? <Loader size={14} className="animate-spin" /> : <LogIn size={14} />}
-                {loading ? 'Opening...' : isConnected && config.oauth ? `Reconnect ${config.label}` : config.cta}
-              </button>
-            </div>
-          )}
+          <div className="min-w-0">
+            <h3 className="text-slate-900 font-bold text-base">{config.label} Analytics</h3>
+            <p className="text-slate-500 text-sm mt-1 leading-relaxed">{config.description}</p>
+          </div>
         </div>
       </div>
 
@@ -396,42 +341,25 @@ function PlatformSection({ platform, data, accounts, companyId, activeDetail, on
   )
 }
 
-export default function GrowthTab({ company, platform, isAdmin = true }) {
-  const [connections, setConnections] = useState({})
+export default function GrowthTab({ company, platform }) {
   const [growth, setGrowth] = useState(null)
   const [loading, setLoading] = useState(true)
   const [refreshing, setRefreshing] = useState(false)
   const [activeDetail, setActiveDetail] = useState({ platform: platform || 'instagram', type: 'posts' })
 
   useEffect(() => {
-    loadConnections()
+    loadGrowth()
   }, [company.id])
 
-  const loadConnections = async () => {
+  const loadGrowth = async () => {
     try {
       setLoading(true)
-      const [connectionData, growthData] = await Promise.all([
-        getConnections(company.id),
-        fetchGrowthMetrics(company.id),
-      ])
-      const connsMap = {}
-      connectionData.connections?.forEach(connection => {
-        connsMap[connection.platform] = [...(connsMap[connection.platform] || []), connection]
-      })
-      setConnections(connsMap)
-      setGrowth(growthData)
+      setGrowth(await fetchGrowthMetrics(company.id))
     } catch (err) {
       console.error('Failed to load growth:', err)
     } finally {
       setLoading(false)
     }
-  }
-
-  const handleDisconnect = async (platform) => {
-    await deleteConnection(company.id, platform).catch(err => {
-      console.error('Failed to disconnect platform:', err)
-    })
-    await loadConnections()
   }
 
   const refreshGrowth = async () => {
@@ -468,7 +396,7 @@ export default function GrowthTab({ company, platform, isAdmin = true }) {
       <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
         <SectionHeader
           title={platform ? `${config.label} Analytics` : 'Social Media Analytics'}
-          description={platform ? config.description : 'Each platform is separate: connect it, view followers, posts, comments, and open the detail behind every metric.'}
+          description={platform ? config.description : 'View analytics separately for Instagram, Facebook, YouTube, and WhatsApp.'}
         />
         <button onClick={refreshGrowth} disabled={refreshing} className="btn-secondary self-start">
           <RefreshCw size={14} className={refreshing ? 'animate-spin' : ''} />
@@ -482,12 +410,8 @@ export default function GrowthTab({ company, platform, isAdmin = true }) {
             key={plt}
             platform={plt}
             data={platformData?.[plt]}
-            accounts={connections[plt] || []}
-            companyId={company.id}
             activeDetail={activeDetail}
             onDetailChange={(nextPlatform, type) => setActiveDetail({ platform: nextPlatform, type })}
-            onDisconnect={() => handleDisconnect(plt)}
-            isAdmin={isAdmin}
           />
         ))}
       </div>

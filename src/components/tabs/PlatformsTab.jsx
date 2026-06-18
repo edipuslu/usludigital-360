@@ -1,7 +1,7 @@
-import { useState } from 'react'
-import { X, ExternalLink, ChevronRight, Copy, CheckCircle2, AlertCircle, Link2, Info, Server, KeyRound, Bot, Database } from 'lucide-react'
+import { useEffect, useState } from 'react'
+import { X, ExternalLink, ChevronRight, Copy, CheckCircle2, AlertCircle, Link2, Info, Server, KeyRound, Bot, Database, LogIn, Loader } from 'lucide-react'
 import { PlatformIcon, SectionHeader } from '../ui/UIKit'
-import { registerConnection, saveBackendAiConfig } from '../../lib/backendApi'
+import { backendUrl, deleteConnection, getConnections, registerConnection, saveBackendAiConfig } from '../../lib/backendApi'
 import clsx from 'clsx'
 
 const PLATFORM_GUIDES = {
@@ -539,13 +539,22 @@ function ConnectionGuideModal({ platform, guide, onClose, onSave, existingCreden
   )
 }
 
-function PlatformCard({ platform, guide, data, onConnect, onDisconnect }) {
+function PlatformCard({ platform, guide, data, backendConnections = [], onConnect, onOAuthLogin, onDisconnect }) {
   const [showGuide, setShowGuide] = useState(false)
+  const [oauthLoading, setOauthLoading] = useState(false)
 
-  const isConnected = !!data?.connected
+  const primaryBackendConnection = backendConnections[0]
+  const isConnected = !!data?.connected || backendConnections.length > 0
+  const connectedHandle = primaryBackendConnection?.handle || data?.handle
+  const supportsOAuth = platform === 'instagram' || platform === 'facebook'
 
   const handleSave = (creds, verification) => {
     onConnect(platform, creds, verification)
+  }
+
+  const handleOAuthLogin = () => {
+    setOauthLoading(true)
+    onOAuthLogin(platform)
   }
 
   const borderColor = {
@@ -585,13 +594,27 @@ function PlatformCard({ platform, guide, data, onConnect, onDisconnect }) {
               Disconnect
             </button>
           ) : (
-            <button
-              onClick={() => setShowGuide(true)}
-              className="btn-primary text-xs py-1.5"
-              style={{ background: guide.color }}
-            >
-              Connect
-            </button>
+            <div className="flex flex-wrap items-center justify-end gap-2">
+              {supportsOAuth && (
+                <button
+                  type="button"
+                  onClick={handleOAuthLogin}
+                  disabled={oauthLoading}
+                  className="h-9 inline-flex items-center gap-1.5 rounded-lg px-3 text-xs font-bold text-white cursor-pointer disabled:opacity-60 transition-colors"
+                  style={{ background: guide.color }}
+                >
+                  {oauthLoading ? <Loader size={13} className="animate-spin" /> : <LogIn size={13} />}
+                  Login
+                </button>
+              )}
+              <button
+                onClick={() => setShowGuide(true)}
+                className={clsx(supportsOAuth ? 'btn-secondary text-xs py-1.5' : 'btn-primary text-xs py-1.5')}
+                style={!supportsOAuth ? { background: guide.color } : undefined}
+              >
+                Setup
+              </button>
+            </div>
           )}
         </div>
 
@@ -601,21 +624,41 @@ function PlatformCard({ platform, guide, data, onConnect, onDisconnect }) {
             <div>
               <div className="text-emerald-800 font-semibold text-sm">Successfully Connected</div>
               <div className="text-emerald-700 text-xs mt-0.5">
-                Verified {data?.handle || 'account'}. Last checked {data?.lastSync || 'just now'}.
+                Verified {connectedHandle || 'account'}. Last checked {data?.lastSync || primaryBackendConnection?.updatedAt || 'just now'}.
               </div>
             </div>
           </div>
         ) : (
-          <button
-            onClick={() => setShowGuide(true)}
-            className="w-full flex items-center justify-between p-4 border-2 border-dashed border-slate-200 rounded-xl hover:border-slate-300 hover:bg-slate-50 cursor-pointer transition-all group"
-          >
-            <div className="text-left">
-              <div className="text-slate-700 font-semibold text-sm group-hover:text-slate-900">Step-by-Step Setup Guide</div>
-              <div className="text-slate-400 text-xs mt-0.5">{guide.steps.length} steps · Includes instructions and direct links</div>
-            </div>
-            <ChevronRight size={16} className="text-slate-400 group-hover:text-slate-600 group-hover:translate-x-0.5 transition-all" />
-          </button>
+          <div className="space-y-3">
+            {supportsOAuth && (
+              <button
+                type="button"
+                onClick={handleOAuthLogin}
+                disabled={oauthLoading}
+                className="w-full flex items-center justify-between p-4 rounded-xl text-white cursor-pointer transition-all disabled:opacity-60"
+                style={{ background: guide.color }}
+              >
+                <div className="flex items-center gap-2 text-left">
+                  {oauthLoading ? <Loader size={16} className="animate-spin" /> : <LogIn size={16} />}
+                  <div>
+                    <div className="font-semibold text-sm">Login with {guide.name}</div>
+                    <div className="text-white/80 text-xs mt-0.5">Choose the exact account or page to connect.</div>
+                  </div>
+                </div>
+                <ChevronRight size={16} className="text-white/80" />
+              </button>
+            )}
+            <button
+              onClick={() => setShowGuide(true)}
+              className="w-full flex items-center justify-between p-4 border-2 border-dashed border-slate-200 rounded-xl hover:border-slate-300 hover:bg-slate-50 cursor-pointer transition-all group"
+            >
+              <div className="text-left">
+                <div className="text-slate-700 font-semibold text-sm group-hover:text-slate-900">{supportsOAuth ? 'Manual Setup Guide' : 'Step-by-Step Setup Guide'}</div>
+                <div className="text-slate-400 text-xs mt-0.5">{guide.steps.length} steps · Includes instructions and direct links</div>
+              </div>
+              <ChevronRight size={16} className="text-slate-400 group-hover:text-slate-600 group-hover:translate-x-0.5 transition-all" />
+            </button>
+          </div>
         )}
       </div>
 
@@ -649,6 +692,29 @@ function RequirementCard({ icon: Icon, title, children }) {
 }
 
 export default function PlatformsTab({ company, onUpdate, onNotify }) {
+  const [backendConnections, setBackendConnections] = useState({})
+
+  useEffect(() => {
+    refreshConnections()
+  }, [company.id])
+
+  const refreshConnections = async () => {
+    try {
+      const data = await getConnections(company.id)
+      const grouped = {}
+      data.connections?.forEach(connection => {
+        grouped[connection.platform] = [...(grouped[connection.platform] || []), connection]
+      })
+      setBackendConnections(grouped)
+    } catch (err) {
+      console.error('Failed to load platform connections:', err)
+    }
+  }
+
+  const loginWithOAuth = platform => {
+    window.location.href = backendUrl(`/api/oauth/${platform}/authorize?company_id=${encodeURIComponent(company.id)}&redirect_uri=${encodeURIComponent(window.location.href)}`)
+  }
+
   const connectPlatform = async (platform, credentials, verification) => {
     const guide = PLATFORM_GUIDES[platform]
     const platformData = {
@@ -675,6 +741,7 @@ export default function PlatformsTab({ company, onUpdate, onNotify }) {
 
     try {
       await registerConnection(company.id, platform, platformData)
+      await refreshConnections()
       await saveBackendAiConfig({
         ...company,
         whatsappLink: credentials.whatsappLink || company.whatsappLink,
@@ -689,7 +756,7 @@ export default function PlatformsTab({ company, onUpdate, onNotify }) {
     }
   }
 
-  const disconnectPlatform = platform => {
+  const disconnectPlatform = async platform => {
     const guide = PLATFORM_GUIDES[platform]
     onUpdate(current => ({
       ...current,
@@ -705,22 +772,28 @@ export default function PlatformsTab({ company, onUpdate, onNotify }) {
         },
       },
     }))
-    onNotify?.(`${guide.name} disconnected.`, 'warning')
+    try {
+      await deleteConnection(company.id, platform)
+      await refreshConnections()
+      onNotify?.(`${guide.name} disconnected.`, 'warning')
+    } catch (err) {
+      onNotify?.(`${guide.name} removed locally, but backend disconnect failed: ${err.message}`, 'warning')
+    }
   }
 
   return (
     <div className="space-y-6 animate-slide-in">
       <SectionHeader
         title="Platform Connections"
-        description="Connect platforms for live AI auto-replies. Saving credentials alone is not enough; webhooks and a backend are required."
+        description="Connect and manage Instagram, Facebook, YouTube, and WhatsApp in one place. Analytics pages only show results."
       />
 
       <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 flex items-start gap-3">
         <AlertCircle size={16} className="text-amber-600 mt-0.5 flex-shrink-0" />
         <div>
-          <div className="text-amber-900 font-semibold text-sm mb-0.5">Real goal: new comment → AI reply → post back to Instagram/Facebook</div>
+          <div className="text-amber-900 font-semibold text-sm mb-0.5">All platform logins live here</div>
           <div className="text-amber-800 text-sm leading-relaxed">
-            To make that live, this app needs a deployed backend webhook. Meta sends new comments to the webhook, the backend calls the AI model, then the backend sends the reply back to Meta.
+            Use this page to connect, reconnect, or disconnect accounts. Social Media Analytics is only for viewing followers, posts, comments, and growth.
           </div>
         </div>
       </div>
@@ -743,9 +816,9 @@ export default function PlatformsTab({ company, onUpdate, onNotify }) {
       <div className="bg-blue-50 border border-blue-200 rounded-xl p-4 flex items-start gap-3">
         <Info size={16} className="text-blue-600 mt-0.5 flex-shrink-0" />
         <div>
-          <div className="text-blue-900 font-semibold text-sm mb-0.5">What the current Connect button does</div>
+          <div className="text-blue-900 font-semibold text-sm mb-0.5">How live replies work after connection</div>
           <div className="text-blue-700 text-sm leading-relaxed">
-            Right now it saves setup credentials for this company and shows the required steps. The next build step is adding the backend webhook and AI reply engine so saved connections can receive real comments and reply automatically.
+            New comments and messages are received by the backend webhook, saved to the inbox, sent to the AI when automation is enabled, and then replied back through the connected platform.
           </div>
         </div>
       </div>
@@ -757,7 +830,9 @@ export default function PlatformsTab({ company, onUpdate, onNotify }) {
             platform={key}
             guide={guide}
             data={company.platforms[key]}
+            backendConnections={backendConnections[key] || []}
             onConnect={connectPlatform}
+            onOAuthLogin={loginWithOAuth}
             onDisconnect={disconnectPlatform}
           />
         ))}
