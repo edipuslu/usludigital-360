@@ -1456,8 +1456,22 @@ function isAutomationScheduleActive(company) {
   return true
 }
 
+function getAutomationStartTime(company) {
+  const value = company?.automation?.schedule?.startAt
+  const time = value ? Date.parse(value) : null
+  return time && Number.isFinite(time) ? time : null
+}
+
+function isAfterAutomationStart(company, item) {
+  const start = getAutomationStartTime(company)
+  if (!start) return true
+  const received = item?.receivedAt ? Date.parse(item.receivedAt) : Date.now()
+  return Number.isFinite(received) && received >= start
+}
+
 function shouldAutoReply(company, item) {
   if (!isAutomationScheduleActive(company)) return false
+  if (!isAfterAutomationStart(company, item)) return false
   const settings = company?.automation?.[item.platform]
   if (!settings) return false
   if (item.type === 'comment' && !settings.commentReply) return false
@@ -1465,6 +1479,33 @@ function shouldAutoReply(company, item) {
   const lowered = item.text.toLowerCase()
   if ((settings.blacklist || []).some(word => lowered.includes(String(word).toLowerCase()))) return false
   return true
+}
+
+function isBackfillCandidate(company, item, platform = 'all') {
+  if (!item || item.companyId !== company.id || item.aiReply || item.status === 'replied_live' || item.status === 'reply_failed') return false
+  if (platform !== 'all' && item.platform !== platform) return false
+  const start = getAutomationStartTime(company)
+  if (!start) return false
+  const received = item.receivedAt ? Date.parse(item.receivedAt) : 0
+  return Number.isFinite(received) && received < start
+}
+
+function estimateBackfillCost(count) {
+  const inputTokensPerMessage = 450
+  const outputTokensPerReply = 90
+  const inputPricePerMillion = 0.4
+  const outputPricePerMillion = 1.6
+  const inputTokens = count * inputTokensPerMessage
+  const outputTokens = count * outputTokensPerReply
+  const estimatedOpenaiUsd = (inputTokens / 1_000_000) * inputPricePerMillion + (outputTokens / 1_000_000) * outputPricePerMillion
+  return {
+    model: 'gpt-4.1-mini fallback estimate',
+    estimatedReplies: count,
+    inputTokens,
+    outputTokens,
+    estimatedOpenaiUsd: Number(estimatedOpenaiUsd.toFixed(4)),
+    suggestedClientPriceUsd: Number(Math.max(5, estimatedOpenaiUsd * 8).toFixed(2)),
+  }
 }
 
 async function generateAiReply(company, item, options = {}) {
@@ -1626,6 +1667,39 @@ async function processAutoReplies(store, items = []) {
       status: ai.reply ? postResult.status : ai.status,
       aiReply: ai.reply,
       error: postResult.error || ai.error,
+    })
+    if (ai.reply) processed.push(savedItem)
+  }
+  return processed
+}
+
+async function processBackfillReplies(store, company, items = []) {
+  const processed = []
+  for (const item of items) {
+    const savedItem = (store.items || []).find(existing => existing.id === item.id) || item
+    if (!savedItem || savedItem.aiReply || savedItem.status === 'replied_live' || savedItem.status === 'reply_failed') continue
+
+    const settings = company?.automation?.[savedItem.platform]
+    if (!settings) continue
+    if (savedItem.type === 'comment' && !settings.commentReply) continue
+    if (savedItem.type === 'dm' && !settings.dmReply) continue
+    const lowered = String(savedItem.text || '').toLowerCase()
+    if ((settings.blacklist || []).some(word => lowered.includes(String(word).toLowerCase()))) continue
+
+    const ai = await generateAiReply(company, savedItem, { force: true }).catch(err => ({
+      reply: '',
+      status: 'ai_error',
+      error: err.message,
+    }))
+    const postResult = ai.reply
+      ? await postPlatformReply(store, savedItem, ai.reply).catch(err => ({ status: 'reply_failed', error: err.message }))
+      : { status: ai.status, error: ai.error }
+
+    Object.assign(savedItem, {
+      status: ai.reply ? postResult.status : ai.status,
+      aiReply: ai.reply,
+      error: postResult.error || ai.error,
+      backfilledAt: new Date().toISOString(),
     })
     if (ai.reply) processed.push(savedItem)
   }
@@ -2008,6 +2082,7 @@ export async function appHandler(req, res) {
           schedule: {
             ...(existing.automation?.schedule || automationDefaults().schedule),
             ...(body.company?.automation?.schedule || {}),
+            startAt: body.company?.automation?.schedule?.startAt || existing.automation?.schedule?.startAt || new Date().toISOString(),
           },
         },
         openaiKey: nextOpenaiKey,
@@ -2045,6 +2120,55 @@ export async function appHandler(req, res) {
       const item = await replyToInboxItem(store, inboxReplyParams.companyId, inboxReplyParams.itemId, body.text || body.reply || '')
       await saveStore(store)
       return json(res, 200, { ok: true, item })
+    }
+
+    const backfillEstimateParams = routeParams(url.pathname, '/api/companies/:companyId/backfill/estimate')
+    if (req.method === 'POST' && backfillEstimateParams) {
+      const body = await readBody(req)
+      const company = store.companies[backfillEstimateParams.companyId]
+      if (!company) return json(res, 404, { error: 'Company not found.' })
+      const platform = body.platform || 'all'
+      const maxItems = Math.max(1, Math.min(Number(body.maxItems || 100), 1000))
+      const syncResult = await syncLiveInbox(store, backfillEstimateParams.companyId)
+      if (syncResult.items.length) await saveStore(store)
+      const candidates = (store.items || [])
+        .filter(item => isBackfillCandidate(company, item, platform))
+        .sort((a, b) => new Date(b.receivedAt || 0) - new Date(a.receivedAt || 0))
+      const selected = candidates.slice(0, maxItems)
+      return json(res, 200, {
+        ok: true,
+        platform,
+        found: candidates.length,
+        selected: selected.length,
+        comments: selected.filter(item => item.type === 'comment').length,
+        dms: selected.filter(item => item.type === 'dm').length,
+        estimate: estimateBackfillCost(selected.length),
+        syncErrors: syncResult.errors,
+      })
+    }
+
+    const backfillRunParams = routeParams(url.pathname, '/api/companies/:companyId/backfill/run')
+    if (req.method === 'POST' && backfillRunParams) {
+      const body = await readBody(req)
+      if (body.confirm !== 'CONFIRM') return json(res, 400, { error: 'Type CONFIRM to start replying to previous messages.' })
+      const company = store.companies[backfillRunParams.companyId]
+      if (!company) return json(res, 404, { error: 'Company not found.' })
+      const platform = body.platform || 'all'
+      const maxItems = Math.max(1, Math.min(Number(body.maxItems || 100), 1000))
+      const syncResult = await syncLiveInbox(store, backfillRunParams.companyId)
+      const candidates = (store.items || [])
+        .filter(item => isBackfillCandidate(company, item, platform))
+        .sort((a, b) => new Date(b.receivedAt || 0) - new Date(a.receivedAt || 0))
+        .slice(0, maxItems)
+      const processed = await processBackfillReplies(store, company, candidates)
+      await saveStore(store)
+      return json(res, 200, {
+        ok: true,
+        found: candidates.length,
+        processed: processed.length,
+        estimate: estimateBackfillCost(candidates.length),
+        syncErrors: syncResult.errors,
+      })
     }
 
     const inboxParams = routeParams(url.pathname, '/api/companies/:companyId/inbox')

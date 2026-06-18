@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
-import { MessageCircle, Send, Search, Filter, Heart, MessageSquare, Calendar, User, ExternalLink, Loader } from 'lucide-react'
+import { MessageCircle, Send, Search, Filter, Heart, MessageSquare, Calendar, User, ExternalLink, Loader, AlertTriangle, Calculator } from 'lucide-react'
 import { PlatformIcon, SectionHeader } from '../ui/UIKit'
-import { fetchInbox, replyToInboxItem } from '../../lib/backendApi'
+import { estimateBackfillReplies, fetchInbox, replyToInboxItem, runBackfillReplies } from '../../lib/backendApi'
 import clsx from 'clsx'
 
 const PLATFORMS = ['instagram', 'facebook', 'youtube', 'whatsapp']
@@ -207,6 +207,110 @@ function OverviewPanel({ messages }) {
   )
 }
 
+function BackfillPanel({ company, platform, onCompleted }) {
+  const [selectedPlatform, setSelectedPlatform] = useState(platform || 'instagram')
+  const [maxItems, setMaxItems] = useState(100)
+  const [estimate, setEstimate] = useState(null)
+  const [confirm, setConfirm] = useState('')
+  const [loading, setLoading] = useState(false)
+  const [running, setRunning] = useState(false)
+  const [error, setError] = useState('')
+  const [result, setResult] = useState(null)
+
+  const payload = { platform: selectedPlatform, maxItems: Number(maxItems || 100) }
+
+  const handleEstimate = async () => {
+    setLoading(true)
+    setError('')
+    setResult(null)
+    try {
+      const data = await estimateBackfillReplies(company.id, payload)
+      setEstimate(data)
+    } catch (err) {
+      setError(err.message || 'Could not estimate previous messages.')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const handleRun = async () => {
+    if (confirm !== 'CONFIRM') return
+    setRunning(true)
+    setError('')
+    try {
+      const data = await runBackfillReplies(company.id, { ...payload, confirm })
+      setResult(data)
+      setConfirm('')
+      onCompleted?.()
+    } catch (err) {
+      setError(err.message || 'Could not run previous-message replies.')
+    } finally {
+      setRunning(false)
+    }
+  }
+
+  return (
+    <div className="rounded-lg border border-amber-200 bg-amber-50 p-4">
+      <div className="flex items-start gap-3">
+        <AlertTriangle size={18} className="text-amber-600 mt-0.5 flex-shrink-0" />
+        <div className="flex-1">
+          <div className="text-slate-900 font-bold text-sm">Previous Messages Reply Permission</div>
+          <p className="text-slate-600 text-xs mt-1">
+            Normal AI replies only answer messages after the activation start time. Use this paid/manual mode only when you approve old comments or DMs.
+          </p>
+
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mt-4">
+            <div>
+              <label className="block text-xs font-semibold text-slate-700 mb-1">Platform</label>
+              <select value={selectedPlatform} onChange={e => setSelectedPlatform(e.target.value)} className="input-field bg-white">
+                <option value="instagram">Instagram</option>
+                <option value="facebook">Facebook</option>
+                <option value="all">All connected</option>
+              </select>
+            </div>
+            <div>
+              <label className="block text-xs font-semibold text-slate-700 mb-1">Max messages to reply</label>
+              <input type="number" min="1" max="1000" value={maxItems} onChange={e => setMaxItems(e.target.value)} className="input-field bg-white" />
+            </div>
+            <div className="flex items-end">
+              <button onClick={handleEstimate} disabled={loading} className="btn-secondary w-full justify-center">
+                {loading ? <Loader size={14} className="animate-spin" /> : <Calculator size={14} />} Estimate
+              </button>
+            </div>
+          </div>
+
+          {estimate && (
+            <div className="mt-4 rounded-lg border border-amber-200 bg-white p-3 text-sm">
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                <div><div className="text-slate-900 font-bold">{estimate.found}</div><div className="text-slate-400 text-xs">Old pending found</div></div>
+                <div><div className="text-slate-900 font-bold">{estimate.selected}</div><div className="text-slate-400 text-xs">Selected replies</div></div>
+                <div><div className="text-slate-900 font-bold">${estimate.estimate?.estimatedOpenaiUsd}</div><div className="text-slate-400 text-xs">Approx OpenAI cost</div></div>
+                <div><div className="text-slate-900 font-bold">${estimate.estimate?.suggestedClientPriceUsd}</div><div className="text-slate-400 text-xs">Suggested client price</div></div>
+              </div>
+              <div className="text-slate-500 text-xs mt-3">
+                Includes {estimate.comments} comment{estimate.comments === 1 ? '' : 's'} and {estimate.dms} DM{estimate.dms === 1 ? '' : 's'} in this selection.
+              </div>
+              <div className="mt-3 grid grid-cols-1 md:grid-cols-[1fr_auto] gap-2">
+                <input value={confirm} onChange={e => setConfirm(e.target.value)} className="input-field" placeholder="Type CONFIRM to start replying" />
+                <button onClick={handleRun} disabled={confirm !== 'CONFIRM' || running || !estimate.selected} className={clsx('btn-danger justify-center', (confirm !== 'CONFIRM' || running || !estimate.selected) && 'opacity-50 cursor-not-allowed')}>
+                  {running ? <Loader size={14} className="animate-spin" /> : <Send size={14} />} Start Replies
+                </button>
+              </div>
+            </div>
+          )}
+
+          {result && (
+            <div className="mt-3 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm font-medium text-emerald-700">
+              Backfill started: AI processed {result.processed} previous message{result.processed === 1 ? '' : 's'}.
+            </div>
+          )}
+          {error && <div className="mt-3 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm font-medium text-red-700">{error}</div>}
+        </div>
+      </div>
+    </div>
+  )
+}
+
 export default function InboxTab({ company, platform, isAdmin = true }) {
   const [activeSection, setActiveSection] = useState('comments')
   const [messages, setMessages] = useState([])
@@ -238,6 +342,14 @@ export default function InboxTab({ company, platform, isAdmin = true }) {
     }
   }, [company.id])
 
+  const reloadInbox = async () => {
+    const data = await fetchInbox(company.id, 'all')
+    setMessages((data.items || []).map(normalizeInboxItem))
+    setSyncedCount(Number(data.synced || 0))
+    setAutoRepliedCount(Number(data.autoReplied || 0))
+    setSyncWarnings(data.syncErrors || [])
+  }
+
   const handleReply = async (msgId, text) => {
     const data = await replyToInboxItem(company.id, msgId, text)
     const updated = normalizeInboxItem(data.item)
@@ -256,6 +368,10 @@ export default function InboxTab({ company, platform, isAdmin = true }) {
   return (
     <div className="space-y-6 animate-slide-in">
       {!loading && !platform && <OverviewPanel messages={messages} />}
+
+      {!loading && isAdmin && (
+        <BackfillPanel company={company} platform={platform} onCompleted={reloadInbox} />
+      )}
 
       {!loading && !platform && syncedCount > 0 && (
         <div className="rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-medium text-emerald-700">

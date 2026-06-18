@@ -130,6 +130,20 @@ export function replyToInboxItem(companyId, itemId, text) {
   })
 }
 
+export function estimateBackfillReplies(companyId, payload) {
+  return request(`/api/companies/${encodeURIComponent(companyId)}/backfill/estimate`, {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  })
+}
+
+export function runBackfillReplies(companyId, payload) {
+  return request(`/api/companies/${encodeURIComponent(companyId)}/backfill/run`, {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  })
+}
+
 // Post a new message to inbox
 export function createTestInboxItem(companyId, payload) {
   return request(`/api/companies/${encodeURIComponent(companyId)}/inbox`, {
