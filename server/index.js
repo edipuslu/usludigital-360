@@ -3,7 +3,7 @@ import { readFile, writeFile, mkdir } from 'node:fs/promises'
 import { existsSync } from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { createHash } from 'node:crypto'
+import { createHash, createHmac } from 'node:crypto'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const DATA_DIR = process.env.VERCEL ? '/tmp/usludigital-360-data' : path.join(__dirname, 'data')
@@ -897,6 +897,25 @@ async function saveFacebookOAuthConnection(store, companyId, tokenData, selected
   return saveSelectedFacebookOAuthConnection(store, companyId, tokenData, option)
 }
 
+async function subscribePageToWebhookEvents(pageAccessToken, pageId, fields = 'messages,messaging_postbacks,messaging_optins') {
+  try {
+    const url = new URL(`${GRAPH_BASE_URL}/${pageId}/subscribed_apps`)
+    url.searchParams.set('subscribed_fields', fields)
+    url.searchParams.set('access_token', pageAccessToken)
+    const response = await fetch(url.toString(), { method: 'POST' })
+    const data = await response.json().catch(() => ({}))
+    if (!response.ok || data?.error) {
+      console.error('[webhook-subscribe] Meta error:', data?.error?.message || `HTTP ${response.status}`)
+      return null
+    }
+    console.log('[webhook-subscribe] success for page', pageId)
+    return data
+  } catch (err) {
+    console.error('[webhook-subscribe] failed:', err.message)
+    return null
+  }
+}
+
 function findCompanyId(store, candidates) {
   for (const candidate of candidates.filter(Boolean).map(String)) {
     for (const platform of ['instagram', 'facebook', 'whatsapp', 'youtube']) {
@@ -1205,11 +1224,13 @@ function normalizeMetaWebhook(body, store) {
         companyId: routed.companyId,
         type: isMessage ? 'dm' : 'comment',
         platform: routed.platform || platform,
-        senderName: value.from?.name || value.sender_name || 'Customer',
-        senderId: value.from?.id || value.sender_id || '',
-        text: value.message || value.text || value.comment?.text || '',
+        senderName: value.from?.name || value.sender?.name || value.sender_name || 'Customer',
+        senderId: value.from?.id || value.sender?.id || value.sender_id || '',
+        text: typeof value.message === 'string'
+          ? value.message
+          : value.message?.text || value.text || value.comment?.text || '',
         sourceLink: makePostLink(platform, value),
-        externalId: value.comment_id || value.message_id || value.id || `${entryId}-${Date.now()}`,
+        externalId: value.comment_id || value.message_id || value.message?.mid || value.id || `${entryId}-${Date.now()}`,
         raw: { entry, change },
       })
     }
@@ -1254,6 +1275,52 @@ function rememberInboxItem(store, item) {
   store.items.unshift(savedItem)
   store.items = store.items.slice(0, 1000)
   return savedItem
+}
+
+function replyKey(item) {
+  return [item?.companyId, item?.platform, item?.type, item?.externalId].map(value => String(value || '')).join(':')
+}
+
+function ensureReplyTracking(store) {
+  if (!store.replyLocks || typeof store.replyLocks !== 'object') store.replyLocks = {}
+  if (!store.repliedKeys || typeof store.repliedKeys !== 'object') store.repliedKeys = {}
+}
+
+function hasLiveReply(store, item) {
+  ensureReplyTracking(store)
+  const key = replyKey(item)
+  if (!key || store.repliedKeys[key]) return Boolean(store.repliedKeys[key])
+  return (store.items || []).some(existing =>
+    existing.companyId === item.companyId &&
+    existing.platform === item.platform &&
+    existing.type === item.type &&
+    existing.externalId === item.externalId &&
+    ['replied_live', 'test_ready'].includes(existing.status)
+  )
+}
+
+function beginReply(store, item) {
+  ensureReplyTracking(store)
+  const key = replyKey(item)
+  const now = Date.now()
+  const lock = store.replyLocks[key]
+  const lockIsFresh = lock && now - Number(lock.startedAt || 0) < 10 * 60 * 1000
+  if (store.repliedKeys[key] || lockIsFresh || hasLiveReply(store, item)) return false
+  store.replyLocks[key] = { startedAt: now }
+  item.status = 'replying'
+  return true
+}
+
+function finishReply(store, item, result = {}) {
+  ensureReplyTracking(store)
+  const key = replyKey(item)
+  delete store.replyLocks[key]
+  if (['replied_live', 'test_ready'].includes(result.status)) {
+    store.repliedKeys[key] = {
+      repliedAt: new Date().toISOString(),
+      itemId: item.id || '',
+    }
+  }
 }
 
 async function syncInstagramInbox(store, companyId) {
@@ -1628,16 +1695,23 @@ async function saveIncomingItems(store, incoming) {
       existing.externalId === item.externalId
     )
     if (existing) continue
+    if (hasLiveReply(store, item)) continue
 
     const company = store.companies[item.companyId] || {}
+    let replyStarted = false
     const ai = await generateAiReply(company, item).catch(err => ({
       reply: '',
       status: 'ai_error',
       error: err.message,
     }))
-    const postResult = ai.reply
-      ? await postPlatformReply(store, item, ai.reply).catch(err => ({ status: 'reply_failed', error: err.message }))
-      : { status: ai.status, error: ai.error }
+    let postResult = { status: ai.status, error: ai.error }
+    if (ai.reply) {
+      replyStarted = beginReply(store, item)
+      postResult = replyStarted
+        ? await postPlatformReply(store, item, ai.reply).catch(err => ({ status: 'reply_failed', error: err.message }))
+        : { status: 'already_replied', error: 'This comment or message already has a live reply.' }
+      if (replyStarted) finishReply(store, item, postResult)
+    }
     const savedItem = {
       id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
       receivedAt: new Date().toISOString(),
@@ -1657,7 +1731,8 @@ async function processAutoReplies(store, items = []) {
   const processed = []
   for (const item of items) {
     const savedItem = (store.items || []).find(existing => existing.id === item.id) || item
-    if (!savedItem || savedItem.aiReply || savedItem.status === 'replied_live' || savedItem.status === 'reply_failed') continue
+    if (!savedItem || savedItem.aiReply || savedItem.status === 'replied_live' || savedItem.status === 'reply_failed' || savedItem.status === 'replying') continue
+    if (!beginReply(store, savedItem)) continue
 
     const company = store.companies[savedItem.companyId] || {}
     const ai = await generateAiReply(company, savedItem).catch(err => ({
@@ -1668,6 +1743,7 @@ async function processAutoReplies(store, items = []) {
     const postResult = ai.reply
       ? await postPlatformReply(store, savedItem, ai.reply).catch(err => ({ status: 'reply_failed', error: err.message }))
       : { status: ai.status, error: ai.error }
+    finishReply(store, savedItem, postResult)
 
     Object.assign(savedItem, {
       status: ai.reply ? postResult.status : ai.status,
@@ -1683,14 +1759,27 @@ async function processBackfillReplies(store, company, items = []) {
   const processed = []
   for (const item of items) {
     const savedItem = (store.items || []).find(existing => existing.id === item.id) || item
-    if (!savedItem || savedItem.aiReply || savedItem.status === 'replied_live' || savedItem.status === 'reply_failed') continue
+    if (!savedItem || savedItem.aiReply || savedItem.status === 'replied_live' || savedItem.status === 'reply_failed' || savedItem.status === 'replying') continue
+    if (!beginReply(store, savedItem)) continue
 
     const settings = company?.automation?.[savedItem.platform]
-    if (!settings) continue
-    if (savedItem.type === 'comment' && !settings.commentReply) continue
-    if (savedItem.type === 'dm' && !settings.dmReply) continue
+    if (!settings) {
+      finishReply(store, savedItem, { status: 'received' })
+      continue
+    }
+    if (savedItem.type === 'comment' && !settings.commentReply) {
+      finishReply(store, savedItem, { status: 'received' })
+      continue
+    }
+    if (savedItem.type === 'dm' && !settings.dmReply) {
+      finishReply(store, savedItem, { status: 'received' })
+      continue
+    }
     const lowered = String(savedItem.text || '').toLowerCase()
-    if ((settings.blacklist || []).some(word => lowered.includes(String(word).toLowerCase()))) continue
+    if ((settings.blacklist || []).some(word => lowered.includes(String(word).toLowerCase()))) {
+      finishReply(store, savedItem, { status: 'received' })
+      continue
+    }
 
     const ai = await generateAiReply(company, savedItem, { force: true }).catch(err => ({
       reply: '',
@@ -1700,6 +1789,7 @@ async function processBackfillReplies(store, company, items = []) {
     const postResult = ai.reply
       ? await postPlatformReply(store, savedItem, ai.reply).catch(err => ({ status: 'reply_failed', error: err.message }))
       : { status: ai.status, error: ai.error }
+    finishReply(store, savedItem, postResult)
 
     Object.assign(savedItem, {
       status: ai.reply ? postResult.status : ai.status,
@@ -1716,11 +1806,13 @@ async function replyToInboxItem(store, companyId, itemId, text) {
   const item = (store.items || []).find(existing => existing.companyId === companyId && existing.id === itemId)
   if (!item) throw new Error('Inbox item was not found.')
   if (!text?.trim()) throw new Error('Reply text is required.')
+  if (!beginReply(store, item)) throw new Error('This comment or message already has a live reply.')
 
   const postResult = await postPlatformReply(store, item, text.trim()).catch(err => ({
     status: 'reply_failed',
     error: err.message,
   }))
+  finishReply(store, item, postResult)
   Object.assign(item, {
     status: postResult.status,
     aiReply: text.trim(),
@@ -1838,6 +1930,10 @@ export async function appHandler(req, res) {
         connected = options.length === 1
           ? saveSelectedInstagramOAuthConnection(store, state.companyId, tokenData, options[0])
           : await saveInstagramOAuthConnection(store, state.companyId, tokenData)
+        const igConnection = findCompanyConnection(store, state.companyId, 'instagram')
+        if (igConnection?.credentials?.pageAccessToken && igConnection?.credentials?.pageId) {
+          await subscribePageToWebhookEvents(igConnection.credentials.pageAccessToken, igConnection.credentials.pageId, 'messages,messaging_postbacks,messaging_optins')
+        }
       } else {
         const options = await getFacebookPageOptions(tokenData.access_token)
         if (options.length > 1) {
@@ -1851,6 +1947,10 @@ export async function appHandler(req, res) {
         connected = options.length === 1
           ? saveSelectedFacebookOAuthConnection(store, state.companyId, tokenData, options[0])
           : await saveFacebookOAuthConnection(store, state.companyId, tokenData)
+        const fbConnection = findCompanyConnection(store, state.companyId, 'facebook')
+        if (fbConnection?.credentials?.accessToken) {
+          await subscribePageToWebhookEvents(fbConnection.credentials.accessToken, fbConnection.externalId, 'messages,messaging_postbacks,messaging_optins,comments')
+        }
       }
       await saveStore(store)
 
@@ -1885,6 +1985,10 @@ export async function appHandler(req, res) {
         token_type: body.get('token_type') || '',
         expires_in: body.get('expires_in') || '',
       }, selected)
+      const igConnection = findCompanyConnection(store, companyId, 'instagram')
+      if (igConnection?.credentials?.pageAccessToken && igConnection?.credentials?.pageId) {
+        await subscribePageToWebhookEvents(igConnection.credentials.pageAccessToken, igConnection.credentials.pageId, 'messages,messaging_postbacks,messaging_optins')
+      }
       await saveStore(store)
 
       const success = new URL(redirectUri)
@@ -1917,6 +2021,10 @@ export async function appHandler(req, res) {
         token_type: body.get('token_type') || '',
         expires_in: body.get('expires_in') || '',
       }, selected)
+      const fbConnection = findCompanyConnection(store, companyId, 'facebook')
+      if (fbConnection?.credentials?.accessToken) {
+        await subscribePageToWebhookEvents(fbConnection.credentials.accessToken, fbConnection.externalId, 'messages,messaging_postbacks,messaging_optins,comments')
+      }
       await saveStore(store)
 
       const success = new URL(redirectUri)
@@ -1938,7 +2046,18 @@ export async function appHandler(req, res) {
     }
 
     if (req.method === 'POST' && url.pathname === '/meta/webhook') {
-      const body = await readBody(req)
+      const chunks = []
+      for await (const chunk of req) chunks.push(chunk)
+      const rawBody = Buffer.concat(chunks)
+      const body = rawBody.length ? JSON.parse(rawBody.toString('utf8')) : {}
+
+      const appSecret = process.env.META_APP_SECRET
+      if (appSecret) {
+        const sig = req.headers['x-hub-signature-256'] || ''
+        const expected = 'sha256=' + createHmac('sha256', appSecret).update(rawBody).digest('hex')
+        if (sig !== expected) return json(res, 403, { error: 'Invalid webhook signature.' })
+      }
+
       const incoming = normalizeMetaWebhook(body, store)
       const saved = await saveIncomingItems(store, incoming)
       await saveStore(store)
