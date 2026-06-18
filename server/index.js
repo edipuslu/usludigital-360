@@ -3,6 +3,7 @@ import { readFile, writeFile, mkdir } from 'node:fs/promises'
 import { existsSync } from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { createHash } from 'node:crypto'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const DATA_DIR = process.env.VERCEL ? '/tmp/usludigital-360-data' : path.join(__dirname, 'data')
@@ -255,6 +256,8 @@ async function loadStore() {
       }
     }
 
+    const persistedItems = storedData?.items || await loadInboxItemsFromSupabase(base, headers)
+
     return {
       ...structuredClone(DEFAULT_STORE),
       ...(storedData || {}),
@@ -263,7 +266,7 @@ async function loadStore() {
         ...(storedData?.connections || {}),
         ...connections,
       },
-      items: storedData?.items || [],
+      items: persistedItems,
     }
   }
 
@@ -354,6 +357,8 @@ async function saveStore(store) {
         throw new Error(error?.message || `Supabase connection save failed with HTTP ${connectionResponse.status}`)
       }
     }
+
+    await saveInboxItemsToSupabase(base, headers, store.items || [])
     return
   }
 
@@ -400,6 +405,135 @@ async function deleteConnectionFromSupabase(companyId, platform) {
 
 function connectionKey(platform, externalId) {
   return `${platform}:${externalId}`
+}
+
+function deterministicUuid(value) {
+  const hex = createHash('sha256').update(String(value)).digest('hex').slice(0, 32)
+  return [
+    hex.slice(0, 8),
+    hex.slice(8, 12),
+    `5${hex.slice(13, 16)}`,
+    `${(parseInt(hex.slice(16, 18), 16) & 0x3f | 0x80).toString(16).padStart(2, '0')}${hex.slice(18, 20)}`,
+    hex.slice(20, 32),
+  ].join('-')
+}
+
+function inboxMeta(item) {
+  return {
+    text: item.text || '',
+    type: item.type || 'comment',
+    externalId: item.externalId || item.id || '',
+    sourceLink: item.sourceLink || item.postUrl || '',
+    senderId: item.senderId || '',
+    likes: Number(item.likes || 0),
+  }
+}
+
+function parseInboxContent(content) {
+  try {
+    const parsed = JSON.parse(content || '')
+    if (parsed && typeof parsed === 'object' && typeof parsed.text === 'string') return parsed
+  } catch {
+    // Older rows may be plain text.
+  }
+  return { text: content || '' }
+}
+
+async function loadInboxItemsFromSupabase(base, headers) {
+  const conversationsResponse = await fetch(`${base}/rest/v1/conversations?select=id,company_id,platform,customer_name,status,created_at&status=in.(comment,dm)&order=created_at.desc&limit=1000`, { headers })
+  const conversations = await conversationsResponse.json().catch(() => [])
+  if (!conversationsResponse.ok || !Array.isArray(conversations) || !conversations.length) return []
+
+  const ids = conversations.map(conversation => conversation.id).filter(Boolean)
+  if (!ids.length) return []
+
+  const messagesResponse = await fetch(`${base}/rest/v1/messages?select=id,conversation_id,author_name,content,is_ai_reply,created_at&conversation_id=in.(${ids.join(',')})&order=created_at.desc&limit=1000`, { headers })
+  const messages = await messagesResponse.json().catch(() => [])
+  if (!messagesResponse.ok || !Array.isArray(messages)) return []
+
+  const conversationById = Object.fromEntries(conversations.map(conversation => [conversation.id, conversation]))
+  return messages
+    .filter(message => !message.is_ai_reply && conversationById[message.conversation_id])
+    .map(message => {
+      const conversation = conversationById[message.conversation_id]
+      const parsed = parseInboxContent(message.content)
+      return {
+        id: message.id,
+        companyId: conversation.company_id,
+        platform: conversation.platform,
+        type: parsed.type || conversation.status || 'comment',
+        senderName: message.author_name || conversation.customer_name || 'Customer',
+        senderId: parsed.senderId || '',
+        text: parsed.text || message.content || '',
+        sourceLink: parsed.sourceLink || '',
+        externalId: parsed.externalId || message.id,
+        likes: Number(parsed.likes || 0),
+        receivedAt: message.created_at || conversation.created_at || new Date().toISOString(),
+        status: 'synced',
+        aiReply: '',
+        error: '',
+      }
+    })
+}
+
+async function saveInboxItemsToSupabase(base, headers, items = []) {
+  const inboxItems = items.filter(item => item.companyId && item.platform && item.type && item.text)
+  if (!inboxItems.length) return
+
+  const conversations = []
+  const messages = []
+  const seen = new Set()
+
+  for (const item of inboxItems) {
+    const externalId = item.externalId || item.id
+    const conversationId = deterministicUuid(`${item.companyId}:${item.platform}:${item.type}:${externalId}:conversation`)
+    const messageId = deterministicUuid(`${item.companyId}:${item.platform}:${item.type}:${externalId}:message`)
+    if (seen.has(messageId)) continue
+    seen.add(messageId)
+
+    conversations.push({
+      id: conversationId,
+      company_id: item.companyId,
+      platform: item.platform,
+      customer_name: item.senderName || 'Customer',
+      status: item.type,
+      created_at: item.receivedAt || new Date().toISOString(),
+    })
+    messages.push({
+      id: messageId,
+      conversation_id: conversationId,
+      author_name: item.senderName || 'Customer',
+      content: JSON.stringify(inboxMeta({ ...item, externalId })),
+      is_ai_reply: false,
+      created_at: item.receivedAt || new Date().toISOString(),
+    })
+  }
+
+  const conversationResponse = await fetch(`${base}/rest/v1/conversations`, {
+    method: 'POST',
+    headers: {
+      ...headers,
+      Prefer: 'resolution=merge-duplicates',
+    },
+    body: JSON.stringify(conversations),
+  })
+  if (!conversationResponse.ok && conversationResponse.status !== 404) {
+    const error = await conversationResponse.json().catch(() => ({}))
+    throw new Error(error?.message || `Supabase inbox conversations save failed with HTTP ${conversationResponse.status}`)
+  }
+
+  const messageResponse = await fetch(`${base}/rest/v1/messages`, {
+    method: 'POST',
+    headers: {
+      ...headers,
+      Prefer: 'resolution=merge-duplicates',
+    },
+    body: JSON.stringify(messages),
+  })
+  if (!messageResponse.ok && messageResponse.status !== 404) {
+    const error = await messageResponse.json().catch(() => ({}))
+    throw new Error(error?.message || `Supabase inbox messages save failed with HTTP ${messageResponse.status}`)
+  }
 }
 
 function rememberConnection(store, companyId, platform, connection) {
