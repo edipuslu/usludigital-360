@@ -65,7 +65,10 @@ const NavItem = ({ icon: Icon, label, to, badge, collapsed, active, onClick }) =
       </span>
     )}
     {collapsed && (
-      <div className="absolute left-full ml-2 px-3 py-2 bg-slate-900 text-white text-xs rounded-lg opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap pointer-events-none z-50 before:absolute before:-left-1.5 before:top-1/2 before:-translate-y-1/2 before:w-0 before:h-0 before:border-4 before:border-transparent before:border-r-slate-900">
+      <div className="absolute left-full ml-3 px-3 py-2 bg-slate-900 text-white text-xs rounded-lg opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap pointer-events-none z-50" style={{
+        boxShadow: '0 4px 12px rgba(0, 0, 0, 0.5)',
+        clipPath: 'polygon(8px 0, 100% 0, 100% 100%, 8px 100%, 0 50%)'
+      }}>
         {label}
       </div>
     )}
