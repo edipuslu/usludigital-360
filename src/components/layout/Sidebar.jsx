@@ -83,7 +83,6 @@ export default function Sidebar({ companyId, companyName, onNavigate, currentSec
     navigate('/login')
   }
 
-  const [growthExpanded, setGrowthExpanded] = useState(false)
   const [inboxExpanded, setInboxExpanded] = useState(false)
 
   // Role-based navigation
@@ -91,7 +90,7 @@ export default function Sidebar({ companyId, companyName, onNavigate, currentSec
     { icon: LayoutDashboard, label: 'Overview', key: 'overview', roles: ['admin', 'client'] },
     { icon: Globe, label: 'Platforms', key: 'platforms', roles: ['admin'] },
     { icon: Inbox, label: 'Inbox', key: 'inbox', submenu: 'inbox', roles: ['admin', 'client'] },
-    { icon: TrendingUp, label: 'Social Media Analytics', key: 'growth', submenu: true, roles: ['admin', 'client'] },
+    { icon: TrendingUp, label: 'Social Media Analytics', key: 'growth', roles: ['admin', 'client'] },
     { icon: Brain, label: 'AI Training', key: 'ai-training', roles: ['admin'] },
     { icon: Zap, label: 'Automation', key: 'automation', roles: ['admin'] },
     { icon: BarChart3, label: 'Analytics', key: 'analytics', roles: ['admin', 'client'] },
@@ -100,13 +99,6 @@ export default function Sidebar({ companyId, companyName, onNavigate, currentSec
 
   const userRole = user?.email === 'admin@usludigital.com' ? 'admin' : 'client'
   const companyNav = allTabs.filter(tab => tab.roles.includes(userRole))
-
-  const platformGrowth = [
-    { label: 'Instagram Analytics', key: 'growth-instagram', platform: 'instagram' },
-    { label: 'Facebook Analytics', key: 'growth-facebook', platform: 'facebook' },
-    { label: 'YouTube Analytics', key: 'growth-youtube', platform: 'youtube' },
-    { label: 'WhatsApp Analytics', key: 'growth-whatsapp', platform: 'whatsapp' },
-  ]
 
   const platformInbox = [
     { label: 'Instagram Inbox', key: 'inbox-instagram' },
@@ -161,13 +153,11 @@ export default function Sidebar({ companyId, companyName, onNavigate, currentSec
                   icon={item.icon}
                   label={item.label}
                   collapsed={collapsed}
-                  active={currentSection === item.key || (item.submenu === 'inbox' && currentSection?.startsWith('inbox')) || (item.submenu === true && currentSection?.startsWith('growth'))}
+                  active={currentSection === item.key || (item.key === 'growth' && currentSection?.startsWith('growth')) || (item.submenu === 'inbox' && currentSection?.startsWith('inbox'))}
                   onClick={() => {
                     if (item.submenu === 'inbox') {
                       setInboxExpanded(!inboxExpanded)
                       onNavigate?.(item.key)
-                    } else if (item.submenu) {
-                      setGrowthExpanded(!growthExpanded)
                     } else {
                       onNavigate?.(item.key)
                     }
@@ -176,25 +166,6 @@ export default function Sidebar({ companyId, companyName, onNavigate, currentSec
                 {item.submenu === 'inbox' && inboxExpanded && !collapsed && (
                   <div className="bg-white/5 rounded-lg mt-1 p-2 space-y-1 ml-2 border-l border-blue-500/20">
                     {platformInbox.map(platform => (
-                      <button
-                        key={platform.key}
-                        onClick={() => onNavigate?.(platform.key)}
-                        className={clsx(
-                          'w-full flex items-center gap-2 text-xs font-medium cursor-pointer transition-colors rounded px-2 py-1.5',
-                          currentSection === platform.key
-                            ? 'bg-blue-600/30 text-blue-300'
-                            : 'text-slate-400 hover:bg-white/5 hover:text-slate-200'
-                        )}
-                        title={platform.label}
-                      >
-                        <span className="flex-1 text-left text-xs">{platform.label}</span>
-                      </button>
-                    ))}
-                  </div>
-                )}
-                {item.submenu === true && growthExpanded && !collapsed && (
-                  <div className="bg-white/5 rounded-lg mt-1 p-2 space-y-1 ml-2 border-l border-blue-500/20">
-                    {platformGrowth.map(platform => (
                       <button
                         key={platform.key}
                         onClick={() => onNavigate?.(platform.key)}

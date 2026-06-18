@@ -5,6 +5,13 @@ import { SectionHeader, PlatformIcon } from '../ui/UIKit'
 import { fetchGrowthMetrics } from '../../lib/backendApi'
 
 const PLATFORM_ORDER = ['instagram', 'facebook', 'youtube', 'whatsapp']
+const ANALYTICS_NAV = [
+  { key: 'overview', label: 'Overview' },
+  { key: 'instagram', label: 'Instagram' },
+  { key: 'facebook', label: 'Facebook' },
+  { key: 'youtube', label: 'YouTube' },
+  { key: 'whatsapp', label: 'WhatsApp' },
+]
 
 const PLATFORMS_CONFIG = {
   instagram: {
@@ -297,6 +304,88 @@ function PostRow({ post, platform, showFocus }) {
   )
 }
 
+function AnalyticsNavItem({ item, active, platformData, onClick }) {
+  const isPlatform = item.key !== 'overview'
+  const summary = isPlatform ? platformData?.[item.key]?.summary : null
+  const hasData = Boolean(summary)
+
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={`w-full flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-semibold cursor-pointer transition-colors ${active ? 'bg-slate-200 text-slate-950' : 'text-slate-500 hover:bg-slate-100 hover:text-slate-800'}`}
+    >
+      <span className="w-7 h-7 rounded-md bg-white border border-slate-200 flex items-center justify-center flex-shrink-0">
+        {isPlatform ? (
+          <PlatformIcon platform={item.key} size={15} connected={hasData} />
+        ) : (
+          <BarChart3 size={15} className="text-slate-500" />
+        )}
+      </span>
+      <span className="flex-1 text-left">{item.label}</span>
+      {isPlatform && hasData && <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />}
+    </button>
+  )
+}
+
+function OverviewPanel({ platformData, onSelect }) {
+  return (
+    <div className="space-y-6">
+      <div>
+        <h2 className="text-slate-900 font-bold text-2xl">Overview</h2>
+        <p className="text-slate-500 text-sm mt-1">Choose a platform to inspect followers, posts, comments, and monthly progress.</p>
+      </div>
+
+      <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
+        {PLATFORM_ORDER.map(platform => {
+          const config = PLATFORMS_CONFIG[platform]
+          const data = platformData?.[platform]
+          const summary = data?.summary
+          const connected = Boolean(summary)
+          return (
+            <button
+              key={platform}
+              type="button"
+              onClick={() => onSelect(platform)}
+              className="text-left rounded-lg border border-slate-200 bg-white hover:border-slate-300 hover:shadow-sm p-5 cursor-pointer transition-all"
+            >
+              <div className="flex items-start justify-between gap-4">
+                <div className="flex items-start gap-3 min-w-0">
+                  <div className="w-11 h-11 rounded-lg flex items-center justify-center flex-shrink-0" style={{ backgroundColor: config.bg }}>
+                    <PlatformIcon platform={platform} size={22} connected={connected} />
+                  </div>
+                  <div className="min-w-0">
+                    <div className="text-slate-900 font-bold text-base">{config.label}</div>
+                    <div className="text-slate-500 text-xs mt-1">{connected ? 'Analytics synced' : 'Waiting for synced data'}</div>
+                  </div>
+                </div>
+                <div className={connected ? 'text-emerald-600 text-xs font-bold' : 'text-slate-400 text-xs font-bold'}>
+                  {connected ? 'Active' : 'No data'}
+                </div>
+              </div>
+
+              <div className="grid grid-cols-3 gap-3 mt-5">
+                <div>
+                  <div className="text-slate-900 text-lg font-bold">{formatNumber(summary?.followers || 0)}</div>
+                  <div className="text-slate-400 text-xs">Followers</div>
+                </div>
+                <div>
+                  <div className="text-slate-900 text-lg font-bold">{formatNumber(summary?.totalPosts || summary?.postsThisMonth || 0)}</div>
+                  <div className="text-slate-400 text-xs">{platform === 'youtube' ? 'Videos' : platform === 'whatsapp' ? 'Messages' : 'Posts'}</div>
+                </div>
+                <div>
+                  <div className="text-slate-900 text-lg font-bold">{formatNumber(summary?.commentsThisMonth || 0)}</div>
+                  <div className="text-slate-400 text-xs">{platform === 'whatsapp' ? 'DMs' : 'Comments'}</div>
+                </div>
+              </div>
+            </button>
+          )
+        })}
+      </div>
+    </div>
+  )
+}
+
 function PlatformSection({ platform, data, activeDetail, onDetailChange }) {
   const config = PLATFORMS_CONFIG[platform]
   const hasData = Boolean(data?.summary)
@@ -345,11 +434,19 @@ export default function GrowthTab({ company, platform }) {
   const [growth, setGrowth] = useState(null)
   const [loading, setLoading] = useState(true)
   const [refreshing, setRefreshing] = useState(false)
+  const [activePanel, setActivePanel] = useState(platform || 'overview')
   const [activeDetail, setActiveDetail] = useState({ platform: platform || 'instagram', type: 'posts' })
 
   useEffect(() => {
     loadGrowth()
   }, [company.id])
+
+  useEffect(() => {
+    if (platform) {
+      setActivePanel(platform)
+      setActiveDetail(current => ({ platform, type: current.type || 'posts' }))
+    }
+  }, [platform])
 
   const loadGrowth = async () => {
     try {
@@ -388,32 +485,59 @@ export default function GrowthTab({ company, platform }) {
     )
   }
 
-  const platformsToShow = platform ? [platform] : PLATFORM_ORDER
-  const config = platform ? PLATFORMS_CONFIG[platform] : null
+  const activeConfig = activePanel !== 'overview' ? PLATFORMS_CONFIG[activePanel] : null
+  const activeTitle = activePanel === 'overview' ? 'Social Media Analytics' : `${activeConfig.label} Analytics`
+  const activeDescription = activePanel === 'overview'
+    ? 'A simpler view for platform performance. Pick a section on the left to see only that platform on the right.'
+    : activeConfig.description
 
   return (
-    <div className="space-y-8 animate-slide-in">
-      <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
-        <SectionHeader
-          title={platform ? `${config.label} Analytics` : 'Social Media Analytics'}
-          description={platform ? config.description : 'View analytics separately for Instagram, Facebook, YouTube, and WhatsApp.'}
-        />
-        <button onClick={refreshGrowth} disabled={refreshing} className="btn-secondary self-start">
-          <RefreshCw size={14} className={refreshing ? 'animate-spin' : ''} />
-          Refresh
-        </button>
-      </div>
+    <div className="animate-slide-in">
+      <div className="flex flex-col lg:flex-row min-h-[680px] overflow-hidden rounded-lg border border-slate-200 bg-white">
+        <aside className="w-full lg:w-64 flex-shrink-0 border-b lg:border-b-0 lg:border-r border-slate-200 bg-slate-50/80 p-4">
+          <div className="px-2 py-2 mb-3">
+            <div className="text-slate-900 font-bold text-base">Social Media Analytics</div>
+            <div className="text-slate-500 text-xs mt-1">Platform performance</div>
+          </div>
+          <div className="space-y-1">
+            {ANALYTICS_NAV.map(item => (
+              <AnalyticsNavItem
+                key={item.key}
+                item={item}
+                active={activePanel === item.key}
+                platformData={platformData}
+                onClick={() => {
+                  setActivePanel(item.key)
+                  if (item.key !== 'overview') setActiveDetail({ platform: item.key, type: 'posts' })
+                }}
+              />
+            ))}
+          </div>
+        </aside>
 
-      <div className="space-y-6">
-        {platformsToShow.map(plt => (
-          <PlatformSection
-            key={plt}
-            platform={plt}
-            data={platformData?.[plt]}
-            activeDetail={activeDetail}
-            onDetailChange={(nextPlatform, type) => setActiveDetail({ platform: nextPlatform, type })}
-          />
-        ))}
+        <main className="flex-1 min-w-0 bg-white p-5 lg:p-8">
+          <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4 mb-8">
+            <SectionHeader title={activeTitle} description={activeDescription} />
+            <button onClick={refreshGrowth} disabled={refreshing} className="btn-secondary self-start">
+              <RefreshCw size={14} className={refreshing ? 'animate-spin' : ''} />
+              Refresh
+            </button>
+          </div>
+
+          {activePanel === 'overview' ? (
+            <OverviewPanel platformData={platformData} onSelect={nextPlatform => {
+              setActivePanel(nextPlatform)
+              setActiveDetail({ platform: nextPlatform, type: 'posts' })
+            }} />
+          ) : (
+            <PlatformSection
+              platform={activePanel}
+              data={platformData?.[activePanel]}
+              activeDetail={activeDetail}
+              onDetailChange={(nextPlatform, type) => setActiveDetail({ platform: nextPlatform, type })}
+            />
+          )}
+        </main>
       </div>
     </div>
   )
