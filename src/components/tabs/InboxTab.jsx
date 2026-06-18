@@ -1,10 +1,36 @@
-import { useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { MessageCircle, Send, Search, Filter, Heart, MessageSquare, Calendar, User, ExternalLink, Loader } from 'lucide-react'
 import { PlatformIcon, SectionHeader } from '../ui/UIKit'
+import { fetchInbox } from '../../lib/backendApi'
 import clsx from 'clsx'
 
 const PLATFORMS = ['instagram', 'facebook', 'youtube', 'whatsapp']
 const PLATFORM_LABELS = { instagram: 'Instagram', facebook: 'Facebook', youtube: 'YouTube', whatsapp: 'WhatsApp' }
+
+function formatInboxDate(value) {
+  if (!value) return 'Unknown date'
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) return value
+  return date.toLocaleString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })
+}
+
+function normalizeInboxItem(item) {
+  return {
+    id: item.id,
+    platform: item.platform || 'instagram',
+    isDM: item.type === 'dm',
+    authorName: item.senderName || item.authorName || 'Customer',
+    authorUrl: item.sourceLink || '',
+    content: item.text || item.content || '',
+    date: formatInboxDate(item.receivedAt || item.date),
+    likes: Number(item.likes || 0),
+    aiReplied: Boolean(item.aiReply),
+    aiReply: item.aiReply || '',
+    error: item.error || '',
+    status: item.status || '',
+    replies: [],
+  }
+}
 
 function MessageCard({ msg, onReply, isReply = false, isAdmin = true }) {
   const [showReplyBox, setShowReplyBox] = useState(false)
@@ -30,9 +56,11 @@ function MessageCard({ msg, onReply, isReply = false, isAdmin = true }) {
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2">
             <span className="text-slate-900 font-semibold text-sm">{msg.authorName}</span>
-            <a href={msg.authorUrl} target="_blank" rel="noreferrer" className="text-slate-400 hover:text-blue-600">
-              <ExternalLink size={12} />
-            </a>
+            {msg.authorUrl && (
+              <a href={msg.authorUrl} target="_blank" rel="noreferrer" className="text-slate-400 hover:text-blue-600">
+                <ExternalLink size={12} />
+              </a>
+            )}
           </div>
           <div className="flex items-center gap-2 mt-0.5">
             <PlatformIcon platform={msg.platform} size={12} connected={true} />
@@ -91,7 +119,7 @@ function MessageCard({ msg, onReply, isReply = false, isAdmin = true }) {
   )
 }
 
-function PlatformSection({ platform, messages, onReply, isDM = false }) {
+function PlatformSection({ platform, messages, onReply, isDM = false, isAdmin = true }) {
   const filtered = messages.filter(m => m.platform === platform && m.isDM === isDM)
   return (
     <div className="mb-8">
@@ -116,25 +144,47 @@ function PlatformSection({ platform, messages, onReply, isDM = false }) {
   )
 }
 
-export default function InboxTab({ company, isAdmin = true }) {
+export default function InboxTab({ company, platform, isAdmin = true }) {
   const [activeSection, setActiveSection] = useState('comments')
-  const [messages, setMessages] = useState([
-    { id: 'msg-1', platform: 'instagram', isDM: false, authorName: 'Ali K.', authorUrl: 'https://instagram.com/alik', content: 'Beautiful collection! Do you ship internationally?', date: 'Today', likes: 3, aiReplied: false, replies: [] },
-    { id: 'msg-2', platform: 'facebook', isDM: false, authorName: 'Zeynep D.', authorUrl: 'https://facebook.com/zeynepd', content: 'What are the dimensions of the Luna sofa?', date: 'Yesterday', likes: 0, aiReplied: true, aiReply: 'Thanks! Luna sofa: 240cm W × 95cm D × 85cm H. Message us on WhatsApp for orders!', replies: [] },
-    { id: 'msg-3', platform: 'instagram', isDM: true, authorName: 'Fatih M.', authorUrl: 'https://instagram.com/fatihm', content: 'Hi! I\'m interested in the bedroom set. Can you send the price list?', date: 'Jun 15', likes: 0, aiReplied: false, replies: [] },
-    { id: 'msg-4', platform: 'youtube', isDM: false, authorName: 'Design Lover', authorUrl: 'https://youtube.com/@designlover', content: 'This is amazing! Where do you source your materials?', date: 'Jun 14', likes: 12, aiReplied: true, aiReply: 'We work with certified Turkish manufacturers. Feel free to reach out!', replies: [{ id: 'reply-1', platform: 'youtube', isDM: false, authorName: 'Design Lover', authorUrl: 'https://youtube.com/@designlover', content: 'Awesome, thanks!', date: 'Jun 14', likes: 2, aiReplied: false, replies: [] }] },
-  ])
+  const [messages, setMessages] = useState([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState('')
+
+  useEffect(() => {
+    let alive = true
+    setLoading(true)
+    setError('')
+    fetchInbox(company.id, 'all')
+      .then(data => {
+        if (!alive) return
+        setMessages((data.items || []).map(normalizeInboxItem))
+      })
+      .catch(err => {
+        if (!alive) return
+        setError(err.message || 'Could not load inbox messages.')
+      })
+      .finally(() => alive && setLoading(false))
+    return () => {
+      alive = false
+    }
+  }, [company.id])
 
   const handleReply = (msgId, text) => {
     setMessages(msgs => msgs.map(msg => msg.id === msgId ? { ...msg, aiReplied: true, aiReply: text } : msg))
   }
 
-  const commentCount = messages.filter(m => !m.isDM).length
-  const dmCount = messages.filter(m => m.isDM).length
+  const platformsToShow = platform ? [platform] : PLATFORMS
+  const visibleMessages = useMemo(
+    () => platform ? messages.filter(message => message.platform === platform) : messages,
+    [messages, platform]
+  )
+  const commentCount = visibleMessages.filter(m => !m.isDM).length
+  const dmCount = visibleMessages.filter(m => m.isDM).length
+  const platformLabel = platform ? PLATFORM_LABELS[platform] : 'All Platforms'
 
   return (
     <div className="space-y-6 animate-slide-in">
-      <SectionHeader title="Inbox & Messages" description="View and reply to comments and DMs from all connected platforms" action={
+      <SectionHeader title={platform ? `${platformLabel} Inbox` : 'Inbox & Messages'} description={platform ? `View ${platformLabel} comments and DMs only.` : 'View and reply to comments and DMs from all connected platforms'} action={
         <div className="flex items-center gap-1 bg-white border border-slate-200 rounded-lg p-1">
           {[['comments', `Comments (${commentCount})`], ['dms', `DMs (${dmCount})`]].map(([v, l]) => (
             <button key={v} onClick={() => setActiveSection(v)} className={clsx('px-4 py-2 rounded-md text-xs font-semibold cursor-pointer', activeSection === v ? 'bg-blue-600 text-white shadow-sm' : 'text-slate-500 hover:text-slate-700')}>
@@ -150,23 +200,33 @@ export default function InboxTab({ company, isAdmin = true }) {
         </div>
         <button className="btn-secondary"><Filter size={14} /> Filter</button>
       </div>
-      <div>
+      {error && (
+        <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm font-medium text-red-700">
+          {error}
+        </div>
+      )}
+      {loading && (
+        <div className="flex items-center justify-center py-16">
+          <Loader size={28} className="animate-spin text-blue-600" />
+        </div>
+      )}
+      {!loading && <div>
         {activeSection === 'comments' ? (
           <div>
-            <h2 className="text-slate-900 font-bold text-lg mb-4">All Comments</h2>
+            <h2 className="text-slate-900 font-bold text-lg mb-4">{platform ? `${platformLabel} Comments` : 'All Comments'}</h2>
             <div className="grid grid-cols-1 gap-6">
-              {PLATFORMS.map(platform => <PlatformSection key={platform} platform={platform} messages={messages} onReply={handleReply} isDM={false} />)}
+              {platformsToShow.map(platformKey => <PlatformSection key={platformKey} platform={platformKey} messages={messages} onReply={handleReply} isDM={false} isAdmin={isAdmin} />)}
             </div>
           </div>
         ) : (
           <div>
-            <h2 className="text-slate-900 font-bold text-lg mb-4">Direct Messages</h2>
+            <h2 className="text-slate-900 font-bold text-lg mb-4">{platform ? `${platformLabel} Direct Messages` : 'Direct Messages'}</h2>
             <div className="grid grid-cols-1 gap-6">
-              {PLATFORMS.map(platform => <PlatformSection key={platform} platform={platform} messages={messages} onReply={handleReply} isDM={true} />)}
+              {platformsToShow.map(platformKey => <PlatformSection key={platformKey} platform={platformKey} messages={messages} onReply={handleReply} isDM={true} isAdmin={isAdmin} />)}
             </div>
           </div>
         )}
-      </div>
+      </div>}
     </div>
   )
 }

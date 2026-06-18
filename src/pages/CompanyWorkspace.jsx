@@ -30,6 +30,10 @@ const SECTION_LABELS = {
   overview: 'Overview',
   platforms: 'Platforms',
   inbox: 'Inbox',
+  'inbox-instagram': 'Instagram Inbox',
+  'inbox-facebook': 'Facebook Inbox',
+  'inbox-youtube': 'YouTube Inbox',
+  'inbox-whatsapp': 'WhatsApp Inbox',
   growth: 'Social Media Analytics',
   'growth-instagram': 'Instagram Analytics',
   'growth-facebook': 'Facebook Analytics',
@@ -254,6 +258,10 @@ export default function CompanyWorkspace() {
   }
 
   const platformMap = {
+    'inbox-instagram': 'instagram',
+    'inbox-facebook': 'facebook',
+    'inbox-youtube': 'youtube',
+    'inbox-whatsapp': 'whatsapp',
     'growth-instagram': 'instagram',
     'growth-facebook': 'facebook',
     'growth-youtube': 'youtube',
@@ -265,7 +273,11 @@ export default function CompanyWorkspace() {
   const tabContent = {
     overview: <OverviewTab company={company} onNavigate={setActiveTab} />,
     platforms: <PlatformsTab company={company} onUpdate={updateCompany} onNotify={addNotification} />,
-    inbox: <InboxTab company={company} onNotify={addNotification} />,
+    inbox: <InboxTab company={company} onNotify={addNotification} isAdmin={isAdmin} />,
+    'inbox-instagram': <InboxTab company={company} platform="instagram" onNotify={addNotification} isAdmin={isAdmin} />,
+    'inbox-facebook': <InboxTab company={company} platform="facebook" onNotify={addNotification} isAdmin={isAdmin} />,
+    'inbox-youtube': <InboxTab company={company} platform="youtube" onNotify={addNotification} isAdmin={isAdmin} />,
+    'inbox-whatsapp': <InboxTab company={company} platform="whatsapp" onNotify={addNotification} isAdmin={isAdmin} />,
     growth: <GrowthTab company={company} isAdmin={isAdmin} />,
     'growth-instagram': <GrowthTab company={company} platform="instagram" isAdmin={isAdmin} />,
     'growth-facebook': <GrowthTab company={company} platform="facebook" isAdmin={isAdmin} />,

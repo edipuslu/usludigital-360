@@ -84,12 +84,13 @@ export default function Sidebar({ companyId, companyName, onNavigate, currentSec
   }
 
   const [growthExpanded, setGrowthExpanded] = useState(false)
+  const [inboxExpanded, setInboxExpanded] = useState(false)
 
   // Role-based navigation
   const allTabs = [
     { icon: LayoutDashboard, label: 'Overview', key: 'overview', roles: ['admin', 'client'] },
     { icon: Globe, label: 'Platforms', key: 'platforms', roles: ['admin'] },
-    { icon: Inbox, label: 'Inbox', key: 'inbox', roles: ['admin', 'client'] },
+    { icon: Inbox, label: 'Inbox', key: 'inbox', submenu: 'inbox', roles: ['admin', 'client'] },
     { icon: TrendingUp, label: 'Social Media Analytics', key: 'growth', submenu: true, roles: ['admin', 'client'] },
     { icon: Brain, label: 'AI Training', key: 'ai-training', roles: ['admin'] },
     { icon: Zap, label: 'Automation', key: 'automation', roles: ['admin'] },
@@ -105,6 +106,13 @@ export default function Sidebar({ companyId, companyName, onNavigate, currentSec
     { icon: '👥', label: 'Facebook Analytics', key: 'growth-facebook', platform: 'facebook' },
     { icon: '▶️', label: 'YouTube Analytics', key: 'growth-youtube', platform: 'youtube' },
     { icon: '💬', label: 'WhatsApp Analytics', key: 'growth-whatsapp', platform: 'whatsapp' },
+  ]
+
+  const platformInbox = [
+    { label: 'Instagram Inbox', key: 'inbox-instagram' },
+    { label: 'Facebook Inbox', key: 'inbox-facebook' },
+    { label: 'YouTube Inbox', key: 'inbox-youtube' },
+    { label: 'WhatsApp Inbox', key: 'inbox-whatsapp' },
   ]
 
   const bottomNav = [
@@ -153,16 +161,38 @@ export default function Sidebar({ companyId, companyName, onNavigate, currentSec
                   icon={item.icon}
                   label={item.label}
                   collapsed={collapsed}
-                  active={currentSection === item.key || (item.submenu && currentSection?.startsWith('growth'))}
+                  active={currentSection === item.key || (item.submenu === 'inbox' && currentSection?.startsWith('inbox')) || (item.submenu === true && currentSection?.startsWith('growth'))}
                   onClick={() => {
-                    if (item.submenu) {
+                    if (item.submenu === 'inbox') {
+                      setInboxExpanded(!inboxExpanded)
+                      onNavigate?.(item.key)
+                    } else if (item.submenu) {
                       setGrowthExpanded(!growthExpanded)
                     } else {
                       onNavigate?.(item.key)
                     }
                   }}
                 />
-                {item.submenu && growthExpanded && !collapsed && (
+                {item.submenu === 'inbox' && inboxExpanded && !collapsed && (
+                  <div className="bg-white/5 rounded-lg mt-1 p-2 space-y-1 ml-2 border-l border-blue-500/20">
+                    {platformInbox.map(platform => (
+                      <button
+                        key={platform.key}
+                        onClick={() => onNavigate?.(platform.key)}
+                        className={clsx(
+                          'w-full flex items-center gap-2 text-xs font-medium cursor-pointer transition-colors rounded px-2 py-1.5',
+                          currentSection === platform.key
+                            ? 'bg-blue-600/30 text-blue-300'
+                            : 'text-slate-400 hover:bg-white/5 hover:text-slate-200'
+                        )}
+                        title={platform.label}
+                      >
+                        <span className="flex-1 text-left text-xs">{platform.label}</span>
+                      </button>
+                    ))}
+                  </div>
+                )}
+                {item.submenu === true && growthExpanded && !collapsed && (
                   <div className="bg-white/5 rounded-lg mt-1 p-2 space-y-1 ml-2 border-l border-blue-500/20">
                     {platformGrowth.map(platform => (
                       <button
