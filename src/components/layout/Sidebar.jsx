@@ -120,33 +120,9 @@ export default function Sidebar({ companyId, companyName, onNavigate, currentSec
       )}
       style={{ background: 'linear-gradient(180deg, #07091A 0%, #060812 100%)' }}
     >
-      <Logo collapsed={collapsed} />
-
-      <div className="flex-1 overflow-y-auto overflow-x-hidden px-2 pt-2 scrollbar-thin">
+      <div className="flex-1 overflow-y-auto overflow-x-hidden px-2 pt-4 scrollbar-thin">
         <>
-          {isAdmin && (
-            <button
-              onClick={() => navigate('/admin')}
-              className={clsx(
-                'w-full flex items-center gap-2 text-slate-500 hover:text-slate-300 text-xs font-medium cursor-pointer transition-colors mb-3 mt-1 px-3 py-1.5 rounded-lg hover:bg-white/5',
-                collapsed && 'justify-center px-2'
-              )}
-            >
-              <ArrowLeft size={13} />
-              {!collapsed && 'Back to Companies'}
-            </button>
-          )}
-
-          {companyName && !collapsed && (
-            <div className="px-3 mb-3">
-              <div className="bg-blue-600/10 border border-blue-500/20 rounded-lg px-3 py-2">
-                <div className="text-[10px] text-slate-500 font-medium uppercase tracking-wider mb-0.5">Company</div>
-                <div className="text-white text-sm font-semibold truncate">{companyName}</div>
-              </div>
-            </div>
-          )}
-
-          <NavSection label="Company Dashboard" collapsed={collapsed}>
+          <NavSection label="" collapsed={collapsed}>
             {companyNav.map(item => (
               <div key={item.key}>
                 <NavItem
@@ -187,7 +163,7 @@ export default function Sidebar({ companyId, companyName, onNavigate, currentSec
           </NavSection>
         </>
 
-        <NavSection label="Account" collapsed={collapsed}>
+        <NavSection label="" collapsed={collapsed}>
           {bottomNav.map(item => (
             <NavItem
               key={item.key}
