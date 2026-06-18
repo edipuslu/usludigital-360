@@ -212,11 +212,10 @@ async function loadStore() {
       headers,
     })
     const rows = await response.json().catch(() => [])
+    let storedData = null
     if (response.ok) {
-      return { ...structuredClone(DEFAULT_STORE), ...(rows[0]?.data || {}) }
-    }
-
-    if (response.status !== 404) {
+      storedData = rows[0]?.data || null
+    } else if (response.status !== 404) {
       throw new Error(rows?.message || `Supabase load failed with HTTP ${response.status}`)
     }
 
@@ -258,8 +257,13 @@ async function loadStore() {
 
     return {
       ...structuredClone(DEFAULT_STORE),
+      ...(storedData || {}),
       companies,
-      connections,
+      connections: {
+        ...(storedData?.connections || {}),
+        ...connections,
+      },
+      items: storedData?.items || [],
     }
   }
 
