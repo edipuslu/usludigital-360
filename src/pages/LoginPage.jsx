@@ -47,7 +47,7 @@ export default function LoginPage() {
       </div>
 
       {/* Right panel */}
-      <div className="flex-1 flex items-center justify-center p-6 lg:p-12" style={{ background: '#F8FAFC' }}>
+      <div className="flex-1 flex items-center justify-center p-6 lg:p-8 overflow-hidden" style={{ background: '#F8FAFC' }}>
         <div className="w-full max-w-md">
           <div className="lg:hidden flex items-center gap-3 mb-8">
             <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-blue-500 to-blue-700 flex items-center justify-center">
