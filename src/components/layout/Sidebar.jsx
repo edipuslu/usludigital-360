@@ -76,7 +76,7 @@ export default function Sidebar({ companyId, companyName, onNavigate, currentSec
   const { user, isAdmin, logout } = useAuth()
   const navigate = useNavigate()
   const location = useLocation()
-  const [collapsed, setCollapsed] = useState(false)
+  const [collapsed, setCollapsed] = useState(true)
 
   const handleLogout = () => {
     logout()
