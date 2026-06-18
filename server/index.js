@@ -11,7 +11,7 @@ const STORE_PATH = path.join(DATA_DIR, 'store.json')
 const PORT = Number(process.env.API_PORT || 8787)
 const HOST = process.env.API_HOST || '127.0.0.1'
 const VERIFY_TOKEN = process.env.META_VERIFY_TOKEN || 'change-this-verify-token'
-const OPENAI_MODEL = process.env.OPENAI_MODEL || 'gpt-4o-mini'
+const OPENAI_MODEL = process.env.OPENAI_MODEL || 'gpt-5-nano'
 const SUPABASE_URL = process.env.SUPABASE_URL || ''
 const SUPABASE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_ANON_KEY || ''
 const SUPABASE_STORE_TABLE = process.env.SUPABASE_STORE_TABLE || 'ud360_store'
@@ -1934,7 +1934,7 @@ export async function appHandler(req, res) {
       if (!company) return json(res, 404, { error: 'Company not found.' })
       return json(res, 200, {
         hasOpenaiKey: Boolean(company.openaiKey || process.env.OPENAI_API_KEY),
-        model: process.env.OPENAI_MODEL || 'gpt-4o-mini',
+        model: OPENAI_MODEL,
         aiTraining: company.aiTraining || {},
         automation: company.automation || {},
       })
