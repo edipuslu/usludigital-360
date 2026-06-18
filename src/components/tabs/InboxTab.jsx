@@ -320,6 +320,7 @@ export default function InboxTab({ company, platform, isAdmin = true }) {
   const [autoRepliedCount, setAutoRepliedCount] = useState(0)
   const [syncWarnings, setSyncWarnings] = useState([])
   const [syncing, setSyncing] = useState(false)
+  const [lastUpdated, setLastUpdated] = useState(null)
 
   useEffect(() => {
     let alive = true
@@ -332,6 +333,7 @@ export default function InboxTab({ company, platform, isAdmin = true }) {
         setSyncedCount(Number(data.synced || 0))
         setAutoRepliedCount(Number(data.autoReplied || 0))
         setSyncWarnings(data.syncErrors || [])
+        setLastUpdated(new Date())
       })
       .catch(err => {
         if (!alive) return
@@ -343,12 +345,39 @@ export default function InboxTab({ company, platform, isAdmin = true }) {
     }
   }, [company.id])
 
+  useEffect(() => {
+    let cancelled = false
+    let busy = false
+
+    const refreshSaved = async () => {
+      if (busy) return
+      busy = true
+      try {
+        const data = await fetchInbox(company.id, 'all')
+        if (cancelled) return
+        setMessages((data.items || []).map(normalizeInboxItem))
+        setLastUpdated(new Date())
+      } catch {
+        // Keep polling quiet so Inbox still feels instant, like a cached chat inbox.
+      } finally {
+        busy = false
+      }
+    }
+
+    const timer = window.setInterval(refreshSaved, 6000)
+    return () => {
+      cancelled = true
+      window.clearInterval(timer)
+    }
+  }, [company.id])
+
   const reloadInbox = async () => {
     const data = await fetchInbox(company.id, 'all')
     setMessages((data.items || []).map(normalizeInboxItem))
     setSyncedCount(Number(data.synced || 0))
     setAutoRepliedCount(Number(data.autoReplied || 0))
     setSyncWarnings(data.syncErrors || [])
+    setLastUpdated(new Date())
   }
 
   const syncLiveMessages = async () => {
@@ -360,6 +389,7 @@ export default function InboxTab({ company, platform, isAdmin = true }) {
       setSyncedCount(Number(data.synced || 0))
       setAutoRepliedCount(Number(data.autoReplied || 0))
       setSyncWarnings(data.syncErrors || [])
+      setLastUpdated(new Date())
     } catch (err) {
       setError(err.message || 'Could not sync live inbox messages.')
     } finally {
@@ -389,8 +419,11 @@ export default function InboxTab({ company, platform, isAdmin = true }) {
       {!loading && isAdmin && (
         <div className="flex items-center justify-between gap-3 rounded-lg border border-slate-200 bg-white px-4 py-3">
           <div>
-            <div className="text-slate-900 text-sm font-bold">Inbox loads saved messages first</div>
-            <div className="text-slate-500 text-xs mt-0.5">Use live sync only when you want to pull latest platform comments and DMs.</div>
+            <div className="text-slate-900 text-sm font-bold">Inbox updates in the background</div>
+            <div className="text-slate-500 text-xs mt-0.5">
+              Cached messages load instantly. New webhook messages appear automatically; use Sync now to pull latest platform history.
+              {lastUpdated && ` Last updated ${lastUpdated.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}.`}
+            </div>
           </div>
           <button onClick={syncLiveMessages} disabled={syncing} className="btn-secondary justify-center flex-shrink-0">
             {syncing ? <Loader size={14} className="animate-spin" /> : <RefreshCw size={14} />} Sync now
