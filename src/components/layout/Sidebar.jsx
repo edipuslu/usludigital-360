@@ -64,11 +64,6 @@ const NavItem = ({ icon: Icon, label, to, badge, collapsed, active, onClick }) =
         {badge}
       </span>
     )}
-    {collapsed && (
-      <div className="absolute left-[76px] top-1/2 -translate-y-1/2 px-2 py-1 bg-black text-white text-xs rounded z-50 whitespace-nowrap">
-        {label}
-      </div>
-    )}
   </button>
 )
 
@@ -118,7 +113,7 @@ export default function Sidebar({ companyId, companyName, onNavigate, currentSec
         'flex flex-col h-screen sticky top-0 flex-shrink-0 transition-[width] duration-300 ease-in-out',
         collapsed ? 'w-[68px]' : 'w-[240px]'
       )}
-      style={{ background: 'linear-gradient(180deg, #07091A 0%, #060812 100%)' }}
+      style={{ background: '#1a1f3a' }}
     >
       <div className="flex-1 overflow-y-auto overflow-x-visible px-2 pt-4 scrollbar-thin">
         <>
