@@ -26,6 +26,23 @@ const TABS = [
   { key: 'reports', label: 'Reports', roles: ['admin', 'client'] },
 ]
 
+const SECTION_LABELS = {
+  overview: 'Overview',
+  platforms: 'Platforms',
+  inbox: 'Inbox',
+  growth: 'Social Media Analytics',
+  'growth-instagram': 'Instagram Analytics',
+  'growth-facebook': 'Facebook Analytics',
+  'growth-youtube': 'YouTube Analytics',
+  'growth-whatsapp': 'WhatsApp Analytics',
+  'ai-training': 'AI Training',
+  automation: 'Automation',
+  analytics: 'Analytics',
+  reports: 'Reports',
+  notifications: 'Notifications',
+  settings: 'Settings',
+}
+
 function NotificationsPanel({ notifications, onMarkAllRead, onRemove }) {
   return (
     <div className="space-y-6 animate-slide-in">
@@ -302,7 +319,7 @@ export default function CompanyWorkspace() {
               <ChevronRight size={11} />
               <span className="text-slate-600 font-medium">{company.name}</span>
               <ChevronRight size={11} />
-              <span className="text-slate-600 font-medium capitalize">{activeTab.replace('-', ' ')}</span>
+              <span className="text-slate-600 font-medium">{SECTION_LABELS[activeTab] || activeTab}</span>
             </div>
             <div className="flex items-center gap-3">
               <h1 className="text-slate-900 text-xl font-bold">{company.name}</h1>
