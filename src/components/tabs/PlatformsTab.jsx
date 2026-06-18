@@ -607,13 +607,15 @@ function PlatformCard({ platform, guide, data, backendConnections = [], onConnec
                   Login
                 </button>
               )}
-              <button
-                onClick={() => setShowGuide(true)}
-                className={clsx(supportsOAuth ? 'btn-secondary text-xs py-1.5' : 'btn-primary text-xs py-1.5')}
-                style={!supportsOAuth ? { background: guide.color } : undefined}
-              >
-                Setup
-              </button>
+              {!supportsOAuth && (
+                <button
+                  onClick={() => setShowGuide(true)}
+                  className="btn-primary text-xs py-1.5"
+                  style={{ background: guide.color }}
+                >
+                  Connect
+                </button>
+              )}
             </div>
           )}
         </div>
@@ -629,7 +631,7 @@ function PlatformCard({ platform, guide, data, backendConnections = [], onConnec
             </div>
           </div>
         ) : (
-          <div className="space-y-3">
+          <div>
             {supportsOAuth && (
               <button
                 type="button"
@@ -648,16 +650,23 @@ function PlatformCard({ platform, guide, data, backendConnections = [], onConnec
                 <ChevronRight size={16} className="text-white/80" />
               </button>
             )}
-            <button
-              onClick={() => setShowGuide(true)}
-              className="w-full flex items-center justify-between p-4 border-2 border-dashed border-slate-200 rounded-xl hover:border-slate-300 hover:bg-slate-50 cursor-pointer transition-all group"
-            >
-              <div className="text-left">
-                <div className="text-slate-700 font-semibold text-sm group-hover:text-slate-900">{supportsOAuth ? 'Manual Setup Guide' : 'Step-by-Step Setup Guide'}</div>
-                <div className="text-slate-400 text-xs mt-0.5">{guide.steps.length} steps · Includes instructions and direct links</div>
-              </div>
-              <ChevronRight size={16} className="text-slate-400 group-hover:text-slate-600 group-hover:translate-x-0.5 transition-all" />
-            </button>
+            {!supportsOAuth && (
+              <button
+                type="button"
+                onClick={() => setShowGuide(true)}
+                className="w-full flex items-center justify-between p-4 rounded-xl text-white cursor-pointer transition-all"
+                style={{ background: guide.color }}
+              >
+                <div className="flex items-center gap-2 text-left">
+                  <LogIn size={16} />
+                  <div>
+                    <div className="font-semibold text-sm">Connect {guide.name}</div>
+                    <div className="text-white/80 text-xs mt-0.5">Enter the required account credentials.</div>
+                  </div>
+                </div>
+                <ChevronRight size={16} className="text-white/80" />
+              </button>
+            )}
           </div>
         )}
       </div>
