@@ -709,6 +709,7 @@ async function instagramGrowthMetrics(store, companyId) {
   const commentsThisMonth = sum(thisMonthPosts, 'comments_count')
   const commentsPreviousMonth = sum(previousMonthPosts, 'comments_count')
   const likesThisMonth = sum(thisMonthPosts, 'like_count')
+  const likesPreviousMonth = sum(previousMonthPosts, 'like_count')
   const followers = Number(profile.followers_count || 0)
 
   return {
@@ -733,6 +734,8 @@ async function instagramGrowthMetrics(store, companyId) {
       commentsPreviousMonth,
       commentsChange: commentsThisMonth - commentsPreviousMonth,
       likesThisMonth,
+      likesPreviousMonth,
+      likesChange: likesThisMonth - likesPreviousMonth,
       engagementRate: followers ? Number((((likesThisMonth + commentsThisMonth) / followers) * 100).toFixed(2)) : 0,
       currentMonthLabel: thisMonthStart.toLocaleString('en', { month: 'long', year: 'numeric' }),
       previousMonthLabel: previousMonthStart.toLocaleString('en', { month: 'long', year: 'numeric' }),
@@ -813,6 +816,7 @@ async function facebookGrowthMetrics(store, companyId) {
   const commentsThisMonth = thisMonthPosts.reduce((total, item) => total + Number(item.comments?.summary?.total_count || 0), 0)
   const commentsPreviousMonth = previousMonthPosts.reduce((total, item) => total + Number(item.comments?.summary?.total_count || 0), 0)
   const likesThisMonth = thisMonthPosts.reduce((total, item) => total + Number(item.likes?.summary?.total_count || 0), 0)
+  const likesPreviousMonth = previousMonthPosts.reduce((total, item) => total + Number(item.likes?.summary?.total_count || 0), 0)
   const followers = Number(profile.followers_count || profile.fan_count || 0)
 
   return {
@@ -835,6 +839,8 @@ async function facebookGrowthMetrics(store, companyId) {
       commentsPreviousMonth,
       commentsChange: commentsThisMonth - commentsPreviousMonth,
       likesThisMonth,
+      likesPreviousMonth,
+      likesChange: likesThisMonth - likesPreviousMonth,
       engagementRate: followers ? Number((((likesThisMonth + commentsThisMonth) / followers) * 100).toFixed(2)) : 0,
       currentMonthLabel: thisMonthStart.toLocaleString('en', { month: 'long', year: 'numeric' }),
       previousMonthLabel: previousMonthStart.toLocaleString('en', { month: 'long', year: 'numeric' }),

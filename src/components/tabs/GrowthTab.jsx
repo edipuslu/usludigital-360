@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { BarChart3, ExternalLink, Eye, FileText, Loader, LogIn, MessageCircle, RefreshCw, Trash2, UserPlus, Users } from 'lucide-react'
+import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
 import { SectionHeader, PlatformIcon } from '../ui/UIKit'
 import { backendUrl, deleteConnection, fetchGrowthMetrics, getConnections } from '../../lib/backendApi'
 
@@ -118,6 +119,83 @@ function MetricButton({ stat, color, active, onClick }) {
       <div className="text-slate-600 text-sm font-semibold mt-1">{stat.label}</div>
       {stat.muted && <div className="text-slate-400 text-xs mt-2 truncate">{stat.muted}</div>}
     </button>
+  )
+}
+
+function AnalyticsGraph({ platform, data }) {
+  const config = PLATFORMS_CONFIG[platform]
+  const summary = data?.summary
+
+  if (!summary) {
+    return (
+      <div className="rounded-lg border border-slate-200 bg-slate-50 p-5">
+        <div className="flex items-center gap-2 text-slate-700 font-bold text-sm">
+          <BarChart3 size={16} className="text-slate-400" />
+          Monthly trend graph
+        </div>
+        <p className="text-slate-500 text-sm mt-2">Connect {config.label} to show the increase or decrease visually.</p>
+      </div>
+    )
+  }
+
+  const previousLabel = summary.previousMonthLabel || 'Previous month'
+  const currentLabel = summary.currentMonthLabel || 'Current month'
+  const chartData = [
+    {
+      name: previousLabel,
+      posts: Number(summary.postsPreviousMonth || 0),
+      comments: Number(summary.commentsPreviousMonth || 0),
+      likes: Number(summary.likesPreviousMonth || 0),
+    },
+    {
+      name: currentLabel,
+      posts: Number(summary.postsThisMonth || 0),
+      comments: Number(summary.commentsThisMonth || 0),
+      likes: Number(summary.likesThisMonth || 0),
+    },
+  ]
+
+  const totals = chartData.reduce((total, row) => total + row.posts + row.comments + row.likes, 0)
+  const changeTotal = Number(summary.postsChange || 0) + Number(summary.commentsChange || 0) + Number(summary.likesChange || 0)
+
+  return (
+    <div className="rounded-lg border border-slate-200 bg-white p-5">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-4">
+        <div>
+          <div className="text-slate-900 font-bold text-sm flex items-center gap-2">
+            <BarChart3 size={16} className="text-slate-400" />
+            Monthly trend graph
+          </div>
+          <p className="text-slate-500 text-xs mt-1">Previous month compared with the current month.</p>
+        </div>
+        <div className={changeTotal >= 0 ? 'text-emerald-600 text-xs font-bold' : 'text-red-600 text-xs font-bold'}>
+          {changeTotal >= 0 ? '+' : ''}{formatNumber(changeTotal)} total change
+        </div>
+      </div>
+
+      {totals === 0 ? (
+        <div className="h-56 rounded-lg border border-dashed border-slate-200 bg-slate-50 flex items-center justify-center text-slate-500 text-sm">
+          No monthly activity yet.
+        </div>
+      ) : (
+        <div className="h-64">
+          <ResponsiveContainer width="100%" height="100%">
+            <BarChart data={chartData} margin={{ top: 8, right: 12, left: -18, bottom: 0 }}>
+              <CartesianGrid strokeDasharray="3 3" stroke="#E2E8F0" vertical={false} />
+              <XAxis dataKey="name" tick={{ fontSize: 11, fill: '#64748B' }} tickLine={false} axisLine={false} />
+              <YAxis tick={{ fontSize: 11, fill: '#94A3B8' }} tickLine={false} axisLine={false} allowDecimals={false} />
+              <Tooltip
+                cursor={{ fill: '#F8FAFC' }}
+                contentStyle={{ borderRadius: 8, border: '1px solid #E2E8F0', boxShadow: '0 10px 30px rgba(15,23,42,0.08)' }}
+              />
+              <Bar dataKey="posts" name="Posts" fill={config.color} radius={[4, 4, 0, 0]} />
+              <Bar dataKey="comments" name="Comments" fill="#2563EB" radius={[4, 4, 0, 0]} />
+              <Bar dataKey="likes" name="Likes" fill="#10B981" radius={[4, 4, 0, 0]} />
+            </BarChart>
+          </ResponsiveContainer>
+        </div>
+      )}
+    </div>
   )
 }
 
@@ -305,6 +383,8 @@ function PlatformSection({ platform, data, accounts, companyId, activeDetail, on
             />
           ))}
         </div>
+
+        <AnalyticsGraph platform={platform} data={data} />
 
         <DetailPanel platform={platform} type={activeDetail.platform === platform ? activeDetail.type : 'posts'} data={data} />
 

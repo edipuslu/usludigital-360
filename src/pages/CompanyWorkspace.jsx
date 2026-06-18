@@ -17,13 +17,13 @@ import GrowthTab from '../components/tabs/GrowthTab'
 import clsx from 'clsx'
 
 const TABS = [
-  { key: 'overview', label: 'Overview' },
-  { key: 'platforms', label: 'Platforms' },
-  { key: 'inbox', label: 'Inbox' },
-  { key: 'ai-training', label: 'AI Training' },
-  { key: 'automation', label: 'Automation' },
-  { key: 'analytics', label: 'Analytics' },
-  { key: 'reports', label: 'Reports' },
+  { key: 'overview', label: 'Overview', roles: ['admin', 'client'] },
+  { key: 'platforms', label: 'Platforms', roles: ['admin'] },
+  { key: 'inbox', label: 'Inbox', roles: ['admin', 'client'] },
+  { key: 'ai-training', label: 'AI Training', roles: ['admin'] },
+  { key: 'automation', label: 'Automation', roles: ['admin'] },
+  { key: 'analytics', label: 'Analytics', roles: ['admin', 'client'] },
+  { key: 'reports', label: 'Reports', roles: ['admin', 'client'] },
 ]
 
 function NotificationsPanel({ notifications, onMarkAllRead, onRemove }) {
@@ -242,17 +242,19 @@ export default function CompanyWorkspace() {
     'growth-youtube': 'youtube',
     'growth-whatsapp': 'whatsapp',
   }
+  const userRole = isAdmin ? 'admin' : 'client'
+  const visibleTabs = TABS.filter(tab => tab.roles.includes(userRole))
 
   const tabContent = {
     overview: <OverviewTab company={company} onNavigate={setActiveTab} />,
     platforms: <PlatformsTab company={company} onUpdate={updateCompany} onNotify={addNotification} />,
     inbox: <InboxTab company={company} onNotify={addNotification} />,
-    growth: <GrowthTab company={company} />,
-    'growth-instagram': <GrowthTab company={company} platform="instagram" />,
-    'growth-facebook': <GrowthTab company={company} platform="facebook" />,
-    'growth-youtube': <GrowthTab company={company} platform="youtube" />,
-    'growth-whatsapp': <GrowthTab company={company} platform="whatsapp" />,
-    'ai-training': <AITrainingTab company={company} onUpdate={updateCompany} onNotify={addNotification} />,
+    growth: <GrowthTab company={company} isAdmin={isAdmin} />,
+    'growth-instagram': <GrowthTab company={company} platform="instagram" isAdmin={isAdmin} />,
+    'growth-facebook': <GrowthTab company={company} platform="facebook" isAdmin={isAdmin} />,
+    'growth-youtube': <GrowthTab company={company} platform="youtube" isAdmin={isAdmin} />,
+    'growth-whatsapp': <GrowthTab company={company} platform="whatsapp" isAdmin={isAdmin} />,
+    'ai-training': <AITrainingTab company={company} onUpdate={updateCompany} onNotify={addNotification} isAdmin={isAdmin} />,
     automation: <AutomationTab company={company} onUpdate={updateCompany} onNotify={addNotification} />,
     analytics: <AnalyticsTab company={company} />,
     reports: <ReportsTab company={company} isAdmin={isAdmin} onUpdate={updateCompany} onNotify={addNotification} />,
@@ -336,7 +338,7 @@ export default function CompanyWorkspace() {
         {/* Tabs */}
         <div className="bg-white border-b border-slate-200 px-8">
           <div className="flex gap-0">
-            {TABS.map(tab => (
+            {visibleTabs.map(tab => (
               <button
                 key={tab.key}
                 onClick={() => setActiveTab(tab.key)}

@@ -34,9 +34,11 @@ function DocumentRow({ doc, onRemove }) {
           <StatusBadge status={doc.status === 'active' ? 'active' : 'training'} />
         </div>
       </div>
-      <button onClick={() => onRemove(doc.id)} className="opacity-0 group-hover:opacity-100 transition-opacity p-1.5 hover:bg-red-50 rounded-lg cursor-pointer text-slate-400 hover:text-red-500">
-        <Trash2 size={13} />
-      </button>
+      {onRemove && (
+        <button onClick={() => onRemove(doc.id)} className="opacity-0 group-hover:opacity-100 transition-opacity p-1.5 hover:bg-red-50 rounded-lg cursor-pointer text-slate-400 hover:text-red-500">
+          <Trash2 size={13} />
+        </button>
+      )}
     </div>
   )
 }
@@ -205,7 +207,7 @@ function OpenAIKeySection({ apiKey, onKeyChange }) {
   )
 }
 
-export default function AITrainingTab({ company, onUpdate, onNotify }) {
+export default function AITrainingTab({ company, onUpdate, onNotify, isAdmin = true }) {
   const [docs, setDocs] = useState(company.aiTraining.documents)
   const [guardrails, setGuardrails] = useState(company.aiTraining.guardrails)
   const [description, setDescription] = useState(company.aiTraining.description)
@@ -309,11 +311,11 @@ export default function AITrainingTab({ company, onUpdate, onNotify }) {
     <div className="space-y-6 animate-slide-in">
       <SectionHeader
         title="AI Training Center"
-        description="Add your OpenAI key and upload business context so the AI replies accurately in your brand's voice"
+        description={isAdmin ? "Add your OpenAI key and upload business context so the AI replies accurately in your brand's voice" : "View the AI training status and business context configured by the admin."}
         action={
           <div className="flex items-center gap-2">
-            <StatusBadge status={apiKey ? 'active' : 'needs_update'} />
-            {docs.length > 0 && (
+            <StatusBadge status={isAdmin ? (apiKey ? 'active' : 'needs_update') : company.aiTraining.status} />
+            {isAdmin && docs.length > 0 && (
               <button onClick={() => saveTraining('active')} className="btn-primary">
                 <RefreshCw size={14} /> Retrain AI
               </button>
@@ -325,8 +327,19 @@ export default function AITrainingTab({ company, onUpdate, onNotify }) {
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Left — OpenAI key + documents */}
         <div className="lg:col-span-2 space-y-5">
-          {/* OpenAI Key — most important, show first */}
-          <OpenAIKeySection apiKey={apiKey} onKeyChange={setApiKey} />
+          {isAdmin ? (
+            <OpenAIKeySection apiKey={apiKey} onKeyChange={setApiKey} />
+          ) : (
+            <div className="card p-5">
+              <div className="flex items-center gap-2 mb-2">
+                <Shield size={15} className="text-slate-400" />
+                <h3 className="text-slate-900 font-bold text-base">AI Connection</h3>
+              </div>
+              <p className="text-slate-500 text-sm leading-relaxed">
+                OpenAI API keys and platform credentials are managed only by the admin workspace.
+              </p>
+            </div>
+          )}
 
           {/* Documents */}
           <div className="card p-5">
@@ -336,10 +349,16 @@ export default function AITrainingTab({ company, onUpdate, onNotify }) {
               </h3>
               <span className="text-slate-400 text-xs">{docs.length} file{docs.length !== 1 ? 's' : ''}</span>
             </div>
-            <DropZone onFileDrop={handleFileDrop} />
+            {isAdmin ? (
+              <DropZone onFileDrop={handleFileDrop} />
+            ) : (
+              <div className="rounded-xl border border-slate-200 bg-slate-50 p-4 text-sm text-slate-500">
+                Training files are managed by the admin workspace.
+              </div>
+            )}
             {docs.length > 0 && (
               <div className="mt-4">
-                {docs.map(doc => <DocumentRow key={doc.id} doc={doc} onRemove={handleRemove} />)}
+                {docs.map(doc => <DocumentRow key={doc.id} doc={doc} onRemove={isAdmin ? handleRemove : undefined} />)}
               </div>
             )}
           </div>
@@ -353,8 +372,8 @@ export default function AITrainingTab({ company, onUpdate, onNotify }) {
               <div>
                 <label className="block text-sm font-semibold text-slate-700 mb-1.5">Website URL</label>
                 <div className="flex gap-2">
-                  <input value={websiteUrl} onChange={e => setWebsiteUrl(e.target.value)} className="input-field flex-1" placeholder="https://yourbusiness.com" />
-                  <button onClick={() => saveTraining('training')} className="btn-secondary flex-shrink-0">Crawl</button>
+                  <input value={websiteUrl} onChange={e => setWebsiteUrl(e.target.value)} disabled={!isAdmin} className="input-field flex-1 disabled:opacity-60 disabled:cursor-not-allowed" placeholder="https://yourbusiness.com" />
+                  {isAdmin && <button onClick={() => saveTraining('training')} className="btn-secondary flex-shrink-0">Crawl</button>}
                 </div>
                 <p className="text-slate-400 text-xs mt-1.5">AI will use your website content as additional context</p>
               </div>
@@ -363,8 +382,9 @@ export default function AITrainingTab({ company, onUpdate, onNotify }) {
                 <textarea
                   value={description}
                   onChange={e => setDescription(e.target.value)}
+                  disabled={!isAdmin}
                   rows={4}
-                  className="input-field resize-none"
+                  className="input-field resize-none disabled:opacity-60 disabled:cursor-not-allowed"
                   placeholder="Describe this business: what it sells, who the customers are, location, unique selling points, anything the AI needs to know to reply correctly…"
                 />
               </div>
@@ -372,7 +392,7 @@ export default function AITrainingTab({ company, onUpdate, onNotify }) {
           </div>
 
           {/* AI Test Console */}
-          <div className="card p-5">
+          {isAdmin && <div className="card p-5">
             <h3 className="text-slate-900 font-bold text-base flex items-center gap-2 mb-1">
               <Brain size={15} className="text-slate-400" /> Test AI Responses
             </h3>
@@ -414,7 +434,7 @@ export default function AITrainingTab({ company, onUpdate, onNotify }) {
                 </div>
               )}
             </div>
-          </div>
+          </div>}
         </div>
 
         {/* Right — settings */}
@@ -436,8 +456,9 @@ export default function AITrainingTab({ company, onUpdate, onNotify }) {
                 <textarea
                   value={fallback}
                   onChange={e => setFallback(e.target.value)}
+                  disabled={!isAdmin}
                   rows={3}
-                  className="input-field resize-none text-xs"
+                  className="input-field resize-none text-xs disabled:opacity-60 disabled:cursor-not-allowed"
                 />
               </div>
             </div>
@@ -452,8 +473,10 @@ export default function AITrainingTab({ company, onUpdate, onNotify }) {
                 <button
                   key={tone.value}
                   onClick={() => setSelectedTone(tone.value)}
+                  disabled={!isAdmin}
                   className={clsx(
-                    'w-full flex items-center gap-3 p-3 rounded-lg border cursor-pointer transition-all text-left',
+                    'w-full flex items-center gap-3 p-3 rounded-lg border transition-all text-left disabled:cursor-not-allowed disabled:opacity-70',
+                    isAdmin && 'cursor-pointer',
                     selectedTone === tone.value ? 'border-blue-300 bg-blue-50' : 'border-slate-100 hover:border-slate-200 hover:bg-slate-50'
                   )}
                 >
@@ -476,7 +499,7 @@ export default function AITrainingTab({ company, onUpdate, onNotify }) {
             </div>
             <ul className="space-y-2">
               {[
-                { label: 'OpenAI API key added', done: !!apiKey },
+                ...(isAdmin ? [{ label: 'OpenAI API key added', done: !!apiKey }] : []),
                 { label: 'Business description written', done: !!description.trim() },
                 { label: 'Training documents uploaded', done: docs.length > 0 },
                 { label: 'Fallback message set', done: !!fallback.trim() },
