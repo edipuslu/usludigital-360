@@ -46,10 +46,11 @@ export function createCompany({ name, industry }) {
       tone: 'professional',
     },
     automation: {
-      instagram: { dmReply: false, commentReply: false, tone: 'professional', blacklist: [] },
-      facebook: { dmReply: false, commentReply: false, tone: 'professional', blacklist: [] },
+      schedule: { enabled: true, startAt: '', endAt: '', timezone: 'Africa/Casablanca' },
+      instagram: { dmReply: true, commentReply: true, tone: 'professional', blacklist: [] },
+      facebook: { dmReply: true, commentReply: true, tone: 'professional', blacklist: [] },
       youtube: { dmReply: false, commentReply: false, tone: 'professional', blacklist: [] },
-      whatsapp: { dmReply: false, commentReply: false, tone: 'professional', blacklist: [] },
+      whatsapp: { dmReply: true, commentReply: false, tone: 'professional', blacklist: [] },
     },
     metrics: {
       thisMonth: {

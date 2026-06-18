@@ -52,6 +52,16 @@ const emptyHeatmap = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'].map(day =
   hours: Array.from({ length: 24 }, (_, h) => ({ hour: h, value: 0 })),
 }))
 
+function automationDefaults() {
+  return {
+    schedule: { enabled: true, startAt: '', endAt: '', timezone: 'Africa/Casablanca' },
+    instagram: { dmReply: true, commentReply: true, tone: 'professional', blacklist: [] },
+    facebook: { dmReply: true, commentReply: true, tone: 'professional', blacklist: [] },
+    youtube: { dmReply: false, commentReply: false, tone: 'professional', blacklist: [] },
+    whatsapp: { dmReply: true, commentReply: false, tone: 'professional', blacklist: [] },
+  }
+}
+
 function companyDefaults(row = {}) {
   const name = row.name || 'Company'
   const slug = name.toLowerCase().trim().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'company'
@@ -85,12 +95,7 @@ function companyDefaults(row = {}) {
       description: '',
       tone: 'professional',
     },
-    automation: {
-      instagram: { dmReply: false, commentReply: false, tone: 'professional', blacklist: [] },
-      facebook: { dmReply: false, commentReply: false, tone: 'professional', blacklist: [] },
-      youtube: { dmReply: false, commentReply: false, tone: 'professional', blacklist: [] },
-      whatsapp: { dmReply: false, commentReply: false, tone: 'professional', blacklist: [] },
-    },
+    automation: automationDefaults(),
     metrics: {
       thisMonth: {
         totalReplies: 0,
@@ -253,7 +258,11 @@ async function loadStore() {
         goal: config.goal || defaults.goal,
         whatsappLink: config.whatsappLink || defaults.whatsappLink,
         aiTraining: { ...defaults.aiTraining, ...(config.aiTraining || {}) },
-        automation: { ...defaults.automation, ...(config.automation || {}) },
+        automation: {
+          ...defaults.automation,
+          ...(config.automation || {}),
+          schedule: { ...defaults.automation.schedule, ...(config.automation?.schedule || {}) },
+        },
         settings: { ...defaults.settings, ...(config.settings || {}) },
         updatedAt: config.updatedAt || defaults.updatedAt,
       }]
@@ -1424,15 +1433,31 @@ function systemPromptFor(company, item) {
   return [
     `You are replying for ${company?.name || 'this company'}.`,
     training.description ? `Business context: ${training.description}` : '',
-    `Platform: ${item.platform}. Message type: ${item.type}.`,
+    `Incoming ${item.type} on ${item.platform}: "${item.text || ''}"`,
     `Tone: ${automation.tone || training.tone || 'professional'}.`,
+    item.type === 'comment' ? 'Write a public comment reply that directly reacts to this specific comment. Do not sound copied or generic.' : '',
+    item.type === 'dm' ? 'Write a private DM reply that answers the customer naturally and moves the conversation forward.' : '',
     company?.goal === 'push_to_whatsapp' && company?.whatsappLink ? `Include this WhatsApp link naturally when helpful: ${company.whatsappLink}` : '',
     training.guardrails ? `If you are not sure, reply with this fallback: "${fallback}"` : '',
-    'Keep the reply concise, helpful, and safe. Do not invent prices, stock, dates, or promises.',
+    'Every reply must be different in wording. Do not reuse the same greeting or sentence pattern repeatedly.',
+    'Answer based on the message. If they ask price, availability, timing, location, or details you do not know, ask one helpful follow-up or use the fallback instead of inventing.',
+    'Keep replies concise, human, warm, and safe. Avoid sounding like an AI assistant.',
   ].filter(Boolean).join('\n')
 }
 
+function isAutomationScheduleActive(company) {
+  const schedule = company?.automation?.schedule || {}
+  if (schedule.enabled === false) return false
+  const now = Date.now()
+  const start = schedule.startAt ? Date.parse(schedule.startAt) : null
+  const end = schedule.endAt ? Date.parse(schedule.endAt) : null
+  if (start && Number.isFinite(start) && now < start) return false
+  if (end && Number.isFinite(end) && now > end) return false
+  return true
+}
+
 function shouldAutoReply(company, item) {
+  if (!isAutomationScheduleActive(company)) return false
   const settings = company?.automation?.[item.platform]
   if (!settings) return false
   if (item.type === 'comment' && !settings.commentReply) return false
@@ -1461,7 +1486,9 @@ async function generateAiReply(company, item, options = {}) {
           { role: 'system', content: systemPromptFor(company, item) },
           { role: 'user', content: item.text },
         ],
-        temperature: 0.6,
+        temperature: 0.85,
+        presence_penalty: 0.35,
+        frequency_penalty: 0.45,
         max_tokens: 180,
       }),
     })
@@ -1978,6 +2005,10 @@ export async function appHandler(req, res) {
         automation: {
           ...(existing.automation || {}),
           ...(body.company?.automation || {}),
+          schedule: {
+            ...(existing.automation?.schedule || automationDefaults().schedule),
+            ...(body.company?.automation?.schedule || {}),
+          },
         },
         openaiKey: nextOpenaiKey,
         updatedAt: new Date().toISOString(),

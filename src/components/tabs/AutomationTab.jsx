@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Save, Plus, X, Zap, MessageSquare, Link2, Volume2, ShieldOff } from 'lucide-react'
+import { Save, Plus, X, Zap, MessageSquare, Link2, Volume2, ShieldOff, Clock } from 'lucide-react'
 import { PlatformIcon, Toggle, SectionHeader } from '../ui/UIKit'
 import { saveBackendAiConfig } from '../../lib/backendApi'
 import clsx from 'clsx'
@@ -7,6 +7,14 @@ import clsx from 'clsx'
 const PLATFORMS = ['instagram', 'facebook', 'youtube', 'whatsapp']
 const PLATFORM_LABELS = { instagram: 'Instagram', facebook: 'Facebook', youtube: 'YouTube', whatsapp: 'WhatsApp Business' }
 const TONES = ['professional', 'friendly', 'luxury', 'casual']
+const DEFAULT_SCHEDULE = { enabled: true, startAt: '', endAt: '', timezone: 'Africa/Casablanca' }
+const DEFAULT_AUTOMATION = {
+  schedule: DEFAULT_SCHEDULE,
+  instagram: { dmReply: true, commentReply: true, tone: 'professional', blacklist: [] },
+  facebook: { dmReply: true, commentReply: true, tone: 'professional', blacklist: [] },
+  youtube: { dmReply: false, commentReply: false, tone: 'professional', blacklist: [] },
+  whatsapp: { dmReply: true, commentReply: false, tone: 'professional', blacklist: [] },
+}
 const GOALS = [
   { value: 'push_to_whatsapp', label: 'Push to WhatsApp', description: 'Every AI reply includes a WhatsApp CTA link' },
   { value: 'grow_followers', label: 'Grow Followers', description: 'Encourage following and sharing content' },
@@ -122,9 +130,26 @@ function PlatformAutomation({ platform, settings, onChange }) {
   )
 }
 
+function toLocalInputValue(value) {
+  if (!value) return ''
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) return ''
+  const offsetDate = new Date(date.getTime() - date.getTimezoneOffset() * 60000)
+  return offsetDate.toISOString().slice(0, 16)
+}
+
+function fromLocalInputValue(value) {
+  return value ? new Date(value).toISOString() : ''
+}
+
 export default function AutomationTab({ company, onUpdate, onNotify }) {
   const [activeP, setActiveP] = useState('instagram')
-  const [settings, setSettings] = useState(company.automation)
+  const initialAutomation = {
+    ...DEFAULT_AUTOMATION,
+    ...(company.automation || {}),
+    schedule: { ...DEFAULT_SCHEDULE, ...(company.automation?.schedule || {}) },
+  }
+  const [settings, setSettings] = useState(initialAutomation)
   const [goal, setGoal] = useState(company.goal)
   const [waLink, setWaLink] = useState(company.whatsappLink)
   const [saved, setSaved] = useState(false)
@@ -165,6 +190,51 @@ export default function AutomationTab({ company, onUpdate, onNotify }) {
           </button>
         }
       />
+
+      {/* Activation schedule */}
+      <div className="card p-5">
+        <div className="flex items-center justify-between gap-3 mb-4">
+          <div className="flex items-center gap-2">
+            <Clock size={16} className="text-blue-600" />
+            <h3 className="text-slate-900 font-bold text-base">AI Activation Time</h3>
+          </div>
+          <Toggle
+            checked={settings.schedule?.enabled !== false}
+            onChange={v => setSettings(prev => ({ ...prev, schedule: { ...(prev.schedule || DEFAULT_SCHEDULE), enabled: v } }))}
+            label="Active"
+            description=""
+          />
+        </div>
+        <p className="text-slate-500 text-sm mb-4">
+          Times are controlled in Morocco time. Leave stop time empty to keep AI running nonstop.
+        </p>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div>
+            <label className="block text-sm font-semibold text-slate-700 mb-1.5">Start replying from</label>
+            <input
+              type="datetime-local"
+              value={toLocalInputValue(settings.schedule?.startAt)}
+              onChange={e => setSettings(prev => ({ ...prev, schedule: { ...(prev.schedule || DEFAULT_SCHEDULE), startAt: fromLocalInputValue(e.target.value), timezone: 'Africa/Casablanca' } }))}
+              className="input-field"
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-semibold text-slate-700 mb-1.5">Stop replying at</label>
+            <input
+              type="datetime-local"
+              value={toLocalInputValue(settings.schedule?.endAt)}
+              onChange={e => setSettings(prev => ({ ...prev, schedule: { ...(prev.schedule || DEFAULT_SCHEDULE), endAt: fromLocalInputValue(e.target.value), timezone: 'Africa/Casablanca' } }))}
+              className="input-field"
+            />
+            <button
+              onClick={() => setSettings(prev => ({ ...prev, schedule: { ...(prev.schedule || DEFAULT_SCHEDULE), endAt: '' } }))}
+              className="mt-2 text-xs font-semibold text-blue-600 hover:text-blue-700"
+            >
+              Run nonstop
+            </button>
+          </div>
+        </div>
+      </div>
 
       {/* Business Goal */}
       <div className="card p-5">
@@ -233,7 +303,7 @@ export default function AutomationTab({ company, onUpdate, onNotify }) {
         <PlatformAutomation
           key={activeP}
           platform={activeP}
-          settings={settings[activeP]}
+          settings={settings[activeP] || DEFAULT_AUTOMATION[activeP]}
           onChange={s => setSettings(prev => ({ ...prev, [activeP]: s }))}
         />
       </div>
