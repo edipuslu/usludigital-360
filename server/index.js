@@ -10,7 +10,7 @@ const DATA_DIR = process.env.VERCEL ? '/tmp/usludigital-360-data' : path.join(__
 const STORE_PATH = path.join(DATA_DIR, 'store.json')
 const PORT = Number(process.env.API_PORT || 8787)
 const HOST = process.env.API_HOST || '127.0.0.1'
-const VERIFY_TOKEN = process.env.META_VERIFY_TOKEN || 'change-this-verify-token'
+const VERIFY_TOKEN = process.env.META_VERIFY_TOKEN || 'usludigital360webhook'
 const OPENAI_MODEL = process.env.OPENAI_MODEL || 'gpt-4.1-nano'
 const OPENAI_MODEL_FALLBACKS = [
   OPENAI_MODEL,

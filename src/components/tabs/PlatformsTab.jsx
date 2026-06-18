@@ -18,48 +18,55 @@ const PLATFORM_GUIDES = {
       {
         num: 1,
         title: 'Create or Open Meta Developer App',
-        description: 'Go to Meta for Developers, open My Apps, and create a Business app for this company connection.',
+        description: 'Go to Meta for Developers, open My Apps, and use the Meta app connected to this dashboard.',
         link: { label: 'Open Meta for Developers', url: 'https://developers.facebook.com' },
-        note: 'This is only the Meta app. Real auto-replies also need the backend webhook steps below.',
+        note: 'In Development Mode this can reply only to App Roles/Test Users. Public customer DMs need Meta approval later.',
       },
       {
         num: 2,
         title: 'Connect Instagram to a Facebook Page',
-        description: 'The Instagram account must be Business or Creator and linked to a Facebook Page. Personal Instagram accounts cannot be used for auto-reply.',
-        note: 'This is required because Instagram comment webhooks and replies go through Meta business assets.',
+        description: 'The Instagram account must be Business or Creator and linked to a Facebook Page. Choose the exact Page that owns the Instagram account you want.',
+        note: 'If you have many Instagram accounts, the OAuth chooser will let you pick the correct Page/Instagram pair.',
       },
       {
         num: 3,
-        title: 'Add Webhooks Product',
-        description: 'Inside the Meta app, add Webhooks. The app must call your backend callback URL whenever Instagram comments arrive.',
+        title: 'Add Your Test Friends',
+        description: 'In Meta App Roles, add each friend as a Tester/Developer and ask them to accept the invitation before they send a DM.',
+        note: 'This is the free testing path. DMs from people who are not accepted test users will not reach the app while it is in Development Mode.',
       },
       {
         num: 4,
-        title: 'Add Backend Callback URL',
-        description: 'Paste your backend URL, for example https://api.yourdomain.com/meta/webhook, and set a verify token. Meta will verify this URL before sending events.',
-        note: 'This dashboard cannot receive live comments by itself. A deployed backend endpoint is required.',
+        title: 'Add Webhooks Product',
+        description: 'Inside the Meta app, add Webhooks. The app must call your backend whenever Instagram DMs or comments arrive.',
       },
       {
         num: 5,
-        title: 'Subscribe to Comment Events',
-        description: 'Subscribe the app to Instagram comment-related webhook events for the connected business/page asset. This is what triggers the AI when a new comment appears.',
+        title: 'Add Backend Callback URL',
+        description: 'Paste https://360.usludigital.com/meta/webhook as the callback URL and use usludigital360webhook as the verify token.',
+        note: 'Meta must show the webhook as verified before live DMs can appear in the Inbox.',
       },
       {
         num: 6,
-        title: 'Get Long-Lived Access Token',
-        description: 'Use Graph API Explorer or OAuth to generate a long-lived token with permissions to read comments and publish replies.',
-        link: { label: 'Open Graph API Explorer', url: 'https://developers.facebook.com/tools/explorer' },
-        note: 'In production, OAuth should collect and refresh tokens automatically instead of manually pasting tokens.',
+        title: 'Subscribe to DM Events',
+        description: 'Subscribe the connected Page to messages, messaging_postbacks, messaging_optins, and comments. OAuth also tries to subscribe automatically after login.',
+        note: 'The messages subscription is what makes a real Instagram DM trigger the AI auto-reply.',
       },
       {
         num: 7,
-        title: 'Connect AI Reply Engine',
-        description: 'The backend receives the comment webhook, sends the comment plus company training context to the AI model, then posts the generated reply back to Instagram.',
+        title: 'Login from This Dashboard',
+        description: 'Click Login with Instagram below, pick the correct Facebook Page/Instagram account, and return to the company dashboard.',
+        note: 'After login, the backend saves the token and uses the same AI key for this company automatically.',
       },
       {
         num: 8,
-        title: 'Paste Temporary Credentials Below',
-        description: 'For this prototype, paste the Instagram Business Account ID and token below. For the real product, these should be saved by OAuth and encrypted on the backend.',
+        title: 'Test a Real DM',
+        description: 'Ask one accepted test user to send a new Instagram DM. The webhook receives it, the AI writes a unique reply, and the reply is posted back to Instagram.',
+        note: 'The local Test DM button proves AI generation only. A real Meta test-user DM is required to prove live posting.',
+      },
+      {
+        num: 9,
+        title: 'Check Inbox',
+        description: 'Open Inbox, choose Instagram DMs, and confirm the incoming DM plus AI reply are saved there.',
       },
     ],
   },
@@ -803,6 +810,7 @@ export default function PlatformsTab({ company, onUpdate, onNotify }) {
           <div className="text-amber-900 font-semibold text-sm mb-0.5">All platform logins live here</div>
           <div className="text-amber-800 text-sm leading-relaxed">
             Use this page to connect, reconnect, or disconnect accounts. Social Media Analytics is only for viewing followers, posts, comments, and growth.
+            Instagram DM AI replies can be tested now with Meta App Roles/Test Users; public users need Meta approval.
           </div>
         </div>
       </div>
@@ -812,7 +820,7 @@ export default function PlatformsTab({ company, onUpdate, onNotify }) {
           Deploy an endpoint like <span className="font-mono">/meta/webhook</span> with GET verification and POST event handling.
         </RequirementCard>
         <RequirementCard icon={KeyRound} title="2. Meta App + Permissions">
-          Create a Meta app, add webhook subscriptions, connect the Page/Instagram account, and approve read/reply permissions.
+          Create a Meta app, add testers in Development Mode, connect the Page/Instagram account, and subscribe messages/comments webhooks.
         </RequirementCard>
         <RequirementCard icon={Bot} title="3. AI Provider">
           Add an AI key, usually OpenAI or a cheaper compatible provider. The backend sends each comment to the model with company context.

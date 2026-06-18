@@ -34,7 +34,7 @@ function normalizeInboxItem(item) {
 
 function formatSyncWarning(warning) {
   if (/Instagram DMs:.*capability|instagram_manage_messages|Advanced Access/i.test(warning)) {
-    return 'Instagram DMs are blocked by Meta app access. Comments can work, but DMs need Instagram Messaging permission/capability approved in Meta before they can sync or reply.'
+    return 'Instagram DMs work in Development Mode only for Meta App Roles/Test Users who accepted the invite. Public customer DMs need Meta approval before they can sync or reply.'
   }
   return warning
 }
@@ -445,7 +445,7 @@ export default function InboxTab({ company, platform, isAdmin = true }) {
           <div>
             <div className="text-slate-900 text-sm font-bold">Inbox updates in the background</div>
             <div className="text-slate-500 text-xs mt-0.5">
-              Cached messages load instantly. New webhook messages appear automatically; use Sync now to pull latest platform history.
+              Cached messages load instantly. New webhook messages appear automatically; Instagram DMs can auto-reply in Development Mode for accepted Meta test users.
               {lastUpdated && ` Last updated ${lastUpdated.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}.`}
             </div>
           </div>
