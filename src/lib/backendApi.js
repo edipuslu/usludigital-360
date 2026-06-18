@@ -118,9 +118,10 @@ export function testBackendAiReply(companyId, text) {
   })
 }
 
-// Fetch inbox (comments and DMs)
-export function fetchInbox(companyId, type = 'all') {
-  return request(`/api/companies/${encodeURIComponent(companyId)}/inbox?type=${encodeURIComponent(type)}`)
+// Fetch inbox (comments and DMs). Live Meta sync is opt-in because it can be slow.
+export function fetchInbox(companyId, type = 'all', options = {}) {
+  const sync = options.sync ? '&sync=1' : ''
+  return request(`/api/companies/${encodeURIComponent(companyId)}/inbox?type=${encodeURIComponent(type)}${sync}`)
 }
 
 export function replyToInboxItem(companyId, itemId, text) {

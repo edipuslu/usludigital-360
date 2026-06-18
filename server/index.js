@@ -2174,18 +2174,21 @@ export async function appHandler(req, res) {
     const inboxParams = routeParams(url.pathname, '/api/companies/:companyId/inbox')
     if (req.method === 'GET' && inboxParams) {
       const type = url.searchParams.get('type') || 'all'
-      const syncResult = await syncLiveInbox(store, inboxParams.companyId)
-      const pendingItems = store.items
-        .filter(item => item.companyId === inboxParams.companyId && !item.aiReply && item.status !== 'reply_failed')
-        .sort((a, b) => new Date(b.receivedAt || 0) - new Date(a.receivedAt || 0))
-        .slice(0, 50)
-      const replies = await processAutoReplies(store, pendingItems)
-      if (syncResult.items.length || replies.length) await saveStore(store)
+      const shouldSync = url.searchParams.get('sync') === '1'
+      const syncResult = shouldSync ? await syncLiveInbox(store, inboxParams.companyId) : { items: [], errors: [] }
+      const pendingItems = shouldSync
+        ? store.items
+          .filter(item => item.companyId === inboxParams.companyId && !item.aiReply && item.status !== 'reply_failed')
+          .sort((a, b) => new Date(b.receivedAt || 0) - new Date(a.receivedAt || 0))
+          .slice(0, 50)
+        : []
+      const replies = shouldSync ? await processAutoReplies(store, pendingItems) : []
+      if (shouldSync && (syncResult.items.length || replies.length)) await saveStore(store)
       const items = store.items.filter(item => {
         if (item.companyId !== inboxParams.companyId) return false
         return type === 'all' || item.type === type
       }).sort((a, b) => new Date(b.receivedAt || 0) - new Date(a.receivedAt || 0))
-      return json(res, 200, { items, synced: syncResult.items.length, autoReplied: replies.length, syncErrors: syncResult.errors })
+      return json(res, 200, { items, synced: syncResult.items.length, autoReplied: replies.length, syncErrors: syncResult.errors, liveSynced: shouldSync })
     }
 
     if (req.method === 'POST' && inboxParams) {

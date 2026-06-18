@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { MessageCircle, Send, Search, Filter, Heart, MessageSquare, Calendar, User, ExternalLink, Loader, AlertTriangle, Calculator } from 'lucide-react'
+import { MessageCircle, Send, Search, Filter, Heart, MessageSquare, Calendar, User, ExternalLink, Loader, AlertTriangle, Calculator, RefreshCw } from 'lucide-react'
 import { PlatformIcon, SectionHeader } from '../ui/UIKit'
 import { estimateBackfillReplies, fetchInbox, replyToInboxItem, runBackfillReplies } from '../../lib/backendApi'
 import clsx from 'clsx'
@@ -319,6 +319,7 @@ export default function InboxTab({ company, platform, isAdmin = true }) {
   const [syncedCount, setSyncedCount] = useState(0)
   const [autoRepliedCount, setAutoRepliedCount] = useState(0)
   const [syncWarnings, setSyncWarnings] = useState([])
+  const [syncing, setSyncing] = useState(false)
 
   useEffect(() => {
     let alive = true
@@ -350,6 +351,22 @@ export default function InboxTab({ company, platform, isAdmin = true }) {
     setSyncWarnings(data.syncErrors || [])
   }
 
+  const syncLiveMessages = async () => {
+    setSyncing(true)
+    setError('')
+    try {
+      const data = await fetchInbox(company.id, 'all', { sync: true })
+      setMessages((data.items || []).map(normalizeInboxItem))
+      setSyncedCount(Number(data.synced || 0))
+      setAutoRepliedCount(Number(data.autoReplied || 0))
+      setSyncWarnings(data.syncErrors || [])
+    } catch (err) {
+      setError(err.message || 'Could not sync live inbox messages.')
+    } finally {
+      setSyncing(false)
+    }
+  }
+
   const handleReply = async (msgId, text) => {
     const data = await replyToInboxItem(company.id, msgId, text)
     const updated = normalizeInboxItem(data.item)
@@ -368,6 +385,18 @@ export default function InboxTab({ company, platform, isAdmin = true }) {
   return (
     <div className="space-y-6 animate-slide-in">
       {!loading && !platform && <OverviewPanel messages={messages} />}
+
+      {!loading && isAdmin && (
+        <div className="flex items-center justify-between gap-3 rounded-lg border border-slate-200 bg-white px-4 py-3">
+          <div>
+            <div className="text-slate-900 text-sm font-bold">Inbox loads saved messages first</div>
+            <div className="text-slate-500 text-xs mt-0.5">Use live sync only when you want to pull latest platform comments and DMs.</div>
+          </div>
+          <button onClick={syncLiveMessages} disabled={syncing} className="btn-secondary justify-center flex-shrink-0">
+            {syncing ? <Loader size={14} className="animate-spin" /> : <RefreshCw size={14} />} Sync now
+          </button>
+        </div>
+      )}
 
       {!loading && isAdmin && (
         <BackfillPanel company={company} platform={platform} onCompleted={reloadInbox} />
