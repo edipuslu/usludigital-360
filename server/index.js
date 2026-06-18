@@ -11,7 +11,14 @@ const STORE_PATH = path.join(DATA_DIR, 'store.json')
 const PORT = Number(process.env.API_PORT || 8787)
 const HOST = process.env.API_HOST || '127.0.0.1'
 const VERIFY_TOKEN = process.env.META_VERIFY_TOKEN || 'change-this-verify-token'
-const OPENAI_MODEL = process.env.OPENAI_MODEL || 'gpt-5-nano'
+const OPENAI_MODEL = process.env.OPENAI_MODEL || 'gpt-4.1-nano'
+const OPENAI_MODEL_FALLBACKS = [
+  OPENAI_MODEL,
+  ...(process.env.OPENAI_MODEL_FALLBACKS || 'gpt-4.1-mini,gpt-5-nano,gpt-5-mini')
+    .split(',')
+    .map(model => model.trim())
+    .filter(Boolean),
+].filter((model, index, models) => models.indexOf(model) === index)
 const SUPABASE_URL = process.env.SUPABASE_URL || ''
 const SUPABASE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_ANON_KEY || ''
 const SUPABASE_STORE_TABLE = process.env.SUPABASE_STORE_TABLE || 'ud360_store'
@@ -1435,29 +1442,36 @@ async function generateAiReply(company, item, options = {}) {
   if (!apiKey) return { reply: '', status: 'needs_openai_key', error: 'OpenAI key is missing on the backend.' }
   if (!options.force && !shouldAutoReply(company, item)) return { reply: '', status: 'received', error: '' }
 
-  const response = await fetch('https://api.openai.com/v1/chat/completions', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      Authorization: `Bearer ${apiKey}`,
-    },
-    body: JSON.stringify({
-      model: OPENAI_MODEL,
-      messages: [
-        { role: 'system', content: systemPromptFor(company, item) },
-        { role: 'user', content: item.text },
-      ],
-      temperature: 0.6,
-      max_tokens: 180,
-    }),
-  })
+  let lastError = ''
+  for (const model of OPENAI_MODEL_FALLBACKS) {
+    const response = await fetch('https://api.openai.com/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${apiKey}`,
+      },
+      body: JSON.stringify({
+        model,
+        messages: [
+          { role: 'system', content: systemPromptFor(company, item) },
+          { role: 'user', content: item.text },
+        ],
+        temperature: 0.6,
+        max_tokens: 180,
+      }),
+    })
 
-  const data = await response.json().catch(() => ({}))
-  if (!response.ok) {
-    return { reply: '', status: 'ai_error', error: data?.error?.message || `OpenAI HTTP ${response.status}` }
+    const data = await response.json().catch(() => ({}))
+    if (response.ok) {
+      return { reply: data.choices?.[0]?.message?.content || '', status: 'ai_replied', error: '', model }
+    }
+
+    lastError = data?.error?.message || `OpenAI HTTP ${response.status}`
+    const canTryNextModel = /does not have access to model|model .* does not exist|invalid model|model_not_found/i.test(lastError)
+    if (!canTryNextModel) break
   }
 
-  return { reply: data.choices?.[0]?.message?.content || '', status: 'ai_replied', error: '' }
+  return { reply: '', status: 'ai_error', error: lastError || 'OpenAI request failed.' }
 }
 
 async function graphPost(pathname, token, body) {
@@ -1935,6 +1949,7 @@ export async function appHandler(req, res) {
       return json(res, 200, {
         hasOpenaiKey: Boolean(company.openaiKey || process.env.OPENAI_API_KEY),
         model: OPENAI_MODEL,
+        modelFallbacks: OPENAI_MODEL_FALLBACKS,
         aiTraining: company.aiTraining || {},
         automation: company.automation || {},
       })
@@ -1976,7 +1991,7 @@ export async function appHandler(req, res) {
         text: String(body.text || '').trim(),
       }, { force: true })
       if (result.error) return json(res, result.status === 'needs_openai_key' ? 400 : 502, { error: result.error, status: result.status })
-      return json(res, 200, { reply: result.reply, model: OPENAI_MODEL })
+      return json(res, 200, { reply: result.reply, model: result.model || OPENAI_MODEL })
     }
 
     const inboxReplyParams = routeParams(url.pathname, '/api/companies/:companyId/inbox/:itemId/reply')
