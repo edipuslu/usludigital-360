@@ -10,7 +10,7 @@ const PLATFORMS_CONFIG = {
     label: 'Instagram',
     color: '#E1306C',
     bg: '#FDE8F1',
-    description: 'Followers, following, posts, comments, and monthly growth for the selected Instagram Business account.',
+    description: 'Followers, following, posts, comments, and monthly analytics for the selected Instagram Business account.',
     oauth: true,
     cta: 'Connect Instagram',
     empty: 'Connect Instagram to load followers, following, post count, comments, and monthly progress.',
@@ -19,7 +19,7 @@ const PLATFORMS_CONFIG = {
     label: 'Facebook',
     color: '#1877F2',
     bg: '#E8F1FD',
-    description: 'Followers, page likes, page posts, comments, and monthly growth for the selected Facebook Page.',
+    description: 'Followers, page likes, page posts, comments, and monthly analytics for the selected Facebook Page.',
     oauth: true,
     cta: 'Connect Facebook',
     empty: 'Connect Facebook to load page followers, page likes, posts, comments, and monthly progress.',
@@ -28,7 +28,7 @@ const PLATFORMS_CONFIG = {
     label: 'YouTube',
     color: '#FF0000',
     bg: '#FFE8E8',
-    description: 'Subscribers, videos, comments, and channel growth will appear here after YouTube OAuth is added.',
+    description: 'Subscribers, videos, comments, and channel analytics will appear here after YouTube OAuth is added.',
     oauth: false,
     cta: 'Setup not ready',
     empty: 'YouTube connection is visible here, but YouTube OAuth/API is not added yet.',
@@ -40,7 +40,7 @@ const PLATFORMS_CONFIG = {
     description: 'DM volume and message activity for WhatsApp Business will appear here after webhook data arrives.',
     oauth: false,
     cta: 'Setup in Platforms',
-    empty: 'Connect WhatsApp Business in Platforms first. Growth needs webhook messages before analytics can load.',
+    empty: 'Connect WhatsApp Business in Platforms first. Analytics needs webhook messages before data can load.',
   },
 }
 
@@ -251,7 +251,7 @@ function PlatformSection({ platform, data, accounts, companyId, activeDetail, on
               <PlatformIcon platform={platform} size={24} connected={isConnected} />
             </div>
             <div className="min-w-0">
-              <h3 className="text-slate-900 font-bold text-base">{config.label} Growth</h3>
+              <h3 className="text-slate-900 font-bold text-base">{config.label} Analytics</h3>
               <p className="text-slate-500 text-sm mt-1 leading-relaxed">{config.description}</p>
               {accounts.length > 0 && (
                 <div className="mt-3 flex flex-wrap gap-2">
@@ -387,8 +387,8 @@ export default function GrowthTab({ company, platform, isAdmin = true }) {
     <div className="space-y-8 animate-slide-in">
       <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
         <SectionHeader
-          title={platform ? `${config.label} Growth` : 'Growth'}
-          description={platform ? config.description : 'Each platform is separate: connect it, view its followers, posts, comments, and open the detail behind every metric.'}
+          title={platform ? `${config.label} Analytics` : 'Social Media Analytics'}
+          description={platform ? config.description : 'Each platform is separate: connect it, view followers, posts, comments, and open the detail behind every metric.'}
         />
         <button onClick={refreshGrowth} disabled={refreshing} className="btn-secondary self-start">
           <RefreshCw size={14} className={refreshing ? 'animate-spin' : ''} />

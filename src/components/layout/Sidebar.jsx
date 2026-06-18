@@ -90,7 +90,7 @@ export default function Sidebar({ companyId, companyName, onNavigate, currentSec
     { icon: LayoutDashboard, label: 'Overview', key: 'overview', roles: ['admin', 'client'] },
     { icon: Globe, label: 'Platforms', key: 'platforms', roles: ['admin'] },
     { icon: Inbox, label: 'Inbox', key: 'inbox', roles: ['admin', 'client'] },
-    { icon: TrendingUp, label: 'Growth', key: 'growth', submenu: true, roles: ['admin', 'client'] },
+    { icon: TrendingUp, label: 'Social Media Analytics', key: 'growth', submenu: true, roles: ['admin', 'client'] },
     { icon: Brain, label: 'AI Training', key: 'ai-training', roles: ['admin'] },
     { icon: Zap, label: 'Automation', key: 'automation', roles: ['admin'] },
     { icon: BarChart3, label: 'Analytics', key: 'analytics', roles: ['admin', 'client'] },
@@ -101,10 +101,10 @@ export default function Sidebar({ companyId, companyName, onNavigate, currentSec
   const companyNav = allTabs.filter(tab => tab.roles.includes(userRole))
 
   const platformGrowth = [
-    { icon: '📷', label: 'Instagram Growth', key: 'growth-instagram', platform: 'instagram' },
-    { icon: '👥', label: 'Facebook Growth', key: 'growth-facebook', platform: 'facebook' },
-    { icon: '▶️', label: 'YouTube Growth', key: 'growth-youtube', platform: 'youtube' },
-    { icon: '💬', label: 'WhatsApp Growth', key: 'growth-whatsapp', platform: 'whatsapp' },
+    { icon: '📷', label: 'Instagram Analytics', key: 'growth-instagram', platform: 'instagram' },
+    { icon: '👥', label: 'Facebook Analytics', key: 'growth-facebook', platform: 'facebook' },
+    { icon: '▶️', label: 'YouTube Analytics', key: 'growth-youtube', platform: 'youtube' },
+    { icon: '💬', label: 'WhatsApp Analytics', key: 'growth-whatsapp', platform: 'whatsapp' },
   ]
 
   const bottomNav = [
