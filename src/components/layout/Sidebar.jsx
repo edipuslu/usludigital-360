@@ -65,10 +65,8 @@ const NavItem = ({ icon: Icon, label, to, badge, collapsed, active, onClick }) =
       </span>
     )}
     {collapsed && (
-      <div className="group/tooltip">
-        <div className="absolute left-full top-1/2 -translate-y-1/2 ml-2 px-2 py-1 bg-black text-white text-xs rounded opacity-0 group-hover/tooltip:opacity-100 transition-opacity z-50 whitespace-nowrap">
-          {label}
-        </div>
+      <div className="absolute left-full top-1/2 -translate-y-1/2 ml-3 px-2 py-1 bg-black text-white text-xs rounded z-50 whitespace-nowrap">
+        {label}
       </div>
     )}
   </button>
