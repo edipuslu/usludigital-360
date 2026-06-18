@@ -52,7 +52,7 @@ const NavItem = ({ icon: Icon, label, to, badge, collapsed, active, onClick }) =
     {active && !collapsed && (
       <div className="absolute left-0 top-1/2 -translate-y-1/2 w-0.5 h-5 bg-blue-500 rounded-full" />
     )}
-    <Icon size={16} className={clsx('flex-shrink-0', active ? 'text-blue-400' : 'text-slate-500 group-hover:text-slate-300')} />
+    <Icon size={20} className={clsx('flex-shrink-0', active ? 'text-blue-400' : 'text-slate-500 group-hover:text-slate-300')} />
     {!collapsed && <span className="flex-1 text-left">{label}</span>}
     {!collapsed && badge != null && (
       <span className="bg-red-500 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full min-w-[18px] text-center leading-none">
