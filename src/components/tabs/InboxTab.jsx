@@ -149,6 +149,7 @@ export default function InboxTab({ company, platform, isAdmin = true }) {
   const [messages, setMessages] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
+  const [syncedCount, setSyncedCount] = useState(0)
 
   useEffect(() => {
     let alive = true
@@ -158,6 +159,7 @@ export default function InboxTab({ company, platform, isAdmin = true }) {
       .then(data => {
         if (!alive) return
         setMessages((data.items || []).map(normalizeInboxItem))
+        setSyncedCount(Number(data.synced || 0))
       })
       .catch(err => {
         if (!alive) return
@@ -193,6 +195,11 @@ export default function InboxTab({ company, platform, isAdmin = true }) {
           ))}
         </div>
       } />
+      {!loading && syncedCount > 0 && (
+        <div className="rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-medium text-emerald-700">
+          Synced {syncedCount} new message{syncedCount === 1 ? '' : 's'} from connected accounts.
+        </div>
+      )}
       <div className="flex gap-3">
         <div className="flex-1 relative">
           <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />

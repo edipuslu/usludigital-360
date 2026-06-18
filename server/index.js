@@ -959,6 +959,173 @@ function normalizeMetaWebhook(body, store) {
   return items.filter(item => item.text)
 }
 
+function rememberInboxItem(store, item) {
+  if (!item.companyId || !item.platform || !item.externalId || !item.text) return null
+  const exists = (store.items || []).find(existing =>
+    existing.companyId === item.companyId &&
+    existing.platform === item.platform &&
+    existing.type === item.type &&
+    existing.externalId === item.externalId
+  )
+  if (exists) return exists
+
+  const savedItem = {
+    id: `sync-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+    receivedAt: item.receivedAt || new Date().toISOString(),
+    status: 'synced',
+    aiReply: '',
+    error: '',
+    ...item,
+  }
+  store.items.unshift(savedItem)
+  store.items = store.items.slice(0, 1000)
+  return savedItem
+}
+
+async function syncInstagramInbox(store, companyId) {
+  const connection = findCompanyConnection(store, companyId, 'instagram')
+  if (!connection) return []
+  const token = connection.credentials?.pageAccessToken || connection.credentials?.accessToken
+  if (!token) return []
+
+  const synced = []
+
+  const mediaResponse = await graphGet(`/${connection.externalId}/media`, {
+    fields: 'id,caption,timestamp,permalink,comments_count',
+    limit: 25,
+    access_token: token,
+  }).catch(() => ({ data: [] }))
+
+  for (const media of mediaResponse.data || []) {
+    if (!Number(media.comments_count || 0)) continue
+    const commentsResponse = await graphGet(`/${media.id}/comments`, {
+      fields: 'id,text,username,timestamp,like_count,permalink',
+      limit: 50,
+      access_token: token,
+    }).catch(() => ({ data: [] }))
+
+    for (const comment of commentsResponse.data || []) {
+      const saved = rememberInboxItem(store, {
+        companyId,
+        type: 'comment',
+        platform: 'instagram',
+        senderName: comment.username || 'Instagram user',
+        senderId: comment.username || '',
+        text: comment.text || '',
+        sourceLink: comment.permalink || media.permalink || '',
+        externalId: comment.id,
+        likes: Number(comment.like_count || 0),
+        receivedAt: comment.timestamp || media.timestamp || new Date().toISOString(),
+        raw: { media, comment, synced: true },
+      })
+      if (saved) synced.push(saved)
+    }
+  }
+
+  const conversationsResponse = await graphGet(`/${connection.externalId}/conversations`, {
+    platform: 'instagram',
+    fields: 'id,updated_time,participants,messages.limit(10){id,message,created_time,from,to}',
+    limit: 25,
+    access_token: token,
+  }).catch(() => ({ data: [] }))
+
+  for (const conversation of conversationsResponse.data || []) {
+    for (const message of conversation.messages?.data || []) {
+      const text = message.message || ''
+      if (!text) continue
+      const fromId = message.from?.id || ''
+      if (fromId && fromId === connection.externalId) continue
+      const saved = rememberInboxItem(store, {
+        companyId,
+        type: 'dm',
+        platform: 'instagram',
+        senderName: message.from?.username || message.from?.name || message.from?.id || 'Instagram user',
+        senderId: fromId,
+        text,
+        sourceLink: '',
+        externalId: message.id,
+        receivedAt: message.created_time || conversation.updated_time || new Date().toISOString(),
+        raw: { conversationId: conversation.id, message, synced: true },
+      })
+      if (saved) synced.push(saved)
+    }
+  }
+
+  return synced
+}
+
+async function syncFacebookInbox(store, companyId) {
+  const connection = findCompanyConnection(store, companyId, 'facebook')
+  if (!connection) return []
+  const token = connection.credentials?.accessToken
+  if (!token) return []
+
+  const synced = []
+
+  const postsResponse = await graphGet(`/${connection.externalId}/posts`, {
+    fields: 'id,message,created_time,permalink_url,comments.limit(50){id,message,from,created_time,like_count,permalink_url}',
+    limit: 25,
+    access_token: token,
+  }).catch(() => ({ data: [] }))
+
+  for (const post of postsResponse.data || []) {
+    for (const comment of post.comments?.data || []) {
+      const saved = rememberInboxItem(store, {
+        companyId,
+        type: 'comment',
+        platform: 'facebook',
+        senderName: comment.from?.name || 'Facebook user',
+        senderId: comment.from?.id || '',
+        text: comment.message || '',
+        sourceLink: comment.permalink_url || post.permalink_url || '',
+        externalId: comment.id,
+        likes: Number(comment.like_count || 0),
+        receivedAt: comment.created_time || post.created_time || new Date().toISOString(),
+        raw: { post, comment, synced: true },
+      })
+      if (saved) synced.push(saved)
+    }
+  }
+
+  const conversationsResponse = await graphGet(`/${connection.externalId}/conversations`, {
+    fields: 'id,updated_time,participants,messages.limit(10){id,message,created_time,from,to}',
+    limit: 25,
+    access_token: token,
+  }).catch(() => ({ data: [] }))
+
+  for (const conversation of conversationsResponse.data || []) {
+    for (const message of conversation.messages?.data || []) {
+      const text = message.message || ''
+      if (!text) continue
+      const fromId = message.from?.id || ''
+      if (fromId && fromId === connection.externalId) continue
+      const saved = rememberInboxItem(store, {
+        companyId,
+        type: 'dm',
+        platform: 'facebook',
+        senderName: message.from?.name || message.from?.id || 'Facebook user',
+        senderId: fromId,
+        text,
+        sourceLink: '',
+        externalId: message.id,
+        receivedAt: message.created_time || conversation.updated_time || new Date().toISOString(),
+        raw: { conversationId: conversation.id, message, synced: true },
+      })
+      if (saved) synced.push(saved)
+    }
+  }
+
+  return synced
+}
+
+async function syncLiveInbox(store, companyId) {
+  const results = await Promise.allSettled([
+    syncInstagramInbox(store, companyId),
+    syncFacebookInbox(store, companyId),
+  ])
+  return results.flatMap(result => result.status === 'fulfilled' ? result.value : [])
+}
+
 function systemPromptFor(company, item) {
   const training = company?.aiTraining || {}
   const automation = company?.automation?.[item.platform] || {}
@@ -1445,11 +1612,13 @@ export async function appHandler(req, res) {
     const inboxParams = routeParams(url.pathname, '/api/companies/:companyId/inbox')
     if (req.method === 'GET' && inboxParams) {
       const type = url.searchParams.get('type') || 'all'
+      const synced = await syncLiveInbox(store, inboxParams.companyId)
+      if (synced.length) await saveStore(store)
       const items = store.items.filter(item => {
         if (item.companyId !== inboxParams.companyId) return false
         return type === 'all' || item.type === type
       })
-      return json(res, 200, { items })
+      return json(res, 200, { items, synced: synced.length })
     }
 
     if (req.method === 'POST' && inboxParams) {
