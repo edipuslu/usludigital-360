@@ -65,7 +65,7 @@ const NavItem = ({ icon: Icon, label, to, badge, collapsed, active, onClick }) =
       </span>
     )}
     {collapsed && (
-      <div className="absolute left-full ml-2 px-2 py-1 bg-slate-800 text-white text-xs rounded-md opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap pointer-events-none z-50">
+      <div className="absolute left-full ml-2 px-3 py-2 bg-slate-900 text-white text-xs rounded-lg opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap pointer-events-none z-50 before:absolute before:-left-1.5 before:top-1/2 before:-translate-y-1/2 before:w-0 before:h-0 before:border-4 before:border-transparent before:border-r-slate-900">
         {label}
       </div>
     )}
@@ -120,7 +120,7 @@ export default function Sidebar({ companyId, companyName, onNavigate, currentSec
       )}
       style={{ background: 'linear-gradient(180deg, #07091A 0%, #060812 100%)' }}
     >
-      <div className="flex-1 overflow-y-auto overflow-x-hidden px-2 pt-4 scrollbar-thin">
+      <div className="flex-1 overflow-y-auto px-2 pt-4 scrollbar-thin">
         <>
           <NavSection label="" collapsed={collapsed}>
             {companyNav.map(item => (
