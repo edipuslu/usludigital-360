@@ -124,6 +124,10 @@ function companyDefaults(row = {}) {
   }
 }
 
+function getWorkspaceOpenaiKey(store) {
+  return process.env.OPENAI_API_KEY || Object.values(store.companies || {}).find(company => company.openaiKey)?.openaiKey || ''
+}
+
 function json(res, status, body) {
   res.writeHead(status, {
     'Content-Type': 'application/json',
@@ -389,12 +393,13 @@ async function saveStore(store) {
 }
 
 function listCompanies(store) {
+  const workspaceOpenaiKey = getWorkspaceOpenaiKey(store)
   return Object.values(store.companies || {})
     .map(company => {
       const { openaiKey, ...safeCompany } = company
       return {
         ...safeCompany,
-        hasOpenaiKey: Boolean(openaiKey || process.env.OPENAI_API_KEY),
+        hasOpenaiKey: Boolean(workspaceOpenaiKey || openaiKey),
       }
     })
     .sort((a, b) => String(b.createdAt || '').localeCompare(String(a.createdAt || '')))
@@ -1840,9 +1845,11 @@ export async function appHandler(req, res) {
     if (req.method === 'POST' && url.pathname === '/api/companies') {
       const body = await readBody(req)
       if (!body.company?.id) return json(res, 400, { error: 'company.id is required.' })
+      const workspaceOpenaiKey = getWorkspaceOpenaiKey(store)
       store.companies[body.company.id] = {
         ...(store.companies[body.company.id] || {}),
         ...body.company,
+        openaiKey: body.company.openaiKey || store.companies[body.company.id]?.openaiKey || workspaceOpenaiKey,
         updatedAt: new Date().toISOString(),
       }
       await saveStore(store)
@@ -1947,7 +1954,7 @@ export async function appHandler(req, res) {
       const company = store.companies[aiParams.companyId]
       if (!company) return json(res, 404, { error: 'Company not found.' })
       return json(res, 200, {
-        hasOpenaiKey: Boolean(company.openaiKey || process.env.OPENAI_API_KEY),
+        hasOpenaiKey: Boolean(getWorkspaceOpenaiKey(store) || company.openaiKey),
         model: OPENAI_MODEL,
         modelFallbacks: OPENAI_MODEL_FALLBACKS,
         aiTraining: company.aiTraining || {},
@@ -1958,6 +1965,8 @@ export async function appHandler(req, res) {
     if (req.method === 'POST' && aiParams) {
       const body = await readBody(req)
       const existing = store.companies[aiParams.companyId] || companyDefaults({ id: aiParams.companyId, name: body.company?.name || 'Company' })
+      const hasOpenaiKeyChange = Object.prototype.hasOwnProperty.call(body, 'openaiKey')
+      const nextOpenaiKey = hasOpenaiKeyChange ? body.openaiKey : existing.openaiKey || getWorkspaceOpenaiKey(store)
       store.companies[aiParams.companyId] = {
         ...existing,
         ...(body.company || {}),
@@ -1970,13 +1979,18 @@ export async function appHandler(req, res) {
           ...(existing.automation || {}),
           ...(body.company?.automation || {}),
         },
-        openaiKey: Object.prototype.hasOwnProperty.call(body, 'openaiKey')
-          ? body.openaiKey
-          : existing.openaiKey || process.env.OPENAI_API_KEY || '',
+        openaiKey: nextOpenaiKey,
         updatedAt: new Date().toISOString(),
       }
+      if (hasOpenaiKeyChange) {
+        for (const company of Object.values(store.companies || {})) {
+          company.openaiKey = nextOpenaiKey
+          company.hasOpenaiKey = Boolean(nextOpenaiKey)
+          company.updatedAt = new Date().toISOString()
+        }
+      }
       await saveStore(store)
-      return json(res, 200, { ok: true })
+      return json(res, 200, { ok: true, appliedToAllCompanies: hasOpenaiKeyChange, hasOpenaiKey: Boolean(nextOpenaiKey) })
     }
 
     const aiTestParams = routeParams(url.pathname, '/api/companies/:companyId/ai-test')

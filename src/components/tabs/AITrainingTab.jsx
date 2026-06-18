@@ -84,6 +84,8 @@ function OpenAIKeySection({ apiKey, hasSavedKey, onKeyChange }) {
   const [inputKey, setInputKey] = useState(apiKey || '')
   const [status, setStatus] = useState(hasSavedKey || apiKey ? 'saved' : 'empty') // empty | testing | valid | invalid | saved
   const [errorMsg, setErrorMsg] = useState('')
+  const [removeMode, setRemoveMode] = useState(false)
+  const [removeText, setRemoveText] = useState('')
 
   useEffect(() => {
     if (apiKey) setInputKey(apiKey)
@@ -100,6 +102,8 @@ function OpenAIKeySection({ apiKey, hasSavedKey, onKeyChange }) {
       })
       if (res.ok) {
         setStatus('valid')
+        setRemoveMode(false)
+        setRemoveText('')
         onKeyChange(inputKey.trim())
       } else {
         const data = await res.json()
@@ -113,8 +117,11 @@ function OpenAIKeySection({ apiKey, hasSavedKey, onKeyChange }) {
   }
 
   const clearKey = () => {
+    if (removeText !== 'Remove') return
     setInputKey('')
     setStatus('empty')
+    setRemoveMode(false)
+    setRemoveText('')
     onKeyChange('')
     localStorage.removeItem('ud360_openai_key')
   }
@@ -203,14 +210,43 @@ function OpenAIKeySection({ apiKey, hasSavedKey, onKeyChange }) {
             )}
           </button>
           {(status === 'valid' || status === 'saved') && (
-            <button onClick={clearKey} className="btn-danger">Remove</button>
+            <button onClick={() => setRemoveMode(true)} className="btn-danger">Remove</button>
           )}
         </div>
+
+        {removeMode && (
+          <div className="rounded-xl border border-red-200 bg-red-50 p-3">
+            <div className="text-red-800 text-xs font-semibold mb-2">
+              This removes the OpenAI key from every company. Type <span className="font-bold">Remove</span> to confirm.
+            </div>
+            <div className="flex flex-col sm:flex-row gap-2">
+              <input
+                value={removeText}
+                onChange={e => setRemoveText(e.target.value)}
+                className="input-field bg-white"
+                placeholder="Remove"
+              />
+              <button
+                onClick={clearKey}
+                disabled={removeText !== 'Remove'}
+                className={clsx('btn-danger justify-center', removeText !== 'Remove' && 'opacity-50 cursor-not-allowed')}
+              >
+                Confirm Remove
+              </button>
+              <button
+                onClick={() => { setRemoveMode(false); setRemoveText('') }}
+                className="btn-secondary justify-center"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        )}
       </div>
 
       <div className="mt-4 flex items-start gap-2 text-xs text-slate-400">
         <Shield size={12} className="mt-0.5 flex-shrink-0" />
-        Your key is saved on the backend for this company. You only need to enter it again when replacing or removing it.
+        Your key is saved once for the admin workspace and used by every company automatically.
       </div>
     </div>
   )
@@ -373,7 +409,7 @@ export default function AITrainingTab({ company, onUpdate, onNotify, isAdmin = t
                   },
                 }, key)
                 onUpdate?.(current => ({ ...current, automation, hasOpenaiKey: Boolean(key) }))
-                onNotify?.(key ? 'OpenAI key saved to backend. Comment and DM auto-replies are enabled.' : 'OpenAI key removed from backend.', 'success')
+                onNotify?.(key ? 'OpenAI key saved for all companies. Comment and DM auto-replies are enabled.' : 'OpenAI key removed from all companies.', 'success')
               } catch (err) {
                 onNotify?.(`OpenAI key changed locally, but backend sync failed: ${err.message}`, 'warning')
               }
