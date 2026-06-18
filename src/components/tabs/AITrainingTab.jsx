@@ -446,7 +446,7 @@ export default function AITrainingTab({ company, onUpdate, onNotify, isAdmin = t
               <Brain size={15} className="text-slate-400" /> Test AI Responses
             </h3>
             <p className="text-slate-400 text-sm mb-4">
-              {hasSavedApiKey ? 'Powered by the saved backend key — type any question a customer might ask' : 'Add your OpenAI API key above to test real AI responses'}
+              {hasSavedApiKey ? 'Powered by gpt-5-nano — type any question a customer might ask' : 'Add your OpenAI API key above to test real AI responses'}
             </p>
             <div className="space-y-3">
               <textarea
