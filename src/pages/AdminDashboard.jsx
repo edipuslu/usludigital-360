@@ -254,23 +254,7 @@ export default function AdminDashboard() {
         className="w-[240px] h-screen sticky top-0 flex-shrink-0 flex flex-col"
         style={{ background: 'linear-gradient(180deg, #07091A 0%, #060812 100%)' }}
       >
-        <div className="flex items-center gap-3 px-4 py-5 border-b border-white/10">
-          <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-blue-500 to-blue-700 flex items-center justify-center flex-shrink-0 shadow-glow-blue">
-            <Zap size={18} className="text-white" fill="white" />
-          </div>
-          <div className="overflow-hidden">
-            <div className="text-white font-bold text-base leading-tight tracking-tight">Usludigital</div>
-            <div className="flex items-center gap-1.5 mt-0.5">
-              <span className="bg-blue-600 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-md leading-none">360</span>
-              <span className="text-slate-500 text-[10px] font-medium uppercase tracking-widest">Admin</span>
-            </div>
-          </div>
-        </div>
-
-        <div className="flex-1 overflow-y-auto px-2 pt-2">
-          <div className="px-4 mb-1 mt-3">
-            <span className="text-[10px] font-semibold text-slate-600 uppercase tracking-widest">Admin Workspace</span>
-          </div>
+        <div className="flex-1 overflow-y-auto px-2 pt-6">
           <button className="w-full flex items-center gap-3 rounded-lg text-sm font-medium cursor-pointer transition-all duration-150 relative group px-3 py-2.5 bg-blue-600/20 text-white">
             <div className="absolute left-0 top-1/2 -translate-y-1/2 w-0.5 h-5 bg-blue-500 rounded-full" />
             <LayoutDashboard size={16} className="text-blue-400" />
@@ -279,15 +263,6 @@ export default function AdminDashboard() {
         </div>
 
         <div className="border-t border-white/10 p-3">
-          <div className="flex items-center gap-3 px-2 py-2 rounded-lg mb-1">
-            <div className="w-8 h-8 rounded-full bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center flex-shrink-0">
-              <span className="text-white text-xs font-bold">{user?.avatar || 'UA'}</span>
-            </div>
-            <div className="flex-1 min-w-0">
-              <div className="text-white text-sm font-medium truncate">Admin Workspace</div>
-              <div className="text-slate-500 text-xs truncate">{user?.email || 'admin@usludigital.com'}</div>
-            </div>
-          </div>
           <button
             onClick={signOut}
             className="flex items-center gap-2 text-slate-500 hover:text-red-400 text-xs font-medium cursor-pointer transition-colors rounded-lg hover:bg-red-500/10 px-2 py-1.5 w-full"
@@ -300,16 +275,7 @@ export default function AdminDashboard() {
 
       <div className="flex-1 flex flex-col min-w-0">
         <header className="bg-white border-b border-slate-200 px-8 py-4 flex items-center justify-between sticky top-0 z-20">
-          <div>
-            <div className="flex items-center gap-2 text-xs text-slate-400 mb-0.5">
-              <Zap size={11} className="text-blue-500" />
-              <span>Usludigital 360</span>
-              <span>/</span>
-              <span className="text-slate-600 font-medium">Admin Workspace</span>
-            </div>
-            <h1 className="text-slate-900 text-xl font-bold">Companies</h1>
-            <div className="text-slate-500 text-sm mt-0.5">Add companies here. Open a company to set up its platforms and automation.</div>
-          </div>
+          <h1 className="text-slate-900 text-xl font-bold">Companies</h1>
           <button onClick={() => setShowCreate(true)} className="btn-primary"><Plus size={14} /> New Company</button>
         </header>
 
