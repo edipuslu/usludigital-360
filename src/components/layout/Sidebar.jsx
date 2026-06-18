@@ -77,12 +77,16 @@ function currentMainItem(currentSection, items) {
   return items.find(item => isActive(currentSection, item.key)) || items[0]
 }
 
+function currentSidebarItem(currentSection, mainItems) {
+  return ACCOUNT_NAV.find(item => item.key === currentSection) || currentMainItem(currentSection, mainItems)
+}
+
 export default function Sidebar({ companyName, onNavigate, currentSection, notificationCount = 0 }) {
   const { user, isAdmin, logout } = useAuth()
   const navigate = useNavigate()
   const role = user?.email === 'admin@usludigital.com' ? 'admin' : 'client'
   const mainItems = MAIN_NAV.filter(item => item.roles.includes(role))
-  const selected = currentMainItem(currentSection, mainItems)
+  const selected = currentSidebarItem(currentSection, mainItems)
   const showInboxMenu = selected?.key === 'inbox'
 
   const handleLogout = () => {
@@ -162,27 +166,13 @@ export default function Sidebar({ companyName, onNavigate, currentSection, notif
               />
             ))
           ) : (
-            mainItems.map(item => (
-              <TextNavItem
-                key={item.key}
-                label={item.label}
-                active={isActive(currentSection, item.key)}
-                onClick={() => onNavigate?.(item.key)}
-              />
-            ))
-          )}
-        </div>
-
-        <div className="mt-auto space-y-1 border-t border-slate-200 pt-4">
-          {ACCOUNT_NAV.map(item => (
             <TextNavItem
-              key={item.key}
-              label={item.label}
-              badge={item.key === 'notifications' ? notificationCount || null : null}
-              active={currentSection === item.key}
-              onClick={() => onNavigate?.(item.key)}
+              label={selected?.label || 'Dashboard'}
+              badge={selected?.key === 'notifications' ? notificationCount || null : null}
+              active
+              onClick={() => selected?.key && onNavigate?.(selected.key)}
             />
-          ))}
+          )}
         </div>
       </div>
     </aside>
