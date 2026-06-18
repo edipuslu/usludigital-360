@@ -967,7 +967,7 @@ function rememberInboxItem(store, item) {
     existing.type === item.type &&
     existing.externalId === item.externalId
   )
-  if (exists) return exists
+  if (exists) return null
 
   const savedItem = {
     id: `sync-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
@@ -989,12 +989,16 @@ async function syncInstagramInbox(store, companyId) {
   if (!token) return []
 
   const synced = []
+  const errors = []
 
   const mediaResponse = await graphGet(`/${connection.externalId}/media`, {
     fields: 'id,caption,timestamp,permalink,comments_count',
-    limit: 25,
+    limit: 100,
     access_token: token,
-  }).catch(() => ({ data: [] }))
+  }).catch(err => {
+    errors.push(`Instagram media: ${err.message}`)
+    return { data: [] }
+  })
 
   for (const media of mediaResponse.data || []) {
     if (!Number(media.comments_count || 0)) continue
@@ -1002,7 +1006,10 @@ async function syncInstagramInbox(store, companyId) {
       fields: 'id,text,username,timestamp,like_count,permalink',
       limit: 50,
       access_token: token,
-    }).catch(() => ({ data: [] }))
+    }).catch(err => {
+      errors.push(`Instagram comments for ${media.id}: ${err.message}`)
+      return { data: [] }
+    })
 
     for (const comment of commentsResponse.data || []) {
       const saved = rememberInboxItem(store, {
@@ -1027,7 +1034,10 @@ async function syncInstagramInbox(store, companyId) {
     fields: 'id,updated_time,participants,messages.limit(10){id,message,created_time,from,to}',
     limit: 25,
     access_token: token,
-  }).catch(() => ({ data: [] }))
+  }).catch(err => {
+    errors.push(`Instagram DMs: ${err.message}`)
+    return { data: [] }
+  })
 
   for (const conversation of conversationsResponse.data || []) {
     for (const message of conversation.messages?.data || []) {
@@ -1051,7 +1061,7 @@ async function syncInstagramInbox(store, companyId) {
     }
   }
 
-  return synced
+  return { items: synced, errors }
 }
 
 async function syncFacebookInbox(store, companyId) {
@@ -1061,12 +1071,16 @@ async function syncFacebookInbox(store, companyId) {
   if (!token) return []
 
   const synced = []
+  const errors = []
 
   const postsResponse = await graphGet(`/${connection.externalId}/posts`, {
     fields: 'id,message,created_time,permalink_url,comments.limit(50){id,message,from,created_time,like_count,permalink_url}',
-    limit: 25,
+    limit: 100,
     access_token: token,
-  }).catch(() => ({ data: [] }))
+  }).catch(err => {
+    errors.push(`Facebook posts: ${err.message}`)
+    return { data: [] }
+  })
 
   for (const post of postsResponse.data || []) {
     for (const comment of post.comments?.data || []) {
@@ -1091,7 +1105,10 @@ async function syncFacebookInbox(store, companyId) {
     fields: 'id,updated_time,participants,messages.limit(10){id,message,created_time,from,to}',
     limit: 25,
     access_token: token,
-  }).catch(() => ({ data: [] }))
+  }).catch(err => {
+    errors.push(`Facebook DMs: ${err.message}`)
+    return { data: [] }
+  })
 
   for (const conversation of conversationsResponse.data || []) {
     for (const message of conversation.messages?.data || []) {
@@ -1115,7 +1132,7 @@ async function syncFacebookInbox(store, companyId) {
     }
   }
 
-  return synced
+  return { items: synced, errors }
 }
 
 async function syncLiveInbox(store, companyId) {
@@ -1123,7 +1140,15 @@ async function syncLiveInbox(store, companyId) {
     syncInstagramInbox(store, companyId),
     syncFacebookInbox(store, companyId),
   ])
-  return results.flatMap(result => result.status === 'fulfilled' ? result.value : [])
+  return results.reduce((acc, result) => {
+    if (result.status === 'fulfilled') {
+      acc.items.push(...(result.value?.items || []))
+      acc.errors.push(...(result.value?.errors || []))
+    } else {
+      acc.errors.push(result.reason?.message || 'Inbox sync failed.')
+    }
+    return acc
+  }, { items: [], errors: [] })
 }
 
 function systemPromptFor(company, item) {
@@ -1612,13 +1637,13 @@ export async function appHandler(req, res) {
     const inboxParams = routeParams(url.pathname, '/api/companies/:companyId/inbox')
     if (req.method === 'GET' && inboxParams) {
       const type = url.searchParams.get('type') || 'all'
-      const synced = await syncLiveInbox(store, inboxParams.companyId)
-      if (synced.length) await saveStore(store)
+      const syncResult = await syncLiveInbox(store, inboxParams.companyId)
+      if (syncResult.items.length) await saveStore(store)
       const items = store.items.filter(item => {
         if (item.companyId !== inboxParams.companyId) return false
         return type === 'all' || item.type === type
       })
-      return json(res, 200, { items, synced: synced.length })
+      return json(res, 200, { items, synced: syncResult.items.length, syncErrors: syncResult.errors })
     }
 
     if (req.method === 'POST' && inboxParams) {

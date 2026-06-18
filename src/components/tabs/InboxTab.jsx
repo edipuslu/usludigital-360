@@ -150,6 +150,7 @@ export default function InboxTab({ company, platform, isAdmin = true }) {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [syncedCount, setSyncedCount] = useState(0)
+  const [syncWarnings, setSyncWarnings] = useState([])
 
   useEffect(() => {
     let alive = true
@@ -160,6 +161,7 @@ export default function InboxTab({ company, platform, isAdmin = true }) {
         if (!alive) return
         setMessages((data.items || []).map(normalizeInboxItem))
         setSyncedCount(Number(data.synced || 0))
+        setSyncWarnings(data.syncErrors || [])
       })
       .catch(err => {
         if (!alive) return
@@ -198,6 +200,11 @@ export default function InboxTab({ company, platform, isAdmin = true }) {
       {!loading && syncedCount > 0 && (
         <div className="rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-medium text-emerald-700">
           Synced {syncedCount} new message{syncedCount === 1 ? '' : 's'} from connected accounts.
+        </div>
+      )}
+      {!loading && syncWarnings.length > 0 && (
+        <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-medium text-amber-800">
+          Some inbox data could not sync from Meta: {syncWarnings.slice(0, 2).join(' · ')}
         </div>
       )}
       <div className="flex gap-3">
