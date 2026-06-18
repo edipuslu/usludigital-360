@@ -232,7 +232,21 @@ async function loadStore() {
       throw new Error(connectionRows?.message || `Supabase connections load failed with HTTP ${connectionsResponse.status}`)
     }
 
-    const companies = Object.fromEntries(companyRows.map(row => [row.id, companyDefaults(row)]))
+    const companyConfigs = await loadCompanyConfigsFromSupabase(base, headers)
+    const companies = Object.fromEntries(companyRows.map(row => {
+      const defaults = companyDefaults(row)
+      const config = companyConfigs[row.id] || {}
+      return [row.id, {
+        ...defaults,
+        openaiKey: config.openaiKey || defaults.openaiKey || '',
+        goal: config.goal || defaults.goal,
+        whatsappLink: config.whatsappLink || defaults.whatsappLink,
+        aiTraining: { ...defaults.aiTraining, ...(config.aiTraining || {}) },
+        automation: { ...defaults.automation, ...(config.automation || {}) },
+        settings: { ...defaults.settings, ...(config.settings || {}) },
+        updatedAt: config.updatedAt || defaults.updatedAt,
+      }]
+    }))
     const connections = {}
     for (const row of Array.isArray(connectionRows) ? connectionRows : []) {
       if (!row.company_id || !row.platform || !row.account_id) continue
@@ -358,6 +372,7 @@ async function saveStore(store) {
       }
     }
 
+    await saveCompanyConfigsToSupabase(base, headers, companies)
     await saveInboxItemsToSupabase(base, headers, store.items || [])
     return
   }
@@ -426,6 +441,9 @@ function inboxMeta(item) {
     sourceLink: item.sourceLink || item.postUrl || '',
     senderId: item.senderId || '',
     likes: Number(item.likes || 0),
+    aiReply: item.aiReply || '',
+    status: item.status || 'synced',
+    error: item.error || '',
   }
 }
 
@@ -469,11 +487,102 @@ async function loadInboxItemsFromSupabase(base, headers) {
         externalId: parsed.externalId || message.id,
         likes: Number(parsed.likes || 0),
         receivedAt: message.created_at || conversation.created_at || new Date().toISOString(),
-        status: 'synced',
-        aiReply: '',
-        error: '',
+        status: parsed.status || 'synced',
+        aiReply: parsed.aiReply || '',
+        error: parsed.error || '',
       }
     })
+}
+
+async function loadCompanyConfigsFromSupabase(base, headers) {
+  const conversationsResponse = await fetch(`${base}/rest/v1/conversations?select=id,company_id,status,created_at&status=eq.config&order=created_at.desc&limit=1000`, { headers })
+  const conversations = await conversationsResponse.json().catch(() => [])
+  if (!conversationsResponse.ok || !Array.isArray(conversations) || !conversations.length) return {}
+
+  const ids = conversations.map(conversation => conversation.id).filter(Boolean)
+  if (!ids.length) return {}
+
+  const messagesResponse = await fetch(`${base}/rest/v1/messages?select=conversation_id,content,created_at&conversation_id=in.(${ids.join(',')})&is_ai_reply=eq.true&order=created_at.desc&limit=1000`, { headers })
+  const messages = await messagesResponse.json().catch(() => [])
+  if (!messagesResponse.ok || !Array.isArray(messages)) return {}
+
+  const conversationById = Object.fromEntries(conversations.map(conversation => [conversation.id, conversation]))
+  const configs = {}
+  for (const message of messages) {
+    const conversation = conversationById[message.conversation_id]
+    if (!conversation?.company_id || configs[conversation.company_id]) continue
+    try {
+      const parsed = JSON.parse(message.content || '{}')
+      if (parsed.kind === 'company_config') configs[conversation.company_id] = parsed
+    } catch {
+      // Ignore old or malformed config rows.
+    }
+  }
+  return configs
+}
+
+async function saveCompanyConfigsToSupabase(base, headers, companies = []) {
+  const configs = companies.filter(company => company?.id)
+  if (!configs.length) return
+
+  const conversations = []
+  const messages = []
+
+  for (const company of configs) {
+    const conversationId = deterministicUuid(`${company.id}:company-config:conversation`)
+    const messageId = deterministicUuid(`${company.id}:company-config:message`)
+    conversations.push({
+      id: conversationId,
+      company_id: company.id,
+      platform: 'system',
+      customer_name: 'Usludigital 360',
+      status: 'config',
+      created_at: company.updatedAt || new Date().toISOString(),
+    })
+    messages.push({
+      id: messageId,
+      conversation_id: conversationId,
+      author_name: 'Usludigital 360',
+      content: JSON.stringify({
+        kind: 'company_config',
+        openaiKey: company.openaiKey || '',
+        goal: company.goal || 'push_to_whatsapp',
+        whatsappLink: company.whatsappLink || '',
+        aiTraining: company.aiTraining || {},
+        automation: company.automation || {},
+        settings: company.settings || {},
+        updatedAt: company.updatedAt || new Date().toISOString(),
+      }),
+      is_ai_reply: true,
+      created_at: company.updatedAt || new Date().toISOString(),
+    })
+  }
+
+  const conversationResponse = await fetch(`${base}/rest/v1/conversations`, {
+    method: 'POST',
+    headers: {
+      ...headers,
+      Prefer: 'resolution=merge-duplicates',
+    },
+    body: JSON.stringify(conversations),
+  })
+  if (!conversationResponse.ok && conversationResponse.status !== 404) {
+    const error = await conversationResponse.json().catch(() => ({}))
+    throw new Error(error?.message || `Supabase config conversations save failed with HTTP ${conversationResponse.status}`)
+  }
+
+  const messageResponse = await fetch(`${base}/rest/v1/messages`, {
+    method: 'POST',
+    headers: {
+      ...headers,
+      Prefer: 'resolution=merge-duplicates',
+    },
+    body: JSON.stringify(messages),
+  })
+  if (!messageResponse.ok && messageResponse.status !== 404) {
+    const error = await messageResponse.json().catch(() => ({}))
+    throw new Error(error?.message || `Supabase config messages save failed with HTTP ${messageResponse.status}`)
+  }
 }
 
 async function saveInboxItemsToSupabase(base, headers, items = []) {
@@ -1364,7 +1473,7 @@ async function graphPost(pathname, token, body) {
 
 async function postPlatformReply(store, item, reply) {
   const connection = findCompanyConnection(store, item.companyId, item.platform)
-  const token = connection?.credentials?.accessToken
+  const token = connection?.credentials?.pageAccessToken || connection?.credentials?.accessToken
 
   if (!token) {
     return { status: 'reply_ready', error: 'AI reply is ready, but no platform token is registered on the backend.' }
@@ -1412,6 +1521,14 @@ async function postPlatformReply(store, item, reply) {
 async function saveIncomingItems(store, incoming) {
   const saved = []
   for (const item of incoming) {
+    const existing = (store.items || []).find(existing =>
+      existing.companyId === item.companyId &&
+      existing.platform === item.platform &&
+      existing.type === item.type &&
+      existing.externalId === item.externalId
+    )
+    if (existing) continue
+
     const company = store.companies[item.companyId] || {}
     const ai = await generateAiReply(company, item).catch(err => ({
       reply: '',
@@ -1434,6 +1551,50 @@ async function saveIncomingItems(store, incoming) {
   }
   store.items = store.items.slice(0, 1000)
   return saved
+}
+
+async function processAutoReplies(store, items = []) {
+  const processed = []
+  for (const item of items) {
+    const savedItem = (store.items || []).find(existing => existing.id === item.id) || item
+    if (!savedItem || savedItem.aiReply || savedItem.status === 'replied_live' || savedItem.status === 'reply_failed') continue
+
+    const company = store.companies[savedItem.companyId] || {}
+    const ai = await generateAiReply(company, savedItem).catch(err => ({
+      reply: '',
+      status: 'ai_error',
+      error: err.message,
+    }))
+    const postResult = ai.reply
+      ? await postPlatformReply(store, savedItem, ai.reply).catch(err => ({ status: 'reply_failed', error: err.message }))
+      : { status: ai.status, error: ai.error }
+
+    Object.assign(savedItem, {
+      status: ai.reply ? postResult.status : ai.status,
+      aiReply: ai.reply,
+      error: postResult.error || ai.error,
+    })
+    if (ai.reply) processed.push(savedItem)
+  }
+  return processed
+}
+
+async function replyToInboxItem(store, companyId, itemId, text) {
+  const item = (store.items || []).find(existing => existing.companyId === companyId && existing.id === itemId)
+  if (!item) throw new Error('Inbox item was not found.')
+  if (!text?.trim()) throw new Error('Reply text is required.')
+
+  const postResult = await postPlatformReply(store, item, text.trim()).catch(err => ({
+    status: 'reply_failed',
+    error: err.message,
+  }))
+  Object.assign(item, {
+    status: postResult.status,
+    aiReply: text.trim(),
+    error: postResult.error || '',
+    repliedAt: new Date().toISOString(),
+  })
+  return item
 }
 
 function routeParams(pathname, pattern) {
@@ -1763,25 +1924,47 @@ export async function appHandler(req, res) {
     const aiParams = routeParams(url.pathname, '/api/companies/:companyId/ai-config')
     if (req.method === 'POST' && aiParams) {
       const body = await readBody(req)
+      const existing = store.companies[aiParams.companyId] || companyDefaults({ id: aiParams.companyId, name: body.company?.name || 'Company' })
       store.companies[aiParams.companyId] = {
+        ...existing,
         ...(body.company || {}),
-        openaiKey: body.openaiKey || store.companies[aiParams.companyId]?.openaiKey || process.env.OPENAI_API_KEY || '',
+        id: aiParams.companyId,
+        aiTraining: {
+          ...(existing.aiTraining || {}),
+          ...(body.company?.aiTraining || {}),
+        },
+        automation: {
+          ...(existing.automation || {}),
+          ...(body.company?.automation || {}),
+        },
+        openaiKey: Object.prototype.hasOwnProperty.call(body, 'openaiKey')
+          ? body.openaiKey
+          : existing.openaiKey || process.env.OPENAI_API_KEY || '',
         updatedAt: new Date().toISOString(),
       }
       await saveStore(store)
       return json(res, 200, { ok: true })
     }
 
+    const inboxReplyParams = routeParams(url.pathname, '/api/companies/:companyId/inbox/:itemId/reply')
+    if (req.method === 'POST' && inboxReplyParams) {
+      const body = await readBody(req)
+      const item = await replyToInboxItem(store, inboxReplyParams.companyId, inboxReplyParams.itemId, body.text || body.reply || '')
+      await saveStore(store)
+      return json(res, 200, { ok: true, item })
+    }
+
     const inboxParams = routeParams(url.pathname, '/api/companies/:companyId/inbox')
     if (req.method === 'GET' && inboxParams) {
       const type = url.searchParams.get('type') || 'all'
       const syncResult = await syncLiveInbox(store, inboxParams.companyId)
-      if (syncResult.items.length) await saveStore(store)
+      const replies = await processAutoReplies(store, syncResult.items)
+      if (syncResult.items.length || replies.length) await saveStore(store)
       const items = store.items.filter(item => {
         if (item.companyId !== inboxParams.companyId) return false
         return type === 'all' || item.type === type
       }).sort((a, b) => new Date(b.receivedAt || 0) - new Date(a.receivedAt || 0))
-      return json(res, 200, { items, synced: syncResult.items.length, syncErrors: syncResult.errors })
+      return json(res, 200, { items, synced: syncResult.items.length, autoReplied: replies.length, syncErrors: syncResult.errors })
     }
 
     if (req.method === 'POST' && inboxParams) {

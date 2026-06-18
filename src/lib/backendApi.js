@@ -104,6 +104,13 @@ export function fetchInbox(companyId, type = 'all') {
   return request(`/api/companies/${encodeURIComponent(companyId)}/inbox?type=${encodeURIComponent(type)}`)
 }
 
+export function replyToInboxItem(companyId, itemId, text) {
+  return request(`/api/companies/${encodeURIComponent(companyId)}/inbox/${encodeURIComponent(itemId)}/reply`, {
+    method: 'POST',
+    body: JSON.stringify({ text }),
+  })
+}
+
 // Post a new message to inbox
 export function createTestInboxItem(companyId, payload) {
   return request(`/api/companies/${encodeURIComponent(companyId)}/inbox`, {

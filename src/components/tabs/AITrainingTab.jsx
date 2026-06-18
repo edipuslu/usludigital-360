@@ -328,7 +328,34 @@ export default function AITrainingTab({ company, onUpdate, onNotify, isAdmin = t
         {/* Left — OpenAI key + documents */}
         <div className="lg:col-span-2 space-y-5">
           {isAdmin ? (
-            <OpenAIKeySection apiKey={apiKey} onKeyChange={setApiKey} />
+            <OpenAIKeySection apiKey={apiKey} onKeyChange={async key => {
+              setApiKey(key)
+              const automation = key ? {
+                ...company.automation,
+                instagram: { ...(company.automation?.instagram || {}), dmReply: true, commentReply: true },
+                facebook: { ...(company.automation?.facebook || {}), dmReply: true, commentReply: true },
+                whatsapp: { ...(company.automation?.whatsapp || {}), dmReply: true },
+              } : company.automation
+              try {
+                await saveBackendAiConfig({
+                  ...company,
+                  automation,
+                  aiTraining: {
+                    ...company.aiTraining,
+                    documents: docs,
+                    websiteUrl,
+                    guardrails,
+                    fallbackMessage: fallback,
+                    description,
+                    tone: selectedTone,
+                  },
+                })
+                onUpdate?.(current => ({ ...current, automation }))
+                onNotify?.(key ? 'OpenAI key saved to backend. Comment and DM auto-replies are enabled.' : 'OpenAI key removed from backend.', 'success')
+              } catch (err) {
+                onNotify?.(`OpenAI key changed locally, but backend sync failed: ${err.message}`, 'warning')
+              }
+            }} />
           ) : (
             <div className="card p-5">
               <div className="flex items-center gap-2 mb-2">

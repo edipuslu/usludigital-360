@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { MessageCircle, Send, Search, Filter, Heart, MessageSquare, Calendar, User, ExternalLink, Loader } from 'lucide-react'
 import { PlatformIcon, SectionHeader } from '../ui/UIKit'
-import { fetchInbox } from '../../lib/backendApi'
+import { fetchInbox, replyToInboxItem } from '../../lib/backendApi'
 import clsx from 'clsx'
 
 const PLATFORMS = ['instagram', 'facebook', 'youtube', 'whatsapp']
@@ -40,11 +40,13 @@ function MessageCard({ msg, onReply, isReply = false, isAdmin = true }) {
   const handleSendReply = async () => {
     if (!replyText.trim()) return
     setSending(true)
-    await new Promise(r => setTimeout(r, 1000))
-    onReply(msg.id, replyText)
-    setReplyText('')
-    setSending(false)
-    setShowReplyBox(false)
+    try {
+      await onReply(msg.id, replyText)
+      setReplyText('')
+      setShowReplyBox(false)
+    } finally {
+      setSending(false)
+    }
   }
 
   return (
@@ -105,14 +107,17 @@ function MessageCard({ msg, onReply, isReply = false, isAdmin = true }) {
         </>
       )}
       {msg.aiReplied && (
-        <div className="mt-3 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+        <div className={clsx('mt-3 p-3 rounded-lg border', msg.status === 'reply_failed' ? 'bg-red-50 border-red-200' : 'bg-blue-50 border-blue-200')}>
           <div className="flex items-center gap-1.5 mb-1">
-            <div className="w-4 h-4 rounded-full bg-blue-600 flex items-center justify-center">
+            <div className={clsx('w-4 h-4 rounded-full flex items-center justify-center', msg.status === 'reply_failed' ? 'bg-red-600' : 'bg-blue-600')}>
               <span className="text-white text-[8px] font-bold">AI</span>
             </div>
-            <span className="text-blue-800 text-xs font-semibold">AI Reply Sent</span>
+            <span className={clsx('text-xs font-semibold', msg.status === 'reply_failed' ? 'text-red-800' : 'text-blue-800')}>
+              {msg.status === 'reply_failed' ? 'Reply Generated, Posting Failed' : 'Reply Sent'}
+            </span>
           </div>
-          <p className="text-blue-700 text-xs leading-relaxed">{msg.aiReply}</p>
+          <p className={clsx('text-xs leading-relaxed', msg.status === 'reply_failed' ? 'text-red-700' : 'text-blue-700')}>{msg.aiReply}</p>
+          {msg.error && <p className="text-red-600 text-xs mt-2">{msg.error}</p>}
         </div>
       )}
     </div>
@@ -208,6 +213,7 @@ export default function InboxTab({ company, platform, isAdmin = true }) {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [syncedCount, setSyncedCount] = useState(0)
+  const [autoRepliedCount, setAutoRepliedCount] = useState(0)
   const [syncWarnings, setSyncWarnings] = useState([])
 
   useEffect(() => {
@@ -219,6 +225,7 @@ export default function InboxTab({ company, platform, isAdmin = true }) {
         if (!alive) return
         setMessages((data.items || []).map(normalizeInboxItem))
         setSyncedCount(Number(data.synced || 0))
+        setAutoRepliedCount(Number(data.autoReplied || 0))
         setSyncWarnings(data.syncErrors || [])
       })
       .catch(err => {
@@ -231,8 +238,10 @@ export default function InboxTab({ company, platform, isAdmin = true }) {
     }
   }, [company.id])
 
-  const handleReply = (msgId, text) => {
-    setMessages(msgs => msgs.map(msg => msg.id === msgId ? { ...msg, aiReplied: true, aiReply: text } : msg))
+  const handleReply = async (msgId, text) => {
+    const data = await replyToInboxItem(company.id, msgId, text)
+    const updated = normalizeInboxItem(data.item)
+    setMessages(msgs => msgs.map(msg => msg.id === msgId ? updated : msg))
   }
 
   const platformsToShow = platform ? [platform] : PLATFORMS
@@ -247,6 +256,18 @@ export default function InboxTab({ company, platform, isAdmin = true }) {
   return (
     <div className="space-y-6 animate-slide-in">
       {!loading && !platform && <OverviewPanel messages={messages} />}
+
+      {!loading && !platform && syncedCount > 0 && (
+        <div className="rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-medium text-emerald-700">
+          Synced {syncedCount} new message{syncedCount === 1 ? '' : 's'} from connected accounts.
+          {autoRepliedCount > 0 && ` AI replied to ${autoRepliedCount}.`}
+        </div>
+      )}
+      {!loading && !platform && syncWarnings.length > 0 && (
+        <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-medium text-amber-800">
+          Some inbox data could not sync from Meta: {syncWarnings.slice(0, 2).join(' · ')}
+        </div>
+      )}
 
       {!loading && platform && (
         <>
@@ -263,6 +284,7 @@ export default function InboxTab({ company, platform, isAdmin = true }) {
           {!loading && syncedCount > 0 && (
             <div className="rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-medium text-emerald-700">
               Synced {syncedCount} new message{syncedCount === 1 ? '' : 's'} from connected accounts.
+              {autoRepliedCount > 0 && ` AI replied to ${autoRepliedCount}.`}
             </div>
           )}
           {!loading && syncWarnings.length > 0 && (
