@@ -1,4 +1,4 @@
-import { MessageSquare, TrendingUp, Activity, Clock, AlertCircle, CheckCircle2, Brain, Globe, Zap } from 'lucide-react'
+import { MessageSquare, TrendingUp, Activity, Clock, AlertCircle, CheckCircle2, Brain, Globe, Zap, Building2, Bot, ClipboardList, FileBarChart } from 'lucide-react'
 import { StatCard, StatusBadge, StatusDot, PlatformIcon } from '../ui/UIKit'
 import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'recharts'
 import clsx from 'clsx'
@@ -12,6 +12,57 @@ const GoalLabels = {
   reply_everyone: 'Reply Everyone',
   custom: 'Custom Goal',
 }
+
+const enterpriseModules = [
+  {
+    key: 'branches',
+    title: 'Coklu sube',
+    label: 'Branch routing',
+    icon: Building2,
+    target: 'settings',
+    points: [
+      'Messages can be routed by location.',
+      'Each branch can have its own sales owner.',
+      'Performance can be reviewed branch by branch.',
+    ],
+  },
+  {
+    key: 'agent',
+    title: 'Ozel AI Agent',
+    label: 'Brand-trained AI',
+    icon: Bot,
+    target: 'ai-training',
+    points: [
+      'Learns products, services, prices, and campaigns.',
+      'Replies in the company sales tone.',
+      'Avoids generic chatbot answers.',
+    ],
+  },
+  {
+    key: 'crm',
+    title: 'CRM',
+    label: 'Lead tracking',
+    icon: ClipboardList,
+    target: 'inbox',
+    points: [
+      'New customers are tracked as leads.',
+      'Lead stages can move from new to interested to sale.',
+      'Sales follow-up can be assigned to the right person.',
+    ],
+  },
+  {
+    key: 'reports',
+    title: 'Raporlama',
+    label: 'Monthly progress',
+    icon: FileBarChart,
+    target: 'reports',
+    points: [
+      'Reports show replies, clicks, growth, and performance.',
+      'Progress can be compared month by month.',
+      'Clients can receive clean monthly summaries.',
+    ],
+  },
+]
 
 const CustomTooltip = ({ active, payload, label }) => {
   if (!active || !payload?.length) return null
@@ -29,7 +80,78 @@ const CustomTooltip = ({ active, payload, label }) => {
   )
 }
 
-export default function OverviewTab({ company }) {
+function EnterpriseModuleCard({ module, value, onOpen }) {
+  const Icon = module.icon
+
+  return (
+    <button
+      type="button"
+      onClick={() => onOpen?.(module.target)}
+      className="text-left rounded-lg border border-slate-200 bg-white p-5 hover:border-blue-200 hover:bg-blue-50/30 transition-colors cursor-pointer focus:outline-none focus:ring-2 focus:ring-blue-200"
+    >
+      <div className="flex items-start justify-between gap-4">
+        <div className="w-10 h-10 rounded-lg border border-slate-200 bg-slate-50 flex items-center justify-center text-slate-600">
+          <Icon size={18} />
+        </div>
+        <div className="text-right">
+          <div className="text-slate-900 text-lg font-bold">{value}</div>
+          <div className="text-slate-400 text-xs">{module.label}</div>
+        </div>
+      </div>
+      <div className="mt-4">
+        <h3 className="text-slate-900 text-sm font-bold">{module.title}</h3>
+        <div className="mt-3 space-y-2">
+          {module.points.map(point => (
+            <div key={point} className="flex items-start gap-2 text-xs leading-relaxed text-slate-600">
+              <CheckCircle2 size={12} className="text-emerald-500 mt-0.5 flex-shrink-0" />
+              <span>{point}</span>
+            </div>
+          ))}
+        </div>
+      </div>
+    </button>
+  )
+}
+
+function EnterpriseSetup({ company, onNavigate }) {
+  const connectedPlatforms = PLATFORM_KEYS.filter(key => company.platforms?.[key]?.connected).length
+  const moduleValues = {
+    branches: String(company.branches?.length || 0),
+    agent: company.aiTraining?.status === 'active' ? 'Active' : 'Setup',
+    crm: String(company.leads?.length || 0),
+    reports: String(company.reports?.length || 0),
+  }
+
+  return (
+    <section className="space-y-4">
+      <div className="flex flex-col lg:flex-row lg:items-end lg:justify-between gap-3">
+        <div>
+          <h2 className="text-slate-900 font-bold text-lg">Kurumsal AI Automation</h2>
+          <p className="text-slate-500 text-sm mt-1 max-w-3xl">
+            One simple structure for multi-branch routing, a custom AI sales agent, CRM follow-up, and monthly reporting.
+          </p>
+        </div>
+        <div className="inline-flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-600 self-start lg:self-auto">
+          <Globe size={13} className="text-slate-400" />
+          {connectedPlatforms}/4 platforms connected
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
+        {enterpriseModules.map(module => (
+          <EnterpriseModuleCard
+            key={module.key}
+            module={module}
+            value={moduleValues[module.key]}
+            onOpen={onNavigate}
+          />
+        ))}
+      </div>
+    </section>
+  )
+}
+
+export default function OverviewTab({ company, onNavigate }) {
   const m = company.metrics.thisMonth
   const last7 = company.metrics.daily.slice(-7)
 
@@ -44,6 +166,8 @@ export default function OverviewTab({ company }) {
 
   return (
     <div className="space-y-8 animate-slide-in">
+      <EnterpriseSetup company={company} onNavigate={onNavigate} />
+
       {/* KPI Row */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         {kpis.map(kpi => (

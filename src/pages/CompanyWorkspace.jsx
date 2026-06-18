@@ -244,7 +244,7 @@ export default function CompanyWorkspace() {
   }
 
   const tabContent = {
-    overview: <OverviewTab company={company} />,
+    overview: <OverviewTab company={company} onNavigate={setActiveTab} />,
     platforms: <PlatformsTab company={company} onUpdate={updateCompany} onNotify={addNotification} />,
     inbox: <InboxTab company={company} onNotify={addNotification} />,
     growth: <GrowthTab company={company} />,
