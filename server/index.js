@@ -1958,7 +1958,11 @@ export async function appHandler(req, res) {
     if (req.method === 'GET' && inboxParams) {
       const type = url.searchParams.get('type') || 'all'
       const syncResult = await syncLiveInbox(store, inboxParams.companyId)
-      const replies = await processAutoReplies(store, syncResult.items)
+      const pendingItems = store.items
+        .filter(item => item.companyId === inboxParams.companyId && !item.aiReply && item.status !== 'reply_failed')
+        .sort((a, b) => new Date(b.receivedAt || 0) - new Date(a.receivedAt || 0))
+        .slice(0, 50)
+      const replies = await processAutoReplies(store, pendingItems)
       if (syncResult.items.length || replies.length) await saveStore(store)
       const items = store.items.filter(item => {
         if (item.companyId !== inboxParams.companyId) return false
