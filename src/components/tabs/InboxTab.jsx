@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
-import { MessageCircle, Send, Search, Filter, Heart, MessageSquare, Calendar, User, ExternalLink, Loader, AlertTriangle, Calculator, RefreshCw } from 'lucide-react'
+import { MessageCircle, Send, Search, Filter, Heart, MessageSquare, Calendar, User, ExternalLink, Loader, AlertTriangle, Calculator, RefreshCw, Plus } from 'lucide-react'
 import { PlatformIcon, SectionHeader } from '../ui/UIKit'
-import { estimateBackfillReplies, fetchInbox, replyToInboxItem, runBackfillReplies } from '../../lib/backendApi'
+import { estimateBackfillReplies, fetchInbox, replyToInboxItem, runBackfillReplies, createTestDM } from '../../lib/backendApi'
 import clsx from 'clsx'
 
 const PLATFORMS = ['instagram', 'facebook', 'youtube', 'whatsapp']
@@ -149,7 +149,8 @@ function PlatformSection({ platform, messages, onReply, isDM = false, isAdmin = 
   )
 }
 
-function OverviewPanel({ messages }) {
+function OverviewPanel({ messages, onRefresh, company }) {
+  const [testing, setTesting] = useState(false)
   const PLATFORM_CONFIG = {
     instagram: { label: 'Instagram', color: '#E1306C', bg: '#FDE8F1' },
     facebook: { label: 'Facebook', color: '#1877F2', bg: '#E8F1FD' },
@@ -157,11 +158,27 @@ function OverviewPanel({ messages }) {
     whatsapp: { label: 'WhatsApp', color: '#25D366', bg: '#E8FBF0' },
   }
 
+  const handleTestDM = async (platform) => {
+    setTesting(true)
+    try {
+      await createTestDM(company.id, platform)
+      await new Promise(r => setTimeout(r, 500))
+      onRefresh?.()
+    } finally {
+      setTesting(false)
+    }
+  }
+
   return (
     <div className="space-y-6">
-      <div>
-        <h2 className="text-slate-900 font-bold text-2xl">Overview</h2>
-        <p className="text-slate-500 text-sm mt-1">Choose a platform to inspect comments and DMs.</p>
+      <div className="flex items-center justify-between">
+        <div>
+          <h2 className="text-slate-900 font-bold text-2xl">Overview</h2>
+          <p className="text-slate-500 text-sm mt-1">Choose a platform to inspect comments and DMs.</p>
+        </div>
+        <button onClick={() => handleTestDM('instagram')} disabled={testing} className="btn-secondary text-xs">
+          {testing ? <Loader size={12} className="animate-spin" /> : <Plus size={12} />} Test DM
+        </button>
       </div>
 
       <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
@@ -414,7 +431,7 @@ export default function InboxTab({ company, platform, isAdmin = true }) {
 
   return (
     <div className="space-y-6 animate-slide-in">
-      {!loading && !platform && <OverviewPanel messages={messages} />}
+      {!loading && !platform && <OverviewPanel messages={messages} company={company} onRefresh={reloadInbox} />}
 
       {!loading && isAdmin && (
         <div className="flex items-center justify-between gap-3 rounded-lg border border-slate-200 bg-white px-4 py-3">

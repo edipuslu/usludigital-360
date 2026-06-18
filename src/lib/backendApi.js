@@ -153,6 +153,18 @@ export function createTestInboxItem(companyId, payload) {
   })
 }
 
+// Create test DM
+export function createTestDM(companyId, platform = 'instagram') {
+  return createTestInboxItem(companyId, {
+    type: 'dm',
+    platform,
+    senderName: 'Test Customer',
+    senderId: `test-dm-${Date.now()}`,
+    text: 'Hi! Is this product available? I am interested in learning more.',
+    externalId: `test-dm-${Date.now()}`,
+  })
+}
+
 // Health check
 export function checkBackendHealth() {
   return request('/health')
