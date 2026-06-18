@@ -1569,6 +1569,13 @@ async function postPlatformReply(store, item, reply) {
   const connection = findCompanyConnection(store, item.companyId, item.platform)
   const token = connection?.credentials?.pageAccessToken || connection?.credentials?.accessToken
 
+  if (item.type === 'dm' && String(item.senderId || '').startsWith('test-dm-')) {
+    return {
+      status: 'test_ready',
+      error: 'Test DM generated locally. Real Instagram DM sending requires a valid Instagram-scoped sender ID from Meta webhooks.',
+    }
+  }
+
   if (!token) {
     return { status: 'reply_ready', error: 'AI reply is ready, but no platform token is registered on the backend.' }
   }

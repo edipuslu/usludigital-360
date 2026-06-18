@@ -32,6 +32,13 @@ function normalizeInboxItem(item) {
   }
 }
 
+function formatSyncWarning(warning) {
+  if (/Instagram DMs:.*capability|instagram_manage_messages|Advanced Access/i.test(warning)) {
+    return 'Instagram DMs are blocked by Meta app access. Comments can work, but DMs need Instagram Messaging permission/capability approved in Meta before they can sync or reply.'
+  }
+  return warning
+}
+
 function MessageCard({ msg, onReply, isReply = false, isAdmin = true }) {
   const [showReplyBox, setShowReplyBox] = useState(false)
   const [replyText, setReplyText] = useState('')
@@ -107,17 +114,17 @@ function MessageCard({ msg, onReply, isReply = false, isAdmin = true }) {
         </>
       )}
       {msg.aiReplied && (
-        <div className={clsx('mt-3 p-3 rounded-lg border', msg.status === 'reply_failed' ? 'bg-red-50 border-red-200' : 'bg-blue-50 border-blue-200')}>
+        <div className={clsx('mt-3 p-3 rounded-lg border', msg.status === 'reply_failed' ? 'bg-red-50 border-red-200' : ['reply_ready', 'test_ready'].includes(msg.status) ? 'bg-amber-50 border-amber-200' : 'bg-blue-50 border-blue-200')}>
           <div className="flex items-center gap-1.5 mb-1">
-            <div className={clsx('w-4 h-4 rounded-full flex items-center justify-center', msg.status === 'reply_failed' ? 'bg-red-600' : 'bg-blue-600')}>
+            <div className={clsx('w-4 h-4 rounded-full flex items-center justify-center', msg.status === 'reply_failed' ? 'bg-red-600' : ['reply_ready', 'test_ready'].includes(msg.status) ? 'bg-amber-500' : 'bg-blue-600')}>
               <span className="text-white text-[8px] font-bold">AI</span>
             </div>
-            <span className={clsx('text-xs font-semibold', msg.status === 'reply_failed' ? 'text-red-800' : 'text-blue-800')}>
-              {msg.status === 'reply_failed' ? 'Reply Generated, Posting Failed' : 'Reply Sent'}
+            <span className={clsx('text-xs font-semibold', msg.status === 'reply_failed' ? 'text-red-800' : ['reply_ready', 'test_ready'].includes(msg.status) ? 'text-amber-800' : 'text-blue-800')}>
+              {msg.status === 'reply_failed' ? 'Reply Generated, Posting Failed' : ['reply_ready', 'test_ready'].includes(msg.status) ? 'Reply Generated, Not Posted' : 'Reply Sent'}
             </span>
           </div>
-          <p className={clsx('text-xs leading-relaxed', msg.status === 'reply_failed' ? 'text-red-700' : 'text-blue-700')}>{msg.aiReply}</p>
-          {msg.error && <p className="text-red-600 text-xs mt-2">{msg.error}</p>}
+          <p className={clsx('text-xs leading-relaxed', msg.status === 'reply_failed' ? 'text-red-700' : ['reply_ready', 'test_ready'].includes(msg.status) ? 'text-amber-700' : 'text-blue-700')}>{msg.aiReply}</p>
+          {msg.error && <p className={clsx('text-xs mt-2', msg.status === 'reply_failed' ? 'text-red-600' : 'text-amber-700')}>{msg.error}</p>}
         </div>
       )}
     </div>
@@ -460,7 +467,7 @@ export default function InboxTab({ company, platform, isAdmin = true }) {
       )}
       {!loading && !platform && syncWarnings.length > 0 && (
         <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-medium text-amber-800">
-          Some inbox data could not sync from Meta: {syncWarnings.slice(0, 2).join(' · ')}
+          Some inbox data could not sync from Meta: {syncWarnings.slice(0, 2).map(formatSyncWarning).join(' · ')}
         </div>
       )}
 
@@ -484,7 +491,7 @@ export default function InboxTab({ company, platform, isAdmin = true }) {
           )}
           {!loading && syncWarnings.length > 0 && (
             <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-medium text-amber-800">
-              Some inbox data could not sync from Meta: {syncWarnings.slice(0, 2).join(' · ')}
+              Some inbox data could not sync from Meta: {syncWarnings.slice(0, 2).map(formatSyncWarning).join(' · ')}
             </div>
           )}
 
