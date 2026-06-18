@@ -16,7 +16,7 @@ const GoalLabels = {
 const enterpriseModules = [
   {
     key: 'branches',
-    title: 'Coklu sube',
+    title: 'Multi-Branch',
     label: 'Branch routing',
     icon: Building2,
     target: 'settings',
@@ -28,7 +28,7 @@ const enterpriseModules = [
   },
   {
     key: 'agent',
-    title: 'Ozel AI Agent',
+    title: 'Custom AI Agent',
     label: 'Brand-trained AI',
     icon: Bot,
     target: 'ai-training',
@@ -52,7 +52,7 @@ const enterpriseModules = [
   },
   {
     key: 'reports',
-    title: 'Raporlama',
+    title: 'Reporting',
     label: 'Monthly progress',
     icon: FileBarChart,
     target: 'reports',
@@ -126,7 +126,7 @@ function EnterpriseSetup({ company, onNavigate }) {
     <section className="space-y-4">
       <div className="flex flex-col lg:flex-row lg:items-end lg:justify-between gap-3">
         <div>
-          <h2 className="text-slate-900 font-bold text-lg">Kurumsal AI Automation</h2>
+          <h2 className="text-slate-900 font-bold text-lg">Enterprise AI Automation</h2>
           <p className="text-slate-500 text-sm mt-1 max-w-3xl">
             One simple structure for multi-branch routing, a custom AI sales agent, CRM follow-up, and monthly reporting.
           </p>
