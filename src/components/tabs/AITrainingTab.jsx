@@ -1,7 +1,7 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Upload, FileText, Trash2, CheckCircle2, RefreshCw, Brain, Shield, Globe, MessageSquare, Plus, Eye, EyeOff, ExternalLink, AlertCircle, Zap, Key } from 'lucide-react'
 import { StatusBadge, SectionHeader, Toggle } from '../ui/UIKit'
-import { saveBackendAiConfig } from '../../lib/backendApi'
+import { getBackendAiConfig, saveBackendAiConfig, testBackendAiReply } from '../../lib/backendApi'
 import clsx from 'clsx'
 
 const TONES = [
@@ -79,11 +79,16 @@ function DropZone({ onFileDrop }) {
   )
 }
 
-function OpenAIKeySection({ apiKey, onKeyChange }) {
+function OpenAIKeySection({ apiKey, hasSavedKey, onKeyChange }) {
   const [showKey, setShowKey] = useState(false)
   const [inputKey, setInputKey] = useState(apiKey || '')
-  const [status, setStatus] = useState(apiKey ? 'saved' : 'empty') // empty | testing | valid | invalid | saved
+  const [status, setStatus] = useState(hasSavedKey || apiKey ? 'saved' : 'empty') // empty | testing | valid | invalid | saved
   const [errorMsg, setErrorMsg] = useState('')
+
+  useEffect(() => {
+    if (apiKey) setInputKey(apiKey)
+    setStatus(hasSavedKey || apiKey ? 'saved' : 'empty')
+  }, [apiKey, hasSavedKey])
 
   const testKey = async () => {
     if (!inputKey.trim()) return
@@ -96,7 +101,6 @@ function OpenAIKeySection({ apiKey, onKeyChange }) {
       if (res.ok) {
         setStatus('valid')
         onKeyChange(inputKey.trim())
-        localStorage.setItem('ud360_openai_key', inputKey.trim())
       } else {
         const data = await res.json()
         setStatus('invalid')
@@ -152,12 +156,17 @@ function OpenAIKeySection({ apiKey, onKeyChange }) {
       <div className="space-y-3">
         <div>
           <label className="block text-sm font-semibold text-slate-700 mb-1.5">Your API Key</label>
+          {hasSavedKey && !inputKey ? (
+            <div className="mb-2 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs font-medium text-emerald-700">
+              OpenAI key is already saved on the backend. Paste a new key only if you want to replace it.
+            </div>
+          ) : null}
           <div className="relative">
             <input
               type={showKey ? 'text' : 'password'}
               value={inputKey}
               onChange={e => { setInputKey(e.target.value); setStatus('empty') }}
-              placeholder="sk-proj-..."
+              placeholder={hasSavedKey ? 'Saved on backend - paste new key to replace' : 'sk-proj-...'}
               className={clsx('input-field pr-20 font-mono text-sm', status === 'valid' && 'border-emerald-400 focus:border-emerald-500 focus:ring-emerald-200', status === 'invalid' && 'border-red-400 focus:border-red-500 focus:ring-red-200')}
             />
             <button
@@ -201,7 +210,7 @@ function OpenAIKeySection({ apiKey, onKeyChange }) {
 
       <div className="mt-4 flex items-start gap-2 text-xs text-slate-400">
         <Shield size={12} className="mt-0.5 flex-shrink-0" />
-        Your key is stored locally in your browser. In production, keys should be stored server-side. Never share your key publicly.
+        Your key is saved on the backend for this company. You only need to enter it again when replacing or removing it.
       </div>
     </div>
   )
@@ -219,6 +228,23 @@ export default function AITrainingTab({ company, onUpdate, onNotify, isAdmin = t
   const [testing, setTesting] = useState(false)
   const [testError, setTestError] = useState('')
   const [apiKey, setApiKey] = useState(() => localStorage.getItem('ud360_openai_key') || '')
+  const [hasSavedApiKey, setHasSavedApiKey] = useState(() => Boolean(localStorage.getItem('ud360_openai_key') || company.hasOpenaiKey))
+
+  useEffect(() => {
+    let alive = true
+    getBackendAiConfig(company.id)
+      .then(config => {
+        if (!alive) return
+        setHasSavedApiKey(Boolean(config.hasOpenaiKey))
+      })
+      .catch(() => {
+        if (!alive) return
+        setHasSavedApiKey(Boolean(localStorage.getItem('ud360_openai_key') || company.hasOpenaiKey))
+      })
+    return () => {
+      alive = false
+    }
+  }, [company.id, company.hasOpenaiKey])
 
   const handleFileDrop = files => {
     const newDocs = files.map((f, i) => {
@@ -270,7 +296,7 @@ export default function AITrainingTab({ company, onUpdate, onNotify, isAdmin = t
 
   const handleTest = async () => {
     if (!testInput.trim()) return
-    if (!apiKey) {
+    if (!apiKey && !hasSavedApiKey) {
       setTestError('Please add and verify your OpenAI API key first.')
       return
     }
@@ -278,28 +304,23 @@ export default function AITrainingTab({ company, onUpdate, onNotify, isAdmin = t
     setTestError('')
     setTestResponse('')
 
-    const systemPrompt = `You are an AI assistant for ${company.name}. ${description ? `Business context: ${description}` : ''} Reply tone: ${selectedTone}. ${guardrails ? `Important: Only answer based on provided business context. If you don't know, respond with the fallback: "${fallback}"` : ''} Always be helpful, brand-appropriate and concise. Keep replies under 3 sentences.`
-
     try {
-      const res = await fetch('https://api.openai.com/v1/chat/completions', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${apiKey}`,
-        },
-        body: JSON.stringify({
-          model: 'gpt-4o-mini',
-          messages: [
-            { role: 'system', content: systemPrompt },
-            { role: 'user', content: testInput },
-          ],
-          max_tokens: 200,
-          temperature: 0.7,
-        }),
-      })
-      const data = await res.json()
-      if (!res.ok) throw new Error(data?.error?.message || 'OpenAI request failed')
-      setTestResponse(data.choices[0].message.content)
+      if (apiKey) {
+        await saveBackendAiConfig({
+          ...company,
+          aiTraining: {
+            ...company.aiTraining,
+            documents: docs,
+            websiteUrl,
+            guardrails,
+            fallbackMessage: fallback,
+            description,
+            tone: selectedTone,
+          },
+        }, apiKey)
+      }
+      const data = await testBackendAiReply(company.id, testInput)
+      setTestResponse(data.reply)
     } catch (err) {
       setTestError(err.message)
     } finally {
@@ -314,7 +335,7 @@ export default function AITrainingTab({ company, onUpdate, onNotify, isAdmin = t
         description={isAdmin ? "Add your OpenAI key and upload business context so the AI replies accurately in your brand's voice" : "View the AI training status and business context configured by the admin."}
         action={
           <div className="flex items-center gap-2">
-            <StatusBadge status={isAdmin ? (apiKey ? 'active' : 'needs_update') : company.aiTraining.status} />
+            <StatusBadge status={isAdmin ? (hasSavedApiKey ? 'active' : 'needs_update') : company.aiTraining.status} />
             {isAdmin && docs.length > 0 && (
               <button onClick={() => saveTraining('active')} className="btn-primary">
                 <RefreshCw size={14} /> Retrain AI
@@ -328,8 +349,9 @@ export default function AITrainingTab({ company, onUpdate, onNotify, isAdmin = t
         {/* Left — OpenAI key + documents */}
         <div className="lg:col-span-2 space-y-5">
           {isAdmin ? (
-            <OpenAIKeySection apiKey={apiKey} onKeyChange={async key => {
+            <OpenAIKeySection apiKey={apiKey} hasSavedKey={hasSavedApiKey} onKeyChange={async key => {
               setApiKey(key)
+              setHasSavedApiKey(Boolean(key))
               const automation = key ? {
                 ...company.automation,
                 instagram: { ...(company.automation?.instagram || {}), dmReply: true, commentReply: true },
@@ -349,8 +371,8 @@ export default function AITrainingTab({ company, onUpdate, onNotify, isAdmin = t
                     description,
                     tone: selectedTone,
                   },
-                })
-                onUpdate?.(current => ({ ...current, automation }))
+                }, key)
+                onUpdate?.(current => ({ ...current, automation, hasOpenaiKey: Boolean(key) }))
                 onNotify?.(key ? 'OpenAI key saved to backend. Comment and DM auto-replies are enabled.' : 'OpenAI key removed from backend.', 'success')
               } catch (err) {
                 onNotify?.(`OpenAI key changed locally, but backend sync failed: ${err.message}`, 'warning')
@@ -424,20 +446,20 @@ export default function AITrainingTab({ company, onUpdate, onNotify, isAdmin = t
               <Brain size={15} className="text-slate-400" /> Test AI Responses
             </h3>
             <p className="text-slate-400 text-sm mb-4">
-              {apiKey ? 'Powered by GPT-4o mini — type any question a customer might ask' : 'Add your OpenAI API key above to test real AI responses'}
+              {hasSavedApiKey ? 'Powered by the saved backend key — type any question a customer might ask' : 'Add your OpenAI API key above to test real AI responses'}
             </p>
             <div className="space-y-3">
               <textarea
                 value={testInput}
                 onChange={e => setTestInput(e.target.value)}
                 rows={2}
-                disabled={!apiKey}
+                disabled={!hasSavedApiKey}
                 className="input-field resize-none disabled:opacity-50 disabled:cursor-not-allowed"
-                placeholder={apiKey ? 'e.g. How much does the Luna Sofa cost? Do you deliver to Ankara?' : 'Add OpenAI API key first…'}
+                placeholder={hasSavedApiKey ? 'e.g. How much does the Luna Sofa cost? Do you deliver to Ankara?' : 'Add OpenAI API key first...'}
               />
               <button
                 onClick={handleTest}
-                disabled={!testInput.trim() || testing || !apiKey}
+                disabled={!testInput.trim() || testing || !hasSavedApiKey}
                 className="btn-primary disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {testing ? <><div className="w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin" />Generating…</> : <><Brain size={14} />Generate AI Reply</>}
@@ -526,7 +548,7 @@ export default function AITrainingTab({ company, onUpdate, onNotify, isAdmin = t
             </div>
             <ul className="space-y-2">
               {[
-                ...(isAdmin ? [{ label: 'OpenAI API key added', done: !!apiKey }] : []),
+                ...(isAdmin ? [{ label: 'OpenAI API key added', done: hasSavedApiKey }] : []),
                 { label: 'Business description written', done: !!description.trim() },
                 { label: 'Training documents uploaded', done: docs.length > 0 },
                 { label: 'Fallback message set', done: !!fallback.trim() },

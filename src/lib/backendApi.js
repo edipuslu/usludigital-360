@@ -80,22 +80,41 @@ export function fetchGrowthMetrics(companyId) {
   return request(`/api/companies/${encodeURIComponent(companyId)}/growth`)
 }
 
-// Save AI config and training data
-export function saveBackendAiConfig(company) {
-  const openaiKey = localStorage.getItem('ud360_openai_key') || ''
+// Save AI config and training data. Only send openaiKey when it is being changed,
+// so normal training saves do not erase a key stored on the backend.
+export function saveBackendAiConfig(company, openaiKey) {
+  const savedLocalKey = typeof localStorage !== 'undefined' ? localStorage.getItem('ud360_openai_key') : ''
+  const body = {
+    company: {
+      id: company.id,
+      name: company.name,
+      goal: company.goal,
+      whatsappLink: company.whatsappLink,
+      aiTraining: company.aiTraining,
+      automation: company.automation,
+    },
+  }
+
+  if (arguments.length > 1) {
+    body.openaiKey = openaiKey || ''
+  } else if (savedLocalKey) {
+    body.openaiKey = savedLocalKey
+  }
+
   return request(`/api/companies/${encodeURIComponent(company.id)}/ai-config`, {
     method: 'POST',
-    body: JSON.stringify({
-      openaiKey,
-      company: {
-        id: company.id,
-        name: company.name,
-        goal: company.goal,
-        whatsappLink: company.whatsappLink,
-        aiTraining: company.aiTraining,
-        automation: company.automation,
-      },
-    }),
+    body: JSON.stringify(body),
+  })
+}
+
+export function getBackendAiConfig(companyId) {
+  return request(`/api/companies/${encodeURIComponent(companyId)}/ai-config`)
+}
+
+export function testBackendAiReply(companyId, text) {
+  return request(`/api/companies/${encodeURIComponent(companyId)}/ai-test`, {
+    method: 'POST',
+    body: JSON.stringify({ text }),
   })
 }
 

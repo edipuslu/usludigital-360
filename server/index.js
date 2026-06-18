@@ -383,6 +383,13 @@ async function saveStore(store) {
 
 function listCompanies(store) {
   return Object.values(store.companies || {})
+    .map(company => {
+      const { openaiKey, ...safeCompany } = company
+      return {
+        ...safeCompany,
+        hasOpenaiKey: Boolean(openaiKey || process.env.OPENAI_API_KEY),
+      }
+    })
     .sort((a, b) => String(b.createdAt || '').localeCompare(String(a.createdAt || '')))
 }
 
@@ -1423,10 +1430,10 @@ function shouldAutoReply(company, item) {
   return true
 }
 
-async function generateAiReply(company, item) {
+async function generateAiReply(company, item, options = {}) {
   const apiKey = company?.openaiKey || process.env.OPENAI_API_KEY
   if (!apiKey) return { reply: '', status: 'needs_openai_key', error: 'OpenAI key is missing on the backend.' }
-  if (!shouldAutoReply(company, item)) return { reply: '', status: 'received', error: '' }
+  if (!options.force && !shouldAutoReply(company, item)) return { reply: '', status: 'received', error: '' }
 
   const response = await fetch('https://api.openai.com/v1/chat/completions', {
     method: 'POST',
@@ -1922,6 +1929,17 @@ export async function appHandler(req, res) {
     }
 
     const aiParams = routeParams(url.pathname, '/api/companies/:companyId/ai-config')
+    if (req.method === 'GET' && aiParams) {
+      const company = store.companies[aiParams.companyId]
+      if (!company) return json(res, 404, { error: 'Company not found.' })
+      return json(res, 200, {
+        hasOpenaiKey: Boolean(company.openaiKey || process.env.OPENAI_API_KEY),
+        model: process.env.OPENAI_MODEL || 'gpt-4o-mini',
+        aiTraining: company.aiTraining || {},
+        automation: company.automation || {},
+      })
+    }
+
     if (req.method === 'POST' && aiParams) {
       const body = await readBody(req)
       const existing = store.companies[aiParams.companyId] || companyDefaults({ id: aiParams.companyId, name: body.company?.name || 'Company' })
@@ -1944,6 +1962,21 @@ export async function appHandler(req, res) {
       }
       await saveStore(store)
       return json(res, 200, { ok: true })
+    }
+
+    const aiTestParams = routeParams(url.pathname, '/api/companies/:companyId/ai-test')
+    if (req.method === 'POST' && aiTestParams) {
+      const body = await readBody(req)
+      const company = store.companies[aiTestParams.companyId]
+      if (!company) return json(res, 404, { error: 'Company not found.' })
+      if (!String(body.text || '').trim()) return json(res, 400, { error: 'text is required.' })
+      const result = await generateAiReply(company, {
+        platform: 'instagram',
+        type: 'dm',
+        text: String(body.text || '').trim(),
+      }, { force: true })
+      if (result.error) return json(res, result.status === 'needs_openai_key' ? 400 : 502, { error: result.error, status: result.status })
+      return json(res, 200, { reply: result.reply, model: OPENAI_MODEL })
     }
 
     const inboxReplyParams = routeParams(url.pathname, '/api/companies/:companyId/inbox/:itemId/reply')
