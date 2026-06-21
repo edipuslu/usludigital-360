@@ -125,6 +125,13 @@ export function testBackendAiReply(companyId, text) {
   })
 }
 
+export function sendBackendReport(companyId, payload) {
+  return request(`/api/companies/${encodeURIComponent(companyId)}/send-report`, {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  })
+}
+
 // Fetch inbox (comments and DMs). Live Meta sync is opt-in because it can be slow.
 export function fetchInbox(companyId, type = 'all', options = {}) {
   const sync = options.sync ? '&sync=1' : ''

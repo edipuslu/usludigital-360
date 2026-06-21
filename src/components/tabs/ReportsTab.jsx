@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { FileText, Download, Send, TrendingUp, MessageSquare, Star, ChevronRight, Calendar, BarChart3, CheckCircle2, Trash2, Zap, AlertCircle } from 'lucide-react'
 import { EmptyState, StatusBadge, UsluLoader } from '../ui/UIKit'
+import { sendBackendReport } from '../../lib/backendApi'
 import clsx from 'clsx'
 import html2pdf from 'html2pdf.js'
 
@@ -58,27 +59,16 @@ function ReportCard({ report, isAdmin, company, onNotify, onDelete }) {
 
     setSending(true)
     try {
-      const backendUrl = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8787'
-      const response = await fetch(`${backendUrl}/api/companies/${company.id}/send-report`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          fromEmail: emailForm.fromEmail,
-          toEmails: recipients,
-          reportId: report.id,
-          month: report.month,
-          summary: report.summary,
-          bestPost: report.bestPost,
-          totalReplies: report.totalReplies,
-          waClicks: report.waClicks,
-        }),
+      await sendBackendReport(company.id, {
+        fromEmail: emailForm.fromEmail,
+        toEmails: recipients,
+        reportId: report.id,
+        month: report.month,
+        summary: report.summary,
+        bestPost: report.bestPost,
+        totalReplies: report.totalReplies,
+        waClicks: report.waClicks,
       })
-
-      const data = await response.json()
-
-      if (!response.ok) {
-        throw new Error(data.error || 'Failed to send email')
-      }
 
       setSending(false)
       setSent(true)
