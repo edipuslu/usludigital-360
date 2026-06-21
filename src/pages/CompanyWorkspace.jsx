@@ -4,7 +4,7 @@ import { Bell, Settings, CheckCircle2, Mail, Save, Trash2, AlertCircle, GitBranc
 import Sidebar from '../components/layout/Sidebar'
 import { PlatformIcon } from '../components/ui/UIKit'
 import { useAuth } from '../context/AuthContext'
-import { loadCompanies, saveCompanies } from './AdminDashboard'
+import { loadCompanies, normalizeCompany, saveCompanies } from './AdminDashboard'
 import { getCompanies, updateBackendCompany } from '../lib/backendApi'
 import OverviewTab from '../components/tabs/OverviewTab'
 import PlatformsTab from '../components/tabs/PlatformsTab'
@@ -292,8 +292,13 @@ export default function CompanyWorkspace() {
     getCompanies()
       .then(data => {
         if (!alive) return
-        setWorkspaces(data.companies || [])
-        saveCompanies(data.companies || [])
+        const backendCompanies = Array.isArray(data.companies) ? data.companies.map(normalizeCompany) : []
+        if (backendCompanies.length > 0 || loadCompanies().length === 0) {
+          setWorkspaces(backendCompanies)
+          saveCompanies(backendCompanies)
+          setSyncError('')
+          return
+        }
         setSyncError('')
       })
       .catch(err => {

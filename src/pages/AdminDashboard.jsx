@@ -202,14 +202,62 @@ export function loadCompanies() {
   try {
     const stored = localStorage.getItem(STORAGE_KEY)
     const parsed = stored ? JSON.parse(stored) : []
-    return Array.isArray(parsed) ? parsed : []
+    return Array.isArray(parsed) ? parsed.map(normalizeCompany) : []
   } catch {
     return []
   }
 }
 
 export function saveCompanies(companies) {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(companies))
+  localStorage.setItem(STORAGE_KEY, JSON.stringify((companies || []).map(normalizeCompany)))
+}
+
+export function normalizeCompany(company) {
+  if (!company) return company
+  return {
+    ...company,
+    platforms: {
+      instagram: { connected: false, handle: null, followers: null, lastSync: null, error: null, ...(company.platforms?.instagram || {}) },
+      facebook: { connected: false, handle: null, followers: null, lastSync: null, error: null, ...(company.platforms?.facebook || {}) },
+      youtube: { connected: false, handle: null, followers: null, lastSync: null, error: null, ...(company.platforms?.youtube || {}) },
+      whatsapp: { connected: false, handle: null, followers: null, lastSync: null, error: null, ...(company.platforms?.whatsapp || {}) },
+      tiktok: { connected: false, handle: null, followers: null, lastSync: null, error: null, ...(company.platforms?.tiktok || {}) },
+    },
+    automation: {
+      ...(company.automation || {}),
+      schedule: { enabled: true, startAt: '', endAt: '', timezone: 'Africa/Casablanca', ...(company.automation?.schedule || {}) },
+      instagram: { dmReply: true, commentReply: true, tone: 'professional', blacklist: [], ...(company.automation?.instagram || {}) },
+      facebook: { dmReply: true, commentReply: true, tone: 'professional', blacklist: [], ...(company.automation?.facebook || {}) },
+      youtube: { dmReply: false, commentReply: false, tone: 'professional', blacklist: [], ...(company.automation?.youtube || {}) },
+      whatsapp: { dmReply: true, commentReply: false, tone: 'professional', blacklist: [], ...(company.automation?.whatsapp || {}) },
+      tiktok: { dmReply: false, commentReply: false, tone: 'professional', blacklist: [], ...(company.automation?.tiktok || {}) },
+    },
+    aiTraining: {
+      status: 'needs_update',
+      lastTrained: null,
+      progress: 0,
+      documents: [],
+      websiteUrl: '',
+      guardrails: true,
+      fallbackMessage: 'For more info, please contact us directly.',
+      description: '',
+      tone: 'professional',
+      ...(company.aiTraining || {}),
+    },
+    branches: company.branches || [],
+    reports: company.reports || [],
+    notifications: company.notifications || [],
+    settings: {
+      workspaceName: company.name || 'Workspace',
+      notificationEmail: 'admin@usludigital.com',
+      timezone: 'Africa/Casablanca',
+      adminAlerts: true,
+      clientAlerts: true,
+      monthlyReportEmail: true,
+      spikeAlerts: true,
+      ...(company.settings || {}),
+    },
+  }
 }
 
 function CompanyModal({ onClose, onCreate }) {
@@ -301,8 +349,13 @@ export default function AdminDashboard() {
     getCompanies()
       .then(data => {
         if (!alive) return
-        setCompanies(data.companies || [])
-        saveCompanies(data.companies || [])
+        const backendCompanies = Array.isArray(data.companies) ? data.companies.map(normalizeCompany) : []
+        if (backendCompanies.length > 0 || loadCompanies().length === 0) {
+          setCompanies(backendCompanies)
+          saveCompanies(backendCompanies)
+          setError('')
+          return
+        }
         setError('')
       })
       .catch(err => {

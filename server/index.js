@@ -257,24 +257,42 @@ async function loadStore() {
     }
 
     const companyConfigs = await loadCompanyConfigsFromSupabase(base, headers)
-    const companies = Object.fromEntries(companyRows.map(row => {
-      const defaults = companyDefaults(row)
-      const config = companyConfigs[row.id] || {}
-      return [row.id, {
-        ...defaults,
-        openaiKey: config.openaiKey || defaults.openaiKey || '',
-        goal: config.goal || defaults.goal,
-        whatsappLink: config.whatsappLink || defaults.whatsappLink,
-        aiTraining: { ...defaults.aiTraining, ...(config.aiTraining || {}) },
-        automation: {
-          ...defaults.automation,
-          ...(config.automation || {}),
-          schedule: { ...defaults.automation.schedule, ...(config.automation?.schedule || {}) },
-        },
-        settings: { ...defaults.settings, ...(config.settings || {}) },
-        updatedAt: config.updatedAt || defaults.updatedAt,
-      }]
-    }))
+    const companies = Array.isArray(companyRows) && companyRows.length > 0
+      ? Object.fromEntries(companyRows.map(row => {
+        const defaults = companyDefaults(row)
+        const config = companyConfigs[row.id] || {}
+        return [row.id, {
+          ...defaults,
+          openaiKey: config.openaiKey || defaults.openaiKey || '',
+          goal: config.goal || defaults.goal,
+          whatsappLink: config.whatsappLink || defaults.whatsappLink,
+          aiTraining: { ...defaults.aiTraining, ...(config.aiTraining || {}) },
+          automation: {
+            ...defaults.automation,
+            ...(config.automation || {}),
+            schedule: { ...defaults.automation.schedule, ...(config.automation?.schedule || {}) },
+          },
+          settings: { ...defaults.settings, ...(config.settings || {}) },
+          branches: row.branches || config.branches || defaults.branches,
+          updatedAt: config.updatedAt || defaults.updatedAt,
+        }]
+      }))
+      : Object.fromEntries(Object.entries(storedData?.companies || {}).map(([id, company]) => {
+        const defaults = companyDefaults({ id, name: company?.name || 'Company' })
+        return [id, {
+          ...defaults,
+          ...company,
+          platforms: { ...defaults.platforms, ...(company?.platforms || {}) },
+          aiTraining: { ...defaults.aiTraining, ...(company?.aiTraining || {}) },
+          automation: {
+            ...defaults.automation,
+            ...(company?.automation || {}),
+            schedule: { ...defaults.automation.schedule, ...(company?.automation?.schedule || {}) },
+          },
+          settings: { ...defaults.settings, ...(company?.settings || {}) },
+          branches: company?.branches || defaults.branches,
+        }]
+      }))
     const connections = {}
     for (const row of Array.isArray(connectionRows) ? connectionRows : []) {
       if (!row.company_id || !row.platform || !row.account_id) continue
@@ -2094,9 +2112,12 @@ export async function appHandler(req, res) {
     const companyParams = routeParams(url.pathname, '/api/companies/:companyId')
     if (req.method === 'PUT' && companyParams) {
       const body = await readBody(req)
-      if (!store.companies[companyParams.companyId]) return json(res, 404, { error: 'Company not found.' })
+      const existingCompany = store.companies[companyParams.companyId] || companyDefaults({
+        id: companyParams.companyId,
+        name: body.company?.name || 'Company',
+      })
       store.companies[companyParams.companyId] = {
-        ...store.companies[companyParams.companyId],
+        ...existingCompany,
         ...(body.company || {}),
         id: companyParams.companyId,
         updatedAt: new Date().toISOString(),
