@@ -1,8 +1,20 @@
 import { useState, useEffect } from 'react'
-import { FileText, Download, Send, TrendingUp, MessageSquare, Star, ChevronRight, Calendar, BarChart3, CheckCircle2, Trash2 } from 'lucide-react'
-import { SectionHeader, EmptyState, StatusBadge, UsluLoader } from '../ui/UIKit'
+import { FileText, Download, Send, TrendingUp, MessageSquare, Star, ChevronRight, Calendar, BarChart3, CheckCircle2, Trash2, Zap, AlertCircle } from 'lucide-react'
+import { EmptyState, StatusBadge, UsluLoader } from '../ui/UIKit'
 import clsx from 'clsx'
 import html2pdf from 'html2pdf.js'
+
+const MONTHLY_REPORT_LIMIT = 3
+
+const getCurrentMonth = () => new Date().toLocaleDateString('en-US', { month: 'long', year: 'numeric' })
+
+const thunderLogoSvg = `
+  <div style="width: 44px; height: 44px; border-radius: 12px; background: #030918; display: flex; align-items: center; justify-content: center;">
+    <svg width="24" height="24" viewBox="0 0 64 64" aria-hidden="true">
+      <path d="M37 7 17 35h14l-4 22 20-29H34l3-21Z" fill="white"></path>
+    </svg>
+  </div>
+`
 
 function ReportCard({ report, isAdmin, company, onNotify, onDelete }) {
   const [expanded, setExpanded] = useState(false)
@@ -71,70 +83,65 @@ function ReportCard({ report, isAdmin, company, onNotify, onDelete }) {
   const handleDownload = () => {
     const element = document.createElement('div')
     element.innerHTML = `
-      <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Helvetica Neue', Arial, sans-serif; padding: 60px 50px; color: #0f172a; background: white; line-height: 1.6;">
-
-        <!-- Logo & Company Header -->
-        <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 60px; border-bottom: 1px solid #e2e8f0; padding-bottom: 40px;">
-          <div>
-            <div style="font-size: 24px; font-weight: 700; letter-spacing: -0.8px; color: #0f172a; margin-bottom: 4px;">USLUDIGITAL</div>
-            <div style="font-size: 12px; color: #64748b; font-weight: 500;">Social Media Analytics Platform</div>
+      <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-serif; padding: 48px; color: #0f172a; background: #ffffff; line-height: 1.55;">
+        <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 42px;">
+          <div style="display: flex; align-items: center; gap: 14px;">
+            ${thunderLogoSvg}
+            <div>
+              <div style="font-size: 23px; font-weight: 800; letter-spacing: -0.8px;">Uslu360Digital</div>
+              <div style="font-size: 11px; color: #64748b; font-weight: 700; text-transform: uppercase; letter-spacing: 0.8px;">Monthly Performance Report</div>
+            </div>
           </div>
           <div style="text-align: right; font-size: 12px; color: #64748b;">
-            <div style="margin-bottom: 6px;"><strong>Report Date:</strong> ${report.generated}</div>
-            <div><strong>ID:</strong> ${report.id.substring(0, 12)}</div>
+            <div><strong>${company.name}</strong></div>
+            <div>Generated ${report.generated}</div>
+            <div>Report ${report.sequence ? `#${report.sequence}` : report.id.substring(0, 8)}</div>
           </div>
         </div>
 
-        <!-- Title Section -->
-        <div style="margin-bottom: 50px;">
-          <div style="font-size: 11px; color: #94a3b8; font-weight: 600; letter-spacing: 0.5px; text-transform: uppercase; margin-bottom: 12px;">Monthly Performance Report</div>
-          <h1 style="font-size: 42px; font-weight: 700; margin: 0; color: #0f172a; letter-spacing: -1px;">${report.month}</h1>
+        <div style="background: #030918; border-radius: 18px; padding: 34px; color: white; margin-bottom: 34px;">
+          <div style="color: #94a3b8; font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 10px;">Executive snapshot</div>
+          <h1 style="font-size: 42px; line-height: 1.05; font-weight: 850; letter-spacing: -1.8px; margin: 0 0 14px;">${report.month}</h1>
+          <p style="max-width: 620px; color: #cbd5e1; font-size: 14px; margin: 0;">${report.summary}</p>
         </div>
 
-        <!-- KPI Grid - Clean & Corporate -->
-        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 40px; margin-bottom: 60px;">
-          <!-- KPI 1 -->
-          <div>
-            <div style="font-size: 11px; color: #64748b; font-weight: 600; letter-spacing: 0.3px; text-transform: uppercase; margin-bottom: 12px;">AI Replies Sent</div>
-            <div style="font-size: 48px; font-weight: 700; color: #0f172a; margin-bottom: 8px;">${report.totalReplies.toLocaleString()}</div>
-            <div style="font-size: 12px; color: #94a3b8;">Automated responses generated</div>
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 30px;">
+          <div style="border: 1px solid #e2e8f0; border-radius: 16px; padding: 22px;">
+            <div style="font-size: 11px; color: #64748b; font-weight: 800; text-transform: uppercase; margin-bottom: 12px;">AI Replies Sent</div>
+            <div style="font-size: 42px; font-weight: 850; color: #255ff4;">${report.totalReplies.toLocaleString()}</div>
+            <div style="font-size: 12px; color: #64748b;">Comments and messages handled by AI</div>
           </div>
-          <!-- KPI 2 -->
-          <div>
-            <div style="font-size: 11px; color: #64748b; font-weight: 600; letter-spacing: 0.3px; text-transform: uppercase; margin-bottom: 12px;">WhatsApp Clicks</div>
-            <div style="font-size: 48px; font-weight: 700; color: #0f172a; margin-bottom: 8px;">${report.waClicks.toLocaleString()}</div>
-            <div style="font-size: 12px; color: #94a3b8;">Direct message initiations</div>
+          <div style="border: 1px solid #e2e8f0; border-radius: 16px; padding: 22px;">
+            <div style="font-size: 11px; color: #64748b; font-weight: 800; text-transform: uppercase; margin-bottom: 12px;">WhatsApp Clicks</div>
+            <div style="font-size: 42px; font-weight: 850; color: #25D366;">${report.waClicks.toLocaleString()}</div>
+            <div style="font-size: 12px; color: #64748b;">Direct customer intent actions</div>
           </div>
         </div>
 
-        <!-- Secondary Metrics -->
-        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 40px; margin-bottom: 60px;">
-          <div>
-            <div style="font-size: 11px; color: #64748b; font-weight: 600; letter-spacing: 0.3px; text-transform: uppercase; margin-bottom: 12px;">Response Rate</div>
-            <div style="font-size: 38px; font-weight: 700; color: #0f172a;">98.2%</div>
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 34px;">
+          <div style="background: #edf2ff; border-radius: 16px; padding: 20px;">
+            <div style="font-size: 12px; color: #64748b; font-weight: 750;">Response Rate</div>
+            <div style="font-size: 30px; font-weight: 850; color: #0f172a;">98.2%</div>
           </div>
-          <div>
-            <div style="font-size: 11px; color: #64748b; font-weight: 600; letter-spacing: 0.3px; text-transform: uppercase; margin-bottom: 12px;">Avg Response Time</div>
-            <div style="font-size: 38px; font-weight: 700; color: #0f172a;">1m 23s</div>
+          <div style="background: #fff7ed; border-radius: 16px; padding: 20px;">
+            <div style="font-size: 12px; color: #64748b; font-weight: 750;">Avg Response Time</div>
+            <div style="font-size: 30px; font-weight: 850; color: #0f172a;">1m 23s</div>
           </div>
         </div>
 
-        <!-- Divider -->
-        <div style="height: 1px; background: #e2e8f0; margin: 60px 0;"></div>
-
-        <!-- Executive Summary -->
-        <div style="margin-bottom: 60px;">
-          <div style="font-size: 13px; font-weight: 700; color: #0f172a; margin-bottom: 16px; letter-spacing: -0.3px;">Summary</div>
-          <p style="font-size: 13px; color: #475569; line-height: 1.7; margin: 0;">${report.summary}</p>
+        <div style="border: 1px solid #e2e8f0; border-radius: 16px; padding: 22px; margin-bottom: 34px;">
+          <div style="font-size: 15px; font-weight: 850; margin-bottom: 12px;">Best Performing Content</div>
+          <div style="font-size: 14px; color: #255ff4; font-weight: 750; margin-bottom: 12px;">${report.bestPost}</div>
+          <div style="display: flex; gap: 8px; flex-wrap: wrap;">
+            <span style="border-radius: 999px; background: #edf2ff; color: #1d49c5; padding: 7px 11px; font-size: 11px; font-weight: 750;">Comments reviewed</span>
+            <span style="border-radius: 999px; background: #fff0f7; color: #c91563; padding: 7px 11px; font-size: 11px; font-weight: 750;">AI replies tracked</span>
+            <span style="border-radius: 999px; background: #fff7ed; color: #c66713; padding: 7px 11px; font-size: 11px; font-weight: 750;">Lead actions measured</span>
+          </div>
         </div>
 
-        <!-- Divider -->
-        <div style="height: 1px; background: #e2e8f0; margin: 60px 0;"></div>
-
-        <!-- Footer -->
-        <div style="font-size: 11px; color: #94a3b8; text-align: center; padding-top: 30px; border-top: 1px solid #e2e8f0;">
-          <div style="margin-bottom: 8px;">Usludigital 360 | Professional Social Media Automation Platform</div>
-          <div>© 2026 All Rights Reserved. This report is confidential and for authorized recipients only.</div>
+        <div style="border-top: 1px solid #e2e8f0; padding-top: 24px; display: flex; justify-content: space-between; align-items: center; font-size: 11px; color: #64748b;">
+          <div>Uslu360Digital | Confidential client report</div>
+          <div>${report.id}</div>
         </div>
       </div>
     `
@@ -151,18 +158,19 @@ function ReportCard({ report, isAdmin, company, onNotify, onDelete }) {
   }
 
   return (
-    <div className="card overflow-hidden">
+    <div className="overflow-hidden rounded-xl border border-slate-200 bg-white">
       <div
-        className="flex items-center justify-between p-5 cursor-pointer hover:bg-slate-50/50 transition-colors"
+        className="flex items-center justify-between p-5 cursor-pointer hover:bg-slate-50 transition-colors"
         onClick={() => setExpanded(e => !e)}
       >
         <div className="flex items-center gap-4">
-          <div className="w-10 h-10 bg-blue-50 border border-blue-100 rounded-xl flex items-center justify-center flex-shrink-0">
-            <FileText size={18} className="text-blue-600" />
+          <div className="w-11 h-11 bg-slate-950 rounded-xl flex items-center justify-center flex-shrink-0 text-white">
+            <Zap size={20} fill="white" />
           </div>
           <div>
             <div className="flex items-center gap-2">
               <span className="text-slate-900 font-bold text-sm">{report.month} Report</span>
+              {report.sequence && <span className="rounded-full bg-blue-50 px-2 py-0.5 text-[10px] font-bold uppercase text-blue-700">#{report.sequence}</span>}
               <StatusBadge status={report.status === 'ready' ? 'active' : 'training'} />
             </div>
             <div className="flex items-center gap-3 mt-0.5">
@@ -329,22 +337,37 @@ function ReportCard({ report, isAdmin, company, onNotify, onDelete }) {
   )
 }
 
-function ReportSchedule() {
+function ReportSchedule({ currentMonth, used, remaining }) {
   return (
-    <div className="card p-5 bg-gradient-to-br from-slate-900 to-slate-800 border-slate-700">
-      <div className="flex items-start gap-4">
-        <div className="w-10 h-10 rounded-xl bg-blue-600/20 border border-blue-500/30 flex items-center justify-center flex-shrink-0">
-          <Calendar size={18} className="text-blue-400" />
+    <div className="rounded-xl border border-slate-800 bg-slate-950 p-5 text-white">
+      <div className="flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between">
+        <div className="flex items-start gap-4">
+          <div className="w-11 h-11 rounded-xl bg-white flex items-center justify-center flex-shrink-0 text-slate-950">
+            <Zap size={20} fill="currentColor" />
+          </div>
+          <div className="flex-1">
+            <h3 className="text-white font-extrabold text-lg mb-1">Professional Monthly Report</h3>
+            <p className="text-slate-400 text-sm leading-relaxed max-w-2xl">
+              Create up to 3 reports per month for start, middle, and end-of-month reviews. Each report can be downloaded as a polished PDF or sent by email.
+            </p>
+          </div>
         </div>
-        <div className="flex-1">
-          <h3 className="text-white font-bold text-base mb-1">Auto-Generated Monthly Reports</h3>
-          <p className="text-slate-400 text-sm leading-relaxed">
-            Reports are automatically generated on the 1st of each month. Workspace users are notified in the dashboard and reports can be sent by email at any time.
-          </p>
-        </div>
-        <div className="flex-shrink-0 text-right">
-          <div className="text-slate-400 text-xs">Next report</div>
-          <div className="text-white font-bold">Aug 1, 2026</div>
+        <div className="grid grid-cols-3 gap-2 rounded-xl bg-white/5 p-2 text-center">
+          <div className="rounded-lg bg-white/5 px-4 py-3">
+            <div className="text-2xl font-extrabold">{MONTHLY_REPORT_LIMIT}</div>
+            <div className="text-[10px] font-bold uppercase text-slate-400">Monthly limit</div>
+          </div>
+          <div className="rounded-lg bg-white/5 px-4 py-3">
+            <div className="text-2xl font-extrabold">{used}</div>
+            <div className="text-[10px] font-bold uppercase text-slate-400">Used</div>
+          </div>
+          <div className="rounded-lg bg-white/5 px-4 py-3">
+            <div className="text-2xl font-extrabold text-amber-300">{remaining}</div>
+            <div className="text-[10px] font-bold uppercase text-slate-400">Left</div>
+          </div>
+          <div className="col-span-3 rounded-lg bg-white/5 px-4 py-2 text-xs font-semibold text-slate-300">
+            {currentMonth}
+          </div>
         </div>
       </div>
     </div>
@@ -354,6 +377,12 @@ function ReportSchedule() {
 export default function ReportsTab({ company, isAdmin = true, onUpdate, onNotify }) {
   const [generating, setGenerating] = useState(false)
   const [cooldown, setCooldown] = useState(0)
+  const reports = company.reports || []
+  const currentMonth = getCurrentMonth()
+  const currentMonthReports = reports.filter(r => r.month === currentMonth)
+  const reportsUsed = currentMonthReports.length
+  const reportsRemaining = Math.max(0, MONTHLY_REPORT_LIMIT - reportsUsed)
+  const monthlyLimitReached = reportsRemaining === 0
 
   useEffect(() => {
     if (cooldown <= 0) return
@@ -363,13 +392,9 @@ export default function ReportsTab({ company, isAdmin = true, onUpdate, onNotify
 
   const generateReport = async () => {
     const now = new Date()
-    const currentMonth = now.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })
 
-    // Check if report already exists for this month
-    const existingReport = company.reports?.find(r => r.month === currentMonth)
-    if (existingReport) {
-      onNotify?.(`Report for ${currentMonth} already exists. Delete it first to generate a new one.`, 'warning')
-      setCooldown(5)
+    if (currentMonthReports.length >= MONTHLY_REPORT_LIMIT) {
+      onNotify?.(`Monthly report already created ${MONTHLY_REPORT_LIMIT} times for ${currentMonth}.`, 'warning')
       return
     }
 
@@ -379,6 +404,7 @@ export default function ReportsTab({ company, isAdmin = true, onUpdate, onNotify
     const report = {
       id: `report-${Date.now()}`,
       month: currentMonth,
+      sequence: currentMonthReports.length + 1,
       status: 'ready',
       generated: now.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }),
       totalReplies: company.metrics.thisMonth.totalReplies,
@@ -387,7 +413,7 @@ export default function ReportsTab({ company, isAdmin = true, onUpdate, onNotify
       bestPost: 'No post selected yet',
     }
     onUpdate?.(current => ({ ...current, reports: [report, ...(current.reports || [])] }))
-    onNotify?.('Monthly report generated.', 'success')
+    onNotify?.(`Monthly report ${report.sequence} of ${MONTHLY_REPORT_LIMIT} generated.`, 'success')
 
     setGenerating(false)
     setCooldown(10)
@@ -395,34 +421,47 @@ export default function ReportsTab({ company, isAdmin = true, onUpdate, onNotify
 
   return (
     <div className="space-y-6 animate-slide-in">
-      <SectionHeader
-        title="Monthly Reports"
-        description="Auto-generated performance reports for each calendar month"
-        action={
-          isAdmin && (
-            <button
-              onClick={generateReport}
-              disabled={generating || cooldown > 0}
-              className={clsx('btn-primary', (generating || cooldown > 0) && 'opacity-50 cursor-not-allowed')}
-            >
-              <FileText size={14} />
-              {generating ? 'Generating...' : cooldown > 0 ? `Wait ${cooldown}s` : 'Generate Report'}
-            </button>
-          )
-        }
-      />
+      <div className="flex flex-col gap-5 rounded-xl border border-slate-200 bg-white p-6 lg:flex-row lg:items-center lg:justify-between">
+        <div className="flex items-start gap-4">
+          <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-slate-950 text-white">
+            <Zap size={22} fill="white" />
+          </div>
+          <div>
+            <h1 className="text-3xl font-extrabold tracking-tight text-slate-950">Reports</h1>
+            <p className="mt-1 max-w-2xl text-sm font-medium text-slate-500">
+              Clean monthly summaries with performance, AI activity, lead actions, best content, and next steps.
+            </p>
+          </div>
+        </div>
+        {isAdmin && (
+          <button
+            onClick={generateReport}
+            disabled={generating || cooldown > 0 || monthlyLimitReached}
+            className={clsx('btn-primary h-11 justify-center', (generating || cooldown > 0 || monthlyLimitReached) && 'opacity-50 cursor-not-allowed')}
+          >
+            {generating ? <UsluLoader size="xs" /> : monthlyLimitReached ? <AlertCircle size={14} /> : <FileText size={14} />}
+            {generating ? 'Generating...' : monthlyLimitReached ? 'Monthly report already created' : cooldown > 0 ? `Wait ${cooldown}s` : 'Generate Report'}
+          </button>
+        )}
+      </div>
 
-      <ReportSchedule />
+      <ReportSchedule currentMonth={currentMonth} used={reportsUsed} remaining={reportsRemaining} />
 
-      {company.reports.length === 0 ? (
+      {monthlyLimitReached && (
+        <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-semibold text-amber-800">
+          Monthly report already created {MONTHLY_REPORT_LIMIT} times for {currentMonth}. Delete one report if you need to create another version.
+        </div>
+      )}
+
+      {reports.length === 0 ? (
         <EmptyState
           icon={FileText}
           title="No reports yet"
-          description="Reports are generated automatically at the end of each month."
+          description="Generate the first report when you are ready to share progress with the client."
         />
       ) : (
         <div className="space-y-4">
-          {company.reports.map(report => (
+          {reports.map(report => (
             <ReportCard
               key={report.id}
               report={report}
