@@ -36,11 +36,14 @@ function IconButton({ icon: Icon, label, active, badge, onClick }) {
       onClick={onClick}
       aria-label={label}
       className={clsx(
-        'relative h-11 w-11 rounded-lg flex items-center justify-center cursor-pointer transition-colors',
+        'group relative h-11 w-11 rounded-lg flex items-center justify-center cursor-pointer transition-colors',
         active ? 'bg-slate-200 text-slate-950' : 'text-slate-500 hover:bg-slate-100 hover:text-slate-900'
       )}
     >
       <Icon size={21} />
+      <span className="pointer-events-none absolute left-[58px] top-1/2 z-50 -translate-y-1/2 whitespace-nowrap rounded-lg bg-slate-950 px-3 py-2 text-sm font-semibold text-white opacity-0 shadow-xl transition-opacity group-hover:opacity-100">
+        {label}
+      </span>
       {badge != null && (
         <span className="absolute -right-0.5 -top-0.5 h-4 min-w-4 rounded-full bg-blue-600 px-1 text-[9px] font-bold leading-4 text-white">
           {badge}
@@ -66,7 +69,6 @@ export default function Sidebar({
   const branchMenuRef = useRef(null)
   const role = user?.email === 'admin@usludigital.com' ? 'admin' : 'client'
   const mainItems = MAIN_NAV.filter(item => item.roles.includes(role))
-  const showBranchSwitcher = branches.length > 0
 
   useEffect(() => {
     if (!branchMenuOpen) return
@@ -93,21 +95,25 @@ export default function Sidebar({
         </div>
 
         <div className="flex flex-1 flex-col items-center gap-2 py-4">
-          {showBranchSwitcher && (
-            <div ref={branchMenuRef} className="relative">
+          <div ref={branchMenuRef} className="relative">
               <button
                 type="button"
                 onClick={() => setBranchMenuOpen(open => !open)}
                 aria-label="View branches"
                 className={clsx(
-                  'relative flex h-11 w-11 items-center justify-center rounded-lg cursor-pointer transition-colors',
+                  'group relative flex h-11 w-11 items-center justify-center rounded-lg cursor-pointer transition-colors',
                   branchMenuOpen ? 'bg-slate-200 text-slate-950' : 'text-slate-500 hover:bg-slate-100 hover:text-slate-900'
                 )}
               >
                 <GitBranch size={21} />
-                <span className="absolute -right-0.5 -top-0.5 h-4 min-w-4 rounded-full bg-blue-600 px-1 text-[9px] font-bold leading-4 text-white">
-                  {branches.length}
+                <span className="pointer-events-none absolute left-[58px] top-1/2 z-50 -translate-y-1/2 whitespace-nowrap rounded-lg bg-slate-950 px-3 py-2 text-sm font-semibold text-white opacity-0 shadow-xl transition-opacity group-hover:opacity-100">
+                  Branches
                 </span>
+                {branches.length > 0 && (
+                  <span className="absolute -right-0.5 -top-0.5 h-4 min-w-4 rounded-full bg-blue-600 px-1 text-[9px] font-bold leading-4 text-white">
+                    {branches.length}
+                  </span>
+                )}
               </button>
 
               {branchMenuOpen && (
@@ -140,7 +146,15 @@ export default function Sidebar({
                   <div className="my-2 h-px bg-slate-200" />
 
                   <div className="max-h-[320px] space-y-1 overflow-y-auto">
-                    {branches.map(branch => (
+                    {branches.length === 0 ? (
+                      <div className="rounded-lg bg-slate-50 px-4 py-6 text-center">
+                        <GitBranch size={22} className="mx-auto mb-2 text-slate-300" />
+                        <div className="text-sm font-bold text-slate-800">No branches added</div>
+                        <div className="mt-1 text-xs leading-relaxed text-slate-500">
+                          Add branches from the admin page and they will appear here.
+                        </div>
+                      </div>
+                    ) : branches.map(branch => (
                       <button
                         key={branch.id}
                         type="button"
@@ -171,8 +185,7 @@ export default function Sidebar({
                   </div>
                 </div>
               )}
-            </div>
-          )}
+          </div>
 
           {isAdmin && (
             <IconButton
@@ -208,9 +221,12 @@ export default function Sidebar({
             type="button"
             onClick={handleLogout}
             aria-label="Sign out"
-            className="mt-2 h-11 w-11 rounded-lg flex items-center justify-center text-slate-400 hover:bg-red-50 hover:text-red-500 cursor-pointer transition-colors"
+            className="group relative mt-2 h-11 w-11 rounded-lg flex items-center justify-center text-slate-400 hover:bg-red-50 hover:text-red-500 cursor-pointer transition-colors"
           >
             <LogOut size={20} />
+            <span className="pointer-events-none absolute left-[58px] top-1/2 z-50 -translate-y-1/2 whitespace-nowrap rounded-lg bg-slate-950 px-3 py-2 text-sm font-semibold text-white opacity-0 shadow-xl transition-opacity group-hover:opacity-100">
+              Sign out
+            </span>
           </button>
           <div className="mt-2 flex h-8 w-8 items-center justify-center rounded-full bg-blue-600 text-xs font-bold text-white">
             {user?.avatar || 'U'}
