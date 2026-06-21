@@ -155,6 +155,13 @@ function getWorkspaceOpenaiKey(store) {
   return process.env.OPENAI_API_KEY || Object.values(store.companies || {}).find(company => company.openaiKey)?.openaiKey || ''
 }
 
+function openaiKeyKind(value) {
+  if (!value) return 'missing'
+  if (String(value).startsWith('sk-proj-')) return 'project'
+  if (String(value).startsWith('sk-svcacct-')) return 'service-account'
+  return 'unknown'
+}
+
 function json(res, status, body) {
   res.writeHead(status, {
     'Content-Type': 'application/json',
@@ -2651,6 +2658,17 @@ export async function appHandler(req, res) {
       return json(res, 200, {
         ...status,
         senderLabel: status.sender || REPORT_FROM_NAME,
+      })
+    }
+
+    if (req.method === 'GET' && url.pathname === '/api/openai-key/status') {
+      const envKey = process.env.OPENAI_API_KEY || ''
+      const activeKey = envKey || getWorkspaceOpenaiKey(store)
+      return json(res, 200, {
+        envKeyConfigured: Boolean(envKey),
+        envKeyKind: openaiKeyKind(envKey),
+        activeKeyKind: openaiKeyKind(activeKey),
+        commit: process.env.VERCEL_GIT_COMMIT_SHA || '',
       })
     }
 
