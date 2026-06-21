@@ -773,38 +773,40 @@ export default function InboxTab({ company, branchId = '', platform, isAdmin = t
                   showFilters ? 'border-[#255ff4]/30 bg-[#255ff4]/10 text-[#255ff4]' : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50'
                 )}
               >
-                <SlidersHorizontal size={16} /> Advanced
+                <SlidersHorizontal size={16} /> More tools
               </button>
             </div>
 
-            <div className="space-y-4">
-              <div className="grid grid-cols-4 rounded-lg border border-slate-200 bg-slate-50 p-1">
-                {[
-                  ['open', 'Open'],
-                  ['all', 'All'],
-                  ['replied', 'Replied'],
-                  ['failed', 'Failed'],
-                ].map(([value, label]) => (
-                  <button
-                    key={value}
-                    type="button"
-                    onClick={() => setStatusFilter(value)}
-                    className={clsx(
-                      'h-10 rounded-md text-sm font-bold transition-colors',
-                      statusFilter === value ? 'bg-white text-slate-950 shadow-sm' : 'text-slate-500 hover:text-slate-900'
-                    )}
-                  >
-                    {label}
-                  </button>
-                ))}
-              </div>
+            <div className="grid grid-cols-4 rounded-lg border border-slate-200 bg-slate-50 p-1">
+              {[
+                ['open', 'Open'],
+                ['all', 'All'],
+                ['replied', 'Replied'],
+                ['failed', 'Failed'],
+              ].map(([value, label]) => (
+                <button
+                  key={value}
+                  type="button"
+                  onClick={() => setStatusFilter(value)}
+                  className={clsx(
+                    'h-10 rounded-md text-sm font-bold transition-colors',
+                    statusFilter === value ? 'bg-white text-slate-950 shadow-sm' : 'text-slate-500 hover:text-slate-900'
+                  )}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+          </div>
 
+          {showFilters && (
+            <div className="space-y-4 border-b border-slate-200 bg-slate-50 p-4">
               <div className="grid grid-cols-1 gap-3">
                 <label className="block">
                   <span className="mb-1 block text-xs font-bold uppercase tracking-wide text-slate-400">Channel</span>
                   <div className="relative">
                     <select value={channelFilter} onChange={e => setChannelFilter(e.target.value)} disabled={Boolean(platform)} className="h-11 w-full appearance-none rounded-lg border border-slate-200 bg-white px-3 pr-9 text-sm font-semibold text-slate-800 outline-none focus:border-[#255ff4] focus:ring-2 focus:ring-[#255ff4]/10 disabled:opacity-60">
-                      <option value="all">All Channels</option>
+                      <option value="all">Every channel</option>
                       {PLATFORMS.map(item => <option key={item} value={item}>{PLATFORM_LABELS[item]}</option>)}
                     </select>
                     <ChevronDown size={16} className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-slate-400" />
@@ -828,7 +830,7 @@ export default function InboxTab({ company, branchId = '', platform, isAdmin = t
                 onClick={() => setOnlyUnread(value => !value)}
                 className={clsx(
                   'flex h-11 w-full items-center justify-between rounded-lg border px-4 text-sm font-bold transition-colors',
-                  onlyUnread ? 'border-[#255ff4]/30 bg-[#255ff4]/10 text-[#255ff4]' : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50'
+                  onlyUnread ? 'border-[#255ff4]/30 bg-[#255ff4]/10 text-[#255ff4]' : 'border-slate-200 bg-white text-slate-700 hover:bg-white'
                 )}
               >
                 Unread only
@@ -836,14 +838,9 @@ export default function InboxTab({ company, branchId = '', platform, isAdmin = t
                   <span className={clsx('block h-4 w-4 rounded-full bg-white transition-transform', onlyUnread && 'translate-x-4')} />
                 </span>
               </button>
-            </div>
-          </div>
-
-          {showFilters && (
-            <div className="border-b border-slate-200 bg-slate-50 p-4">
               {isAdmin && <BackfillPanel company={company} platform={platform} onCompleted={reloadInbox} />}
               {isAdmin && (
-                <button onClick={() => handleTestDM(platform || 'instagram')} disabled={syncing} className="mt-3 inline-flex h-10 items-center gap-2 rounded-lg bg-blue-600 px-4 text-sm font-bold text-white hover:bg-blue-700 disabled:opacity-50">
+                <button onClick={() => handleTestDM(platform || 'instagram')} disabled={syncing} className="inline-flex h-10 items-center gap-2 rounded-lg bg-[#255ff4] px-4 text-sm font-bold text-white hover:bg-[#1d4ed8] disabled:opacity-50">
                   {syncing ? <UsluLoader size="xs" /> : <Plus size={14} />} Test DM
                 </button>
               )}
