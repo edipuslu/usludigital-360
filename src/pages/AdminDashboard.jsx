@@ -455,19 +455,6 @@ export default function AdminDashboard() {
             </div>
           </section>
 
-          <section className="grid grid-cols-1 gap-4 md:grid-cols-3">
-            {[
-              ['Companies', totals.companies],
-              ['Connected channels', totals.connected],
-              ['Branches', totals.branches],
-            ].map(([label, value]) => (
-              <div key={label} className="rounded-lg border border-slate-200 bg-white p-5">
-                <div className="text-sm font-semibold text-slate-500">{label}</div>
-                <div className="mt-2 text-3xl font-extrabold text-slate-950">{value}</div>
-              </div>
-            ))}
-          </section>
-
           <section className="rounded-lg border border-slate-200 bg-white">
             <div className="flex flex-col gap-4 border-b border-slate-200 px-5 py-4 lg:flex-row lg:items-center lg:justify-between">
               <div>
