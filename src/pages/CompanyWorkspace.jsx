@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import { Bell, Settings, CheckCircle2, Mail, Save, Trash2, AlertCircle, GitBranch, MapPin, Users, History, Monitor, KeyRound, Eye, EyeOff } from 'lucide-react'
+import { Bell, Settings, CheckCircle2, Save, Trash2, AlertCircle, GitBranch, MapPin, KeyRound, Eye, EyeOff } from 'lucide-react'
 import Sidebar from '../components/layout/Sidebar'
 import { PlatformIcon, UsluLoader } from '../components/ui/UIKit'
 import { useAuth } from '../context/AuthContext'
@@ -110,14 +110,6 @@ function NotificationsPanel({ notifications, onMarkAllRead, onRemove }) {
 const SETTINGS_MAIN = [
   { key: 'general', label: 'General', icon: Settings },
   { key: 'notifications', label: 'Notifications', icon: Bell },
-  { key: 'team', label: 'Team Members', icon: Users },
-  { key: 'logs', label: 'Logs', icon: History },
-  { key: 'display', label: 'Display', icon: Monitor },
-]
-
-const SETTINGS_INBOX = [
-  { key: 'inbox-behavior', label: 'Inbox Behavior' },
-  { key: 'auto-assignment', label: 'Auto-Assignment' },
 ]
 
 const SETTINGS_CHANNELS = [
@@ -401,15 +393,7 @@ function SettingsPanel({ company, settings, onSave, onUpdate, onNotify, isAdmin 
       return <ApiKeysSetting company={company} onNotify={onNotify} />
     }
 
-    const placeholders = {
-      team: ['Team Members', 'Invite and manage people who can access this company workspace.', Users],
-      logs: ['Logs', 'Connection changes, automation actions, and AI reply activity will appear here.', History],
-      display: ['Display', 'Control simple interface preferences for this workspace.', Monitor],
-      'inbox-behavior': ['Inbox Behavior', 'Manage how conversations are opened, closed, filtered, and assigned.', Mail],
-      'auto-assignment': ['Auto-Assignment', 'Set rules for assigning incoming messages to the right person or branch.', Users],
-    }
-    const [title, description, Icon] = placeholders[selected] || placeholders.general || placeholders.display
-    return <PlaceholderSetting title={title} description={description} icon={Icon} />
+    return <PlaceholderSetting title="Settings" description="Choose a settings section from the left." icon={Settings} />
   }
 
   return (
@@ -424,15 +408,6 @@ function SettingsPanel({ company, settings, onSave, onUpdate, onNotify, isAdmin 
             <div className="mb-3 px-3 text-base font-extrabold text-slate-950">Main</div>
             <div className="space-y-1">
               {SETTINGS_MAIN.map(item => (
-                <SettingsNavItem key={item.key} item={item} active={selected === item.key} onClick={() => setSelected(item.key)} />
-              ))}
-            </div>
-          </div>
-
-          <div>
-            <div className="mb-3 px-3 text-base font-extrabold text-slate-950">Inbox</div>
-            <div className="space-y-1">
-              {SETTINGS_INBOX.map(item => (
                 <SettingsNavItem key={item.key} item={item} active={selected === item.key} onClick={() => setSelected(item.key)} />
               ))}
             </div>
