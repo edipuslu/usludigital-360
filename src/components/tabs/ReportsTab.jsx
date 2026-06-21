@@ -267,17 +267,15 @@ function ReportCard({ report, isAdmin, company, onNotify, onDelete }) {
             <button onClick={handleDownload} className="btn-primary">
               <Download size={14} /> Download PDF
             </button>
-            {isAdmin && (
-              <button onClick={handleSendClick} disabled={sending || sent} className={clsx('btn-secondary', sent && 'text-emerald-600 border-emerald-200 bg-emerald-50')}>
-                {sending ? (
-                  <><UsluLoader size="xs" />Sending...</>
-                ) : sent ? (
-                  <><CheckCircle2 size={14} className="text-emerald-600" />Sent</>
-                ) : (
-                  <><Send size={14} />Send Email</>
-                )}
-              </button>
-            )}
+            <button onClick={handleSendClick} disabled={sending || sent} className={clsx('btn-secondary', sent && 'text-emerald-600 border-emerald-200 bg-emerald-50')}>
+              {sending ? (
+                <><UsluLoader size="xs" />Sending...</>
+              ) : sent ? (
+                <><CheckCircle2 size={14} className="text-emerald-600" />Sent</>
+              ) : (
+                <><Send size={14} />Send Email</>
+              )}
+            </button>
             {isAdmin && (
               <button
                 onClick={handleDelete}
@@ -453,16 +451,14 @@ export default function ReportsTab({ company, isAdmin = true, onUpdate, onNotify
             </p>
           </div>
         </div>
-        {isAdmin && (
-          <button
-            onClick={generateReport}
-            disabled={generating || cooldown > 0 || monthlyLimitReached}
-            className={clsx('btn-primary h-11 justify-center', (generating || cooldown > 0 || monthlyLimitReached) && 'opacity-50 cursor-not-allowed')}
-          >
-            {generating ? <UsluLoader size="xs" /> : monthlyLimitReached ? <AlertCircle size={14} /> : <FileText size={14} />}
-            {generating ? 'Generating...' : monthlyLimitReached ? 'Monthly report already created' : cooldown > 0 ? `Wait ${cooldown}s` : 'Generate Report'}
-          </button>
-        )}
+        <button
+          onClick={generateReport}
+          disabled={generating || cooldown > 0 || monthlyLimitReached}
+          className={clsx('btn-primary h-11 justify-center', (generating || cooldown > 0 || monthlyLimitReached) && 'opacity-50 cursor-not-allowed')}
+        >
+          {generating ? <UsluLoader size="xs" /> : monthlyLimitReached ? <AlertCircle size={14} /> : <FileText size={14} />}
+          {generating ? 'Generating...' : monthlyLimitReached ? 'Monthly report already created' : cooldown > 0 ? `Wait ${cooldown}s` : 'Generate Report'}
+        </button>
       </div>
 
       <ReportSchedule currentMonth={currentMonth} used={reportsUsed} remaining={reportsRemaining} />
