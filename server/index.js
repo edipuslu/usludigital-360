@@ -30,10 +30,12 @@ const SUPABASE_URL = process.env.SUPABASE_URL || ''
 const SUPABASE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_ANON_KEY || ''
 const SUPABASE_STORE_TABLE = process.env.SUPABASE_STORE_TABLE || 'ud360_store'
 const SUPABASE_STORE_ID = process.env.SUPABASE_STORE_ID || 'default'
-const REPORT_FROM_EMAIL = process.env.REPORT_FROM_EMAIL || process.env.GMAIL_USER || ''
-const REPORT_FROM_NAME = process.env.REPORT_FROM_NAME || 'Uslu360Digital Reports'
 const GMAIL_USER = process.env.GMAIL_USER || ''
 const GMAIL_APP_PASSWORD = process.env.GMAIL_APP_PASSWORD || process.env.GMAIL_PASS || ''
+const RAW_REPORT_FROM_EMAIL = process.env.REPORT_FROM_EMAIL || ''
+const REPORT_FROM_EMAIL = RAW_REPORT_FROM_EMAIL || GMAIL_USER || ''
+const REPORT_FROM_NAME = process.env.REPORT_FROM_NAME || 'Uslu360Digital Reports'
+const REPORT_EMAIL_PROVIDER = String(process.env.REPORT_EMAIL_PROVIDER || '').trim().toLowerCase()
 const SMTP_HOST = process.env.SMTP_HOST || ''
 const SMTP_PORT = Number(process.env.SMTP_PORT || 587)
 const SMTP_USER = process.env.SMTP_USER || ''
@@ -323,8 +325,23 @@ function createReportTransporter() {
 
 function getReportEmailStatus() {
   const sender = REPORT_FROM_EMAIL || SMTP_USER || GMAIL_USER
-  if (RESEND_API_KEY && REPORT_FROM_EMAIL) {
-    return { configured: true, provider: 'resend', sender }
+  if (REPORT_EMAIL_PROVIDER === 'gmail') {
+    return GMAIL_USER && GMAIL_APP_PASSWORD
+      ? { configured: true, provider: 'gmail', sender: GMAIL_USER }
+      : { configured: false, provider: 'gmail', sender: GMAIL_USER || '' }
+  }
+  if (REPORT_EMAIL_PROVIDER === 'resend') {
+    return RESEND_API_KEY && RAW_REPORT_FROM_EMAIL
+      ? { configured: true, provider: 'resend', sender: RAW_REPORT_FROM_EMAIL }
+      : { configured: false, provider: 'resend', sender: RAW_REPORT_FROM_EMAIL || '' }
+  }
+  if (REPORT_EMAIL_PROVIDER === 'smtp') {
+    return SMTP_HOST && SMTP_USER && SMTP_PASS
+      ? { configured: true, provider: 'smtp', sender: sender || SMTP_USER }
+      : { configured: false, provider: 'smtp', sender: sender || SMTP_USER || '' }
+  }
+  if (RESEND_API_KEY && RAW_REPORT_FROM_EMAIL) {
+    return { configured: true, provider: 'resend', sender: RAW_REPORT_FROM_EMAIL }
   }
   if (SMTP_HOST && SMTP_USER && SMTP_PASS && sender) {
     return { configured: true, provider: 'smtp', sender }
@@ -373,7 +390,7 @@ async function sendReportEmail({ company, report, recipients }) {
   const filename = `uslu360digital-${String(report.month || 'monthly-report').toLowerCase().replace(/[^a-z0-9]+/g, '-')}.pdf`
   const status = getReportEmailStatus()
   if (!status.configured) {
-    throw new Error('Professional email sending is not configured. Add RESEND_API_KEY + REPORT_FROM_EMAIL, or SMTP settings, in Vercel Environment Variables.')
+    throw new Error('Professional email sending is not configured. Add REPORT_EMAIL_PROVIDER=gmail with GMAIL_USER and GMAIL_APP_PASSWORD, or configure Resend/SMTP in Vercel Environment Variables.')
   }
 
   if (status.provider === 'resend') {
@@ -383,7 +400,7 @@ async function sendReportEmail({ company, report, recipients }) {
   const transporter = createReportTransporter()
   const fromEmail = status.sender
   if (!transporter || !fromEmail) {
-    throw new Error('Professional email sending is not configured. Add RESEND_API_KEY + REPORT_FROM_EMAIL, or SMTP settings, in Vercel Environment Variables.')
+    throw new Error('Professional email sending is not configured. Add REPORT_EMAIL_PROVIDER=gmail with GMAIL_USER and GMAIL_APP_PASSWORD, or configure Resend/SMTP in Vercel Environment Variables.')
   }
 
   const info = await transporter.sendMail({
