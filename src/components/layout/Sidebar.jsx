@@ -1,7 +1,6 @@
 import {
   LayoutDashboard, BarChart3, Brain, FileText,
   Bell, Settings, LogOut, Zap, ArrowLeft, Inbox, TrendingUp,
-  GitBranch, MapPin,
 } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../../context/AuthContext'
@@ -49,35 +48,15 @@ function IconButton({ icon: Icon, label, active, badge, onClick }) {
   )
 }
 
-function TextNavItem({ label, active, onClick, badge }) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      className={clsx(
-        'w-full flex items-center justify-between gap-3 rounded-lg px-3 py-2.5 text-sm font-semibold cursor-pointer transition-colors',
-        active ? 'bg-slate-200 text-slate-950' : 'text-slate-500 hover:bg-slate-100 hover:text-slate-900'
-      )}
-    >
-      <span className="truncate">{label}</span>
-      {badge != null && <span className="text-xs text-slate-400">{badge}</span>}
-    </button>
-  )
-}
-
 export default function Sidebar({
   onNavigate,
   currentSection,
   notificationCount = 0,
-  branches = [],
-  activeBranchId = 'all',
-  onBranchChange,
 }) {
   const { user, isAdmin, logout } = useAuth()
   const navigate = useNavigate()
   const role = user?.email === 'admin@usludigital.com' ? 'admin' : 'client'
   const mainItems = MAIN_NAV.filter(item => item.roles.includes(role))
-  const showBranchMenu = branches.length > 0
 
   const handleLogout = () => {
     logout()
@@ -85,8 +64,7 @@ export default function Sidebar({
   }
 
   return (
-    <aside className="sticky top-0 flex h-screen flex-shrink-0 border-r border-slate-200 bg-white">
-      <div className="flex w-[76px] flex-col items-center border-r border-slate-200 bg-white">
+    <aside className="sticky top-0 flex h-screen w-[76px] flex-shrink-0 flex-col items-center border-r border-slate-200 bg-white">
         <div className="flex h-[72px] w-full items-center justify-center border-b border-slate-200">
           <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-slate-950 text-white">
             <Zap size={20} fill="white" />
@@ -136,43 +114,6 @@ export default function Sidebar({
             {user?.avatar || 'U'}
           </div>
         </div>
-      </div>
-
-      {showBranchMenu && (
-        <div className="hidden w-[280px] flex-col border-l border-slate-200 bg-slate-50/70 px-6 py-7 lg:flex">
-          <div>
-            <div className="mb-3 flex items-center gap-2 px-1 text-xs font-bold uppercase tracking-wide text-slate-400">
-              <GitBranch size={13} />
-              Branches
-            </div>
-            <div className="space-y-1">
-              <TextNavItem
-                label="All branches"
-                active={activeBranchId === 'all'}
-                onClick={() => onBranchChange?.('all')}
-                badge={branches.length}
-              />
-              {branches.map(branch => (
-                <button
-                  key={branch.id}
-                  type="button"
-                  onClick={() => onBranchChange?.(branch.id)}
-                  className={clsx(
-                    'w-full rounded-lg px-3 py-2.5 text-left cursor-pointer transition-colors',
-                    activeBranchId === branch.id ? 'bg-slate-200 text-slate-950' : 'text-slate-500 hover:bg-slate-100 hover:text-slate-900'
-                  )}
-                >
-                  <div className="truncate text-sm font-semibold">{branch.name}</div>
-                  <div className="mt-1 flex items-center gap-1 text-xs text-slate-400">
-                    <MapPin size={10} />
-                    <span className="truncate">{branch.location || 'No location'}</span>
-                  </div>
-                </button>
-              ))}
-            </div>
-          </div>
-        </div>
-      )}
     </aside>
   )
 }
