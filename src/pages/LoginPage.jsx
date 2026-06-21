@@ -401,7 +401,7 @@ export default function LoginPage() {
   return (
     <div className="h-screen flex overflow-hidden" style={{ background: '#060912' }}>
       {/* Left panel */}
-      <div className="hidden lg:flex relative w-[52%] h-screen flex-col overflow-hidden px-12 py-10 text-white">
+      <div className="hidden lg:flex relative w-[30%] h-screen flex-col overflow-hidden px-8 py-10 text-white">
         <div className="relative z-10 flex items-center justify-between">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-2xl bg-white flex items-center justify-center">
@@ -412,14 +412,16 @@ export default function LoginPage() {
               <div className="text-white/50 text-xs mt-1">AI automation workspace</div>
             </div>
           </div>
-          <div className="rounded-full border border-white/15 px-3 py-1 text-xs text-white/70">Live dashboard</div>
+          <div className="hidden xl:block rounded-full border border-white/15 px-3 py-1 text-xs text-white/70">Live dashboard</div>
         </div>
 
         <div className="relative z-10 flex flex-1 items-center justify-center">
-          <AnimatedLoginCharacters isTyping={isTyping} showPassword={showPw} passwordValue={form.password} />
+          <div className="scale-[0.72] xl:scale-[0.78] origin-center">
+            <AnimatedLoginCharacters isTyping={isTyping} showPassword={showPw} passwordValue={form.password} />
+          </div>
         </div>
 
-        <div className="relative z-10 grid grid-cols-3 gap-3 text-sm">
+        <div className="relative z-10 grid grid-cols-1 xl:grid-cols-3 gap-3 text-sm">
           {[
             ['Comments', 'AI replies'],
             ['DMs', 'Smart inbox'],
@@ -434,7 +436,7 @@ export default function LoginPage() {
       </div>
 
       {/* Right panel */}
-      <div className="flex-1 flex items-center justify-center p-6 lg:p-8 overflow-hidden" style={{ background: '#F8FAFC' }}>
+      <div className="flex w-full lg:w-[70%] items-center justify-center p-6 lg:p-8 overflow-hidden" style={{ background: '#F8FAFC' }}>
         <div className="w-full max-w-md">
           <div className="lg:hidden flex items-center gap-3 mb-8">
             <div className="w-9 h-9 rounded-xl bg-slate-950 flex items-center justify-center">
