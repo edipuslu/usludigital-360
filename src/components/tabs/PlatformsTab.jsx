@@ -768,16 +768,18 @@ function PlatformCard({ platform, guide, data, backendConnections = [], onConnec
   )
 }
 
-export default function PlatformsTab({ company, onUpdate, onNotify, selectedPlatform = null, compact = false }) {
+export default function PlatformsTab({ company, onUpdate, onNotify, branchId = '', selectedPlatform = null, compact = false }) {
   const [backendConnections, setBackendConnections] = useState({})
+  const branchScope = branchId && branchId !== 'all' ? branchId : ''
+  const scopeLabel = company.branchName ? `${company.branchName} branch` : 'company'
 
   useEffect(() => {
     refreshConnections()
-  }, [company.id])
+  }, [company.id, branchScope])
 
   const refreshConnections = async () => {
     try {
-      const data = await getConnections(company.id)
+      const data = await getConnections(company.id, { branchId: branchScope })
       const grouped = {}
       data.connections?.forEach(connection => {
         grouped[connection.platform] = [...(grouped[connection.platform] || []), connection]
@@ -789,7 +791,8 @@ export default function PlatformsTab({ company, onUpdate, onNotify, selectedPlat
   }
 
   const loginWithOAuth = platform => {
-    window.location.href = backendUrl(`/api/oauth/${platform}/authorize?company_id=${encodeURIComponent(company.id)}&redirect_uri=${encodeURIComponent(window.location.href)}`)
+    const branch = branchScope ? `&branch_id=${encodeURIComponent(branchScope)}` : ''
+    window.location.href = backendUrl(`/api/oauth/${platform}/authorize?company_id=${encodeURIComponent(company.id)}${branch}&redirect_uri=${encodeURIComponent(window.location.href)}`)
   }
 
   const connectPlatform = async (platform, credentials, verification) => {
@@ -817,7 +820,7 @@ export default function PlatformsTab({ company, onUpdate, onNotify, selectedPlat
     }))
 
     try {
-      await registerConnection(company.id, platform, platformData)
+      await registerConnection(company.id, platform, platformData, { branchId: branchScope })
       await refreshConnections()
       await saveBackendAiConfig({
         ...company,
@@ -827,7 +830,7 @@ export default function PlatformsTab({ company, onUpdate, onNotify, selectedPlat
           [platform]: { ...(company.platforms?.[platform] || {}), ...platformData },
         },
       })
-      onNotify?.(`${guide.name} verified and registered with the webhook backend.`, 'success')
+      onNotify?.(`${guide.name} verified for ${scopeLabel} and registered with the webhook backend.`, 'success')
     } catch (err) {
       onNotify?.(`${guide.name} verified, but backend registration failed: ${err.message}`, 'warning')
     }
@@ -850,9 +853,9 @@ export default function PlatformsTab({ company, onUpdate, onNotify, selectedPlat
       },
     }))
     try {
-      await deleteConnection(company.id, platform)
+      await deleteConnection(company.id, platform, { branchId: branchScope })
       await refreshConnections()
-      onNotify?.(`${guide.name} disconnected.`, 'warning')
+      onNotify?.(`${guide.name} disconnected from ${scopeLabel}.`, 'warning')
     } catch (err) {
       onNotify?.(`${guide.name} removed locally, but backend disconnect failed: ${err.message}`, 'warning')
     }

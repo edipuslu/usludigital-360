@@ -60,27 +60,31 @@ export function deleteBackendCompany(companyId) {
 }
 
 // Register platform connection (Instagram, Facebook, YouTube)
-export function registerConnection(companyId, platform, connection) {
-  return request(`/api/companies/${encodeURIComponent(companyId)}/connections`, {
+export function registerConnection(companyId, platform, connection, options = {}) {
+  const branch = options.branchId && options.branchId !== 'all' ? `?branch_id=${encodeURIComponent(options.branchId)}` : ''
+  return request(`/api/companies/${encodeURIComponent(companyId)}/connections${branch}`, {
     method: 'POST',
-    body: JSON.stringify({ platform, connection }),
+    body: JSON.stringify({ platform, connection, branchId: options.branchId || null }),
   })
 }
 
 // Get all platform connections for a company
-export function getConnections(companyId) {
-  return request(`/api/companies/${encodeURIComponent(companyId)}/connections`)
+export function getConnections(companyId, options = {}) {
+  const branch = options.branchId && options.branchId !== 'all' ? `?branch_id=${encodeURIComponent(options.branchId)}` : ''
+  return request(`/api/companies/${encodeURIComponent(companyId)}/connections${branch}`)
 }
 
-export function deleteConnection(companyId, platform) {
-  return request(`/api/companies/${encodeURIComponent(companyId)}/connections/${encodeURIComponent(platform)}`, {
+export function deleteConnection(companyId, platform, options = {}) {
+  const branch = options.branchId && options.branchId !== 'all' ? `?branch_id=${encodeURIComponent(options.branchId)}` : ''
+  return request(`/api/companies/${encodeURIComponent(companyId)}/connections/${encodeURIComponent(platform)}${branch}`, {
     method: 'DELETE',
   })
 }
 
 // Fetch growth metrics (followers, posts, engagement)
-export function fetchGrowthMetrics(companyId) {
-  return request(`/api/companies/${encodeURIComponent(companyId)}/growth`)
+export function fetchGrowthMetrics(companyId, options = {}) {
+  const branch = options.branchId && options.branchId !== 'all' ? `?branch_id=${encodeURIComponent(options.branchId)}` : ''
+  return request(`/api/companies/${encodeURIComponent(companyId)}/growth${branch}`)
 }
 
 // Save AI config and training data. Only send openaiKey when it is being changed,
@@ -124,11 +128,13 @@ export function testBackendAiReply(companyId, text) {
 // Fetch inbox (comments and DMs). Live Meta sync is opt-in because it can be slow.
 export function fetchInbox(companyId, type = 'all', options = {}) {
   const sync = options.sync ? '&sync=1' : ''
-  return request(`/api/companies/${encodeURIComponent(companyId)}/inbox?type=${encodeURIComponent(type)}${sync}`)
+  const branch = options.branchId && options.branchId !== 'all' ? `&branch_id=${encodeURIComponent(options.branchId)}` : ''
+  return request(`/api/companies/${encodeURIComponent(companyId)}/inbox?type=${encodeURIComponent(type)}${sync}${branch}`)
 }
 
-export function replyToInboxItem(companyId, itemId, text) {
-  return request(`/api/companies/${encodeURIComponent(companyId)}/inbox/${encodeURIComponent(itemId)}/reply`, {
+export function replyToInboxItem(companyId, itemId, text, options = {}) {
+  const branch = options.branchId && options.branchId !== 'all' ? `?branch_id=${encodeURIComponent(options.branchId)}` : ''
+  return request(`/api/companies/${encodeURIComponent(companyId)}/inbox/${encodeURIComponent(itemId)}/reply${branch}`, {
     method: 'POST',
     body: JSON.stringify({ text }),
   })
@@ -149,15 +155,16 @@ export function runBackfillReplies(companyId, payload) {
 }
 
 // Post a new message to inbox
-export function createTestInboxItem(companyId, payload) {
-  return request(`/api/companies/${encodeURIComponent(companyId)}/inbox`, {
+export function createTestInboxItem(companyId, payload, options = {}) {
+  const branch = options.branchId && options.branchId !== 'all' ? `?branch_id=${encodeURIComponent(options.branchId)}` : ''
+  return request(`/api/companies/${encodeURIComponent(companyId)}/inbox${branch}`, {
     method: 'POST',
-    body: JSON.stringify(payload),
+    body: JSON.stringify({ ...payload, branchId: options.branchId || payload.branchId || null }),
   })
 }
 
 // Create test DM
-export function createTestDM(companyId, platform = 'instagram') {
+export function createTestDM(companyId, platform = 'instagram', options = {}) {
   return createTestInboxItem(companyId, {
     type: 'dm',
     platform,
@@ -165,7 +172,7 @@ export function createTestDM(companyId, platform = 'instagram') {
     senderId: `test-dm-${Date.now()}`,
     text: 'Hi! Is this product available? I am interested in learning more.',
     externalId: `test-dm-${Date.now()}`,
-  })
+  }, options)
 }
 
 // Health check

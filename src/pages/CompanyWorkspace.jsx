@@ -44,6 +44,13 @@ const TAB_TO_SECTION = {
 }
 
 const UUID_SECTION_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+const PLATFORM_DEFAULTS = {
+  instagram: { connected: false, handle: null, followers: null, lastSync: null, error: null },
+  facebook: { connected: false, handle: null, followers: null, lastSync: null, error: null },
+  youtube: { connected: false, handle: null, followers: null, lastSync: null, error: null },
+  whatsapp: { connected: false, handle: null, followers: null, lastSync: null, error: null },
+  tiktok: { connected: false, handle: null, followers: null, lastSync: null, error: null },
+}
 
 function tabFromSection(section) {
   return SECTION_TO_TAB[section || 'home'] || 'overview'
@@ -170,6 +177,7 @@ function SettingsPanel({ company, settings, onSave, onUpdate, onNotify, isAdmin 
           company={company}
           onUpdate={onUpdate}
           onNotify={onNotify}
+          branchId={company.branchId || ''}
           selectedPlatform={selected}
           compact
         />
@@ -347,6 +355,20 @@ export default function CompanyWorkspace() {
   const company = useMemo(() => workspaces.find(c => c.id === selectedCompanyId) || workspaces[0], [selectedCompanyId, workspaces])
   const branches = company?.branches || []
   const activeBranch = branches.find(branch => branch.id === activeBranchId)
+  const scopedCompany = useMemo(() => {
+    if (!activeBranch) return company
+    return {
+      ...company,
+      branchId: activeBranch.id,
+      branchName: activeBranch.name,
+      branchLocation: activeBranch.location || '',
+      platforms: {
+        ...PLATFORM_DEFAULTS,
+        ...(activeBranch.platforms || {}),
+      },
+      whatsappLink: activeBranch.whatsappLink || company.whatsappLink,
+    }
+  }, [company, activeBranch])
 
   useEffect(() => {
     if (!section) {
@@ -378,6 +400,20 @@ export default function CompanyWorkspace() {
     }
   }, [activeBranchId, company, branches])
 
+  const changeBranch = branchId => {
+    const nextBranchId = branchId || 'all'
+    setActiveBranchId(nextBranchId)
+    window.sessionStorage.setItem(`ud360_active_branch_id:${company.id}`, nextBranchId)
+  }
+
+  useEffect(() => {
+    if (!company?.id) return
+    const savedBranchId = window.sessionStorage.getItem(`ud360_active_branch_id:${company.id}`)
+    if (savedBranchId && savedBranchId !== activeBranchId) {
+      setActiveBranchId(savedBranchId)
+    }
+  }, [company?.id])
+
   const updateCompany = updater => {
     setWorkspaces(prev => {
       const current = prev.find(c => c.id === company.id) || prev[0]
@@ -387,6 +423,35 @@ export default function CompanyWorkspace() {
       updateBackendCompany(companyWithoutBranches)
         .then(() => setSyncError(''))
         .catch(err => setSyncError(err.message || 'Saved locally, but backend sync failed.'))
+      return next
+    })
+  }
+
+  const updateScopedCompany = updater => {
+    if (!activeBranch) return updateCompany(updater)
+    setWorkspaces(prev => {
+      const current = prev.find(c => c.id === company.id) || prev[0]
+      const currentBranch = (current.branches || []).find(branch => branch.id === activeBranch.id) || activeBranch
+      const currentScoped = {
+        ...current,
+        branchId: currentBranch.id,
+        branchName: currentBranch.name,
+        branchLocation: currentBranch.location || '',
+        platforms: { ...PLATFORM_DEFAULTS, ...(currentBranch.platforms || {}) },
+        whatsappLink: currentBranch.whatsappLink || current.whatsappLink,
+      }
+      const nextScoped = typeof updater === 'function' ? updater(currentScoped) : { ...currentScoped, ...updater }
+      const nextBranches = (current.branches || []).map(branch => branch.id === currentBranch.id ? {
+        ...branch,
+        platforms: nextScoped.platforms || branch.platforms || {},
+        whatsappLink: nextScoped.whatsappLink || branch.whatsappLink || '',
+        updatedAt: new Date().toISOString(),
+      } : branch)
+      const nextCompany = { ...current, branches: nextBranches }
+      const next = prev.map(c => c.id === current.id ? nextCompany : c)
+      updateBackendCompany(nextCompany, { allowBranchUpdate: true })
+        .then(() => setSyncError(''))
+        .catch(err => setSyncError(err.message || 'Saved locally, but branch backend sync failed.'))
       return next
     })
   }
@@ -436,16 +501,16 @@ export default function CompanyWorkspace() {
 
   const tabContent = {
     overview: <OverviewTab company={company} onNavigate={navigateToTab} isAdmin={isAdmin} />,
-    inbox: <InboxTab company={company} onNotify={addNotification} isAdmin={isAdmin} />,
-    'inbox-instagram': <InboxTab company={company} platform="instagram" onNotify={addNotification} isAdmin={isAdmin} />,
-    'inbox-facebook': <InboxTab company={company} platform="facebook" onNotify={addNotification} isAdmin={isAdmin} />,
-    'inbox-youtube': <InboxTab company={company} platform="youtube" onNotify={addNotification} isAdmin={isAdmin} />,
-    'inbox-whatsapp': <InboxTab company={company} platform="whatsapp" onNotify={addNotification} isAdmin={isAdmin} />,
-    growth: <GrowthTab company={company} isAdmin={isAdmin} />,
-    'growth-instagram': <GrowthTab company={company} platform="instagram" isAdmin={isAdmin} />,
-    'growth-facebook': <GrowthTab company={company} platform="facebook" isAdmin={isAdmin} />,
-    'growth-youtube': <GrowthTab company={company} platform="youtube" isAdmin={isAdmin} />,
-    'growth-whatsapp': <GrowthTab company={company} platform="whatsapp" isAdmin={isAdmin} />,
+    inbox: <InboxTab company={scopedCompany} branchId={activeBranch?.id || ''} onNotify={addNotification} isAdmin={isAdmin} />,
+    'inbox-instagram': <InboxTab company={scopedCompany} branchId={activeBranch?.id || ''} platform="instagram" onNotify={addNotification} isAdmin={isAdmin} />,
+    'inbox-facebook': <InboxTab company={scopedCompany} branchId={activeBranch?.id || ''} platform="facebook" onNotify={addNotification} isAdmin={isAdmin} />,
+    'inbox-youtube': <InboxTab company={scopedCompany} branchId={activeBranch?.id || ''} platform="youtube" onNotify={addNotification} isAdmin={isAdmin} />,
+    'inbox-whatsapp': <InboxTab company={scopedCompany} branchId={activeBranch?.id || ''} platform="whatsapp" onNotify={addNotification} isAdmin={isAdmin} />,
+    growth: <GrowthTab company={scopedCompany} branchId={activeBranch?.id || ''} isAdmin={isAdmin} />,
+    'growth-instagram': <GrowthTab company={scopedCompany} branchId={activeBranch?.id || ''} platform="instagram" isAdmin={isAdmin} />,
+    'growth-facebook': <GrowthTab company={scopedCompany} branchId={activeBranch?.id || ''} platform="facebook" isAdmin={isAdmin} />,
+    'growth-youtube': <GrowthTab company={scopedCompany} branchId={activeBranch?.id || ''} platform="youtube" isAdmin={isAdmin} />,
+    'growth-whatsapp': <GrowthTab company={scopedCompany} branchId={activeBranch?.id || ''} platform="whatsapp" isAdmin={isAdmin} />,
     'ai-training': <AITrainingTab company={company} onUpdate={updateCompany} onNotify={addNotification} isAdmin={isAdmin} />,
     automation: <AutomationTab company={company} onUpdate={updateCompany} onNotify={addNotification} />,
     analytics: <AnalyticsTab company={company} />,
@@ -459,9 +524,9 @@ export default function CompanyWorkspace() {
     ),
     settings: (
       <SettingsPanel
-        company={company}
+        company={scopedCompany}
         settings={company.settings || {}}
-        onUpdate={updateCompany}
+        onUpdate={activeBranch ? updateScopedCompany : updateCompany}
         onNotify={addNotification}
         isAdmin={isAdmin}
         onSave={settings => {
@@ -483,7 +548,7 @@ export default function CompanyWorkspace() {
         notificationCount={(company.notifications || []).filter(n => !n.read).length}
         branches={branches}
         activeBranchId={activeBranchId}
-        onBranchChange={setActiveBranchId}
+        onBranchChange={changeBranch}
       />
 
       <div className="flex-1 flex flex-col min-w-0">
@@ -508,7 +573,7 @@ export default function CompanyWorkspace() {
                 </div>
               </div>
               <div className="text-xs font-semibold text-slate-400">
-                Read only
+                Active branch
               </div>
             </div>
           )}

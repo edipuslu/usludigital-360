@@ -299,10 +299,12 @@ async function loadStore() {
     const connections = {}
     for (const row of Array.isArray(connectionRows) ? connectionRows : []) {
       if (!row.company_id || !row.platform || !row.account_id) continue
-      const key = connectionKey(row.platform, row.account_id)
+      const branchId = row.branch_id || row.branchId || ''
+      const key = connectionKey(row.platform, row.account_id, branchId)
       if (connections[key]) continue
       connections[key] = {
         companyId: row.company_id,
+        branchId: branchId || null,
         platform: row.platform,
         externalId: row.account_id,
         handle: row.account_id,
@@ -477,8 +479,8 @@ async function deleteConnectionFromSupabase(companyId, platform) {
   return response.ok
 }
 
-function connectionKey(platform, externalId) {
-  return `${platform}:${externalId}`
+function connectionKey(platform, externalId, branchId = '') {
+  return `${platform}:${externalId}:${branchId || 'company'}`
 }
 
 function deterministicUuid(value) {
@@ -495,6 +497,7 @@ function deterministicUuid(value) {
 function inboxMeta(item) {
   return {
     text: item.text || '',
+    branchId: item.branchId || null,
     type: item.type || 'comment',
     externalId: item.externalId || item.id || '',
     sourceLink: item.sourceLink || item.postUrl || '',
@@ -537,6 +540,7 @@ async function loadInboxItemsFromSupabase(base, headers) {
       return {
         id: message.id,
         companyId: conversation.company_id,
+        branchId: parsed.branchId || null,
         platform: conversation.platform,
         type: parsed.type || conversation.status || 'comment',
         senderName: message.author_name || conversation.customer_name || 'Customer',
@@ -719,8 +723,8 @@ async function saveInboxItemsToSupabase(base, headers, items = []) {
 
   for (const item of inboxItems) {
     const externalId = item.externalId || item.id
-    const conversationId = deterministicUuid(`${item.companyId}:${item.platform}:${item.type}:${externalId}:conversation`)
-    const messageId = deterministicUuid(`${item.companyId}:${item.platform}:${item.type}:${externalId}:message`)
+    const conversationId = deterministicUuid(`${item.companyId}:${item.branchId || 'company'}:${item.platform}:${item.type}:${externalId}:conversation`)
+    const messageId = deterministicUuid(`${item.companyId}:${item.branchId || 'company'}:${item.platform}:${item.type}:${externalId}:message`)
     if (seen.has(messageId)) continue
     seen.add(messageId)
 
@@ -769,12 +773,13 @@ async function saveInboxItemsToSupabase(base, headers, items = []) {
   }
 }
 
-function rememberConnection(store, companyId, platform, connection) {
+function rememberConnection(store, companyId, platform, connection, branchId = '') {
   const externalId = connection?.verifiedId || connection?.id || connection?.pageId || connection?.phoneNumberId || connection?.channelId
   if (!externalId) return
 
-  store.connections[connectionKey(platform, String(externalId))] = {
+  store.connections[connectionKey(platform, String(externalId), branchId)] = {
     companyId,
+    branchId: branchId || null,
     platform,
     externalId: String(externalId),
     handle: connection.handle || connection.name || String(externalId),
@@ -783,10 +788,11 @@ function rememberConnection(store, companyId, platform, connection) {
   }
 }
 
-function listConnections(store, companyId) {
+function listConnections(store, companyId, branchId = '') {
   return Object.values(store.connections)
-    .filter(connection => connection.companyId === companyId)
+    .filter(connection => connection.companyId === companyId && String(connection.branchId || '') === String(branchId || ''))
     .map(connection => ({
+      branchId: connection.branchId || null,
       platform: connection.platform,
       externalId: connection.externalId,
       handle: connection.handle,
@@ -825,7 +831,7 @@ async function getFacebookPageOptions(accessToken) {
   }))
 }
 
-function renderInstagramAccountChooser(res, { tokenData, companyId, redirectUri, options }) {
+function renderInstagramAccountChooser(res, { tokenData, companyId, branchId = '', redirectUri, options }) {
   const rows = options.map(option => `
     <label class="option">
       <input type="radio" name="page_id" value="${escapeHtml(option.pageId)}" required>
@@ -865,6 +871,7 @@ function renderInstagramAccountChooser(res, { tokenData, companyId, redirectUri,
           </div>
           <form method="post" action="/api/oauth/instagram/choose">
             <input type="hidden" name="company_id" value="${escapeHtml(companyId)}">
+            <input type="hidden" name="branch_id" value="${escapeHtml(branchId)}">
             <input type="hidden" name="redirect_uri" value="${escapeHtml(redirectUri)}">
             <input type="hidden" name="access_token" value="${escapeHtml(tokenData.access_token)}">
             <input type="hidden" name="token_type" value="${escapeHtml(tokenData.token_type || '')}">
@@ -877,7 +884,7 @@ function renderInstagramAccountChooser(res, { tokenData, companyId, redirectUri,
     </html>`)
 }
 
-function renderFacebookPageChooser(res, { tokenData, companyId, redirectUri, options }) {
+function renderFacebookPageChooser(res, { tokenData, companyId, branchId = '', redirectUri, options }) {
   const rows = options.map(option => `
     <label class="option">
       <input type="radio" name="page_id" value="${escapeHtml(option.pageId)}" required>
@@ -917,6 +924,7 @@ function renderFacebookPageChooser(res, { tokenData, companyId, redirectUri, opt
           </div>
           <form method="post" action="/api/oauth/facebook/choose">
             <input type="hidden" name="company_id" value="${escapeHtml(companyId)}">
+            <input type="hidden" name="branch_id" value="${escapeHtml(branchId)}">
             <input type="hidden" name="redirect_uri" value="${escapeHtml(redirectUri)}">
             <input type="hidden" name="access_token" value="${escapeHtml(tokenData.access_token)}">
             <input type="hidden" name="token_type" value="${escapeHtml(tokenData.token_type || '')}">
@@ -929,7 +937,7 @@ function renderFacebookPageChooser(res, { tokenData, companyId, redirectUri, opt
     </html>`)
 }
 
-function saveSelectedInstagramOAuthConnection(store, companyId, tokenData, option) {
+function saveSelectedInstagramOAuthConnection(store, companyId, tokenData, option, branchId = '') {
   const accessToken = tokenData.access_token
   const instagram = option.instagram
   const expiresAt = tokenData.expires_in ? new Date(Date.now() + Number(tokenData.expires_in) * 1000).toISOString() : null
@@ -944,7 +952,7 @@ function saveSelectedInstagramOAuthConnection(store, companyId, tokenData, optio
       tokenType: tokenData.token_type,
       expiresAt,
     },
-  })
+  }, branchId)
 
   return {
     instagram,
@@ -952,7 +960,7 @@ function saveSelectedInstagramOAuthConnection(store, companyId, tokenData, optio
   }
 }
 
-function saveSelectedFacebookOAuthConnection(store, companyId, tokenData, option) {
+function saveSelectedFacebookOAuthConnection(store, companyId, tokenData, option, branchId = '') {
   const accessToken = tokenData.access_token
   const expiresAt = tokenData.expires_in ? new Date(Date.now() + Number(tokenData.expires_in) * 1000).toISOString() : null
 
@@ -965,14 +973,14 @@ function saveSelectedFacebookOAuthConnection(store, companyId, tokenData, option
       tokenType: tokenData.token_type,
       expiresAt,
     },
-  })
+  }, branchId)
 
   return {
     facebook: { id: option.pageId, name: option.pageName },
   }
 }
 
-async function saveInstagramOAuthConnection(store, companyId, tokenData, selectedPageId = '') {
+async function saveInstagramOAuthConnection(store, companyId, tokenData, selectedPageId = '', branchId = '') {
   const accessToken = tokenData.access_token
   const options = await getInstagramAccountOptions(accessToken)
   if (!options.length) {
@@ -980,10 +988,10 @@ async function saveInstagramOAuthConnection(store, companyId, tokenData, selecte
   }
 
   const option = options.find(item => item.pageId === selectedPageId) || options[0]
-  return saveSelectedInstagramOAuthConnection(store, companyId, tokenData, option)
+  return saveSelectedInstagramOAuthConnection(store, companyId, tokenData, option, branchId)
 }
 
-async function saveFacebookOAuthConnection(store, companyId, tokenData, selectedPageId = '') {
+async function saveFacebookOAuthConnection(store, companyId, tokenData, selectedPageId = '', branchId = '') {
   const accessToken = tokenData.access_token
   const options = await getFacebookPageOptions(accessToken)
   if (!options.length) {
@@ -991,7 +999,7 @@ async function saveFacebookOAuthConnection(store, companyId, tokenData, selected
   }
 
   const option = options.find(item => item.pageId === selectedPageId) || options[0]
-  return saveSelectedFacebookOAuthConnection(store, companyId, tokenData, option)
+  return saveSelectedFacebookOAuthConnection(store, companyId, tokenData, option, branchId)
 }
 
 async function subscribePageToWebhookEvents(pageAccessToken, pageId, fields = 'messages,messaging_postbacks,messaging_optins') {
@@ -1016,15 +1024,21 @@ async function subscribePageToWebhookEvents(pageAccessToken, pageId, fields = 'm
 function findCompanyId(store, candidates) {
   for (const candidate of candidates.filter(Boolean).map(String)) {
     for (const platform of ['instagram', 'facebook', 'whatsapp', 'youtube']) {
-      const match = store.connections[connectionKey(platform, candidate)]
-      if (match?.companyId) return { companyId: match.companyId, platform: match.platform }
+      const match = Object.values(store.connections || {}).find(connection => (
+        connection.platform === platform && connection.externalId === candidate
+      ))
+      if (match?.companyId) return { companyId: match.companyId, branchId: match.branchId || null, platform: match.platform }
     }
   }
-  return { companyId: 'unmatched', platform: null }
+  return { companyId: 'unmatched', branchId: null, platform: null }
 }
 
-function findCompanyConnection(store, companyId, platform) {
-  return Object.values(store.connections).find(connection => connection.companyId === companyId && connection.platform === platform)
+function findCompanyConnection(store, companyId, platform, branchId = '') {
+  return Object.values(store.connections).find(connection => (
+    connection.companyId === companyId &&
+    connection.platform === platform &&
+    String(connection.branchId || '') === String(branchId || '')
+  ))
 }
 
 function monthWindows(now = new Date()) {
@@ -1065,8 +1079,8 @@ async function fetchInstagramMedia(connection, token, previousMonthStart) {
   return media
 }
 
-async function instagramGrowthMetrics(store, companyId) {
-  const connection = findCompanyConnection(store, companyId, 'instagram')
+async function instagramGrowthMetrics(store, companyId, branchId = '') {
+  const connection = findCompanyConnection(store, companyId, 'instagram', branchId)
   if (!connection) {
     return {
       platform: 'instagram',
@@ -1173,8 +1187,8 @@ async function fetchFacebookPosts(connection, token, previousMonthStart) {
   return posts
 }
 
-async function facebookGrowthMetrics(store, companyId) {
-  const connection = findCompanyConnection(store, companyId, 'facebook')
+async function facebookGrowthMetrics(store, companyId, branchId = '') {
+  const connection = findCompanyConnection(store, companyId, 'facebook', branchId)
   if (!connection) {
     return {
       platform: 'facebook',
@@ -1251,8 +1265,8 @@ async function facebookGrowthMetrics(store, companyId) {
   }
 }
 
-function youtubeGrowthMetrics(store, companyId) {
-  const connection = findCompanyConnection(store, companyId, 'youtube')
+function youtubeGrowthMetrics(store, companyId, branchId = '') {
+  const connection = findCompanyConnection(store, companyId, 'youtube', branchId)
   return {
     platform: 'youtube',
     connected: Boolean(connection),
@@ -1264,8 +1278,8 @@ function youtubeGrowthMetrics(store, companyId) {
   }
 }
 
-function whatsappGrowthMetrics(store, companyId) {
-  const connection = findCompanyConnection(store, companyId, 'whatsapp')
+function whatsappGrowthMetrics(store, companyId, branchId = '') {
+  const connection = findCompanyConnection(store, companyId, 'whatsapp', branchId)
   return {
     platform: 'whatsapp',
     connected: Boolean(connection),
@@ -1304,6 +1318,7 @@ function normalizeMetaWebhook(body, store) {
         for (const message of value.messages) {
           items.push({
             companyId: routed.companyId,
+            branchId: routed.branchId || null,
             type: 'dm',
             platform,
             senderName: message.from || 'WhatsApp contact',
@@ -1319,6 +1334,7 @@ function normalizeMetaWebhook(body, store) {
 
       items.push({
         companyId: routed.companyId,
+        branchId: routed.branchId || null,
         type: isMessage ? 'dm' : 'comment',
         platform: routed.platform || platform,
         senderName: value.from?.name || value.sender?.name || value.sender_name || 'Customer',
@@ -1336,6 +1352,7 @@ function normalizeMetaWebhook(body, store) {
       const routed = findCompanyId(store, [event.recipient?.id, entryId])
       items.push({
         companyId: routed.companyId,
+        branchId: routed.branchId || null,
         type: 'dm',
         platform: routed.platform || (object.includes('instagram') ? 'instagram' : 'facebook'),
         senderName: event.sender?.id || 'Customer',
@@ -1355,6 +1372,7 @@ function rememberInboxItem(store, item) {
   if (!item.companyId || !item.platform || !item.externalId || !item.text) return null
   const exists = (store.items || []).find(existing =>
     existing.companyId === item.companyId &&
+    String(existing.branchId || '') === String(item.branchId || '') &&
     existing.platform === item.platform &&
     existing.type === item.type &&
     existing.externalId === item.externalId
@@ -1375,7 +1393,7 @@ function rememberInboxItem(store, item) {
 }
 
 function replyKey(item) {
-  return [item?.companyId, item?.platform, item?.type, item?.externalId].map(value => String(value || '')).join(':')
+  return [item?.companyId, item?.branchId, item?.platform, item?.type, item?.externalId].map(value => String(value || '')).join(':')
 }
 
 function ensureReplyTracking(store) {
@@ -1389,6 +1407,7 @@ function hasLiveReply(store, item) {
   if (!key || store.repliedKeys[key]) return Boolean(store.repliedKeys[key])
   return (store.items || []).some(existing =>
     existing.companyId === item.companyId &&
+    String(existing.branchId || '') === String(item.branchId || '') &&
     existing.platform === item.platform &&
     existing.type === item.type &&
     existing.externalId === item.externalId &&
@@ -1420,8 +1439,8 @@ function finishReply(store, item, result = {}) {
   }
 }
 
-async function syncInstagramInbox(store, companyId) {
-  const connection = findCompanyConnection(store, companyId, 'instagram')
+async function syncInstagramInbox(store, companyId, branchId = '') {
+  const connection = findCompanyConnection(store, companyId, 'instagram', branchId)
   if (!connection) return []
   const token = connection.credentials?.pageAccessToken || connection.credentials?.accessToken
   if (!token) return []
@@ -1452,6 +1471,7 @@ async function syncInstagramInbox(store, companyId) {
     for (const comment of commentsResponse.data || []) {
       const saved = rememberInboxItem(store, {
         companyId,
+        branchId: branchId || null,
         type: 'comment',
         platform: 'instagram',
         senderName: comment.username || 'Instagram user',
@@ -1485,6 +1505,7 @@ async function syncInstagramInbox(store, companyId) {
       if (fromId && fromId === connection.externalId) continue
       const saved = rememberInboxItem(store, {
         companyId,
+        branchId: branchId || null,
         type: 'dm',
         platform: 'instagram',
         senderName: message.from?.username || message.from?.name || message.from?.id || 'Instagram user',
@@ -1502,8 +1523,8 @@ async function syncInstagramInbox(store, companyId) {
   return { items: synced, errors }
 }
 
-async function syncFacebookInbox(store, companyId) {
-  const connection = findCompanyConnection(store, companyId, 'facebook')
+async function syncFacebookInbox(store, companyId, branchId = '') {
+  const connection = findCompanyConnection(store, companyId, 'facebook', branchId)
   if (!connection) return []
   const token = connection.credentials?.accessToken
   if (!token) return []
@@ -1524,6 +1545,7 @@ async function syncFacebookInbox(store, companyId) {
     for (const comment of post.comments?.data || []) {
       const saved = rememberInboxItem(store, {
         companyId,
+        branchId: branchId || null,
         type: 'comment',
         platform: 'facebook',
         senderName: comment.from?.name || 'Facebook user',
@@ -1556,6 +1578,7 @@ async function syncFacebookInbox(store, companyId) {
       if (fromId && fromId === connection.externalId) continue
       const saved = rememberInboxItem(store, {
         companyId,
+        branchId: branchId || null,
         type: 'dm',
         platform: 'facebook',
         senderName: message.from?.name || message.from?.id || 'Facebook user',
@@ -1573,10 +1596,10 @@ async function syncFacebookInbox(store, companyId) {
   return { items: synced, errors }
 }
 
-async function syncLiveInbox(store, companyId) {
+async function syncLiveInbox(store, companyId, branchId = '') {
   const results = await Promise.allSettled([
-    syncInstagramInbox(store, companyId),
-    syncFacebookInbox(store, companyId),
+    syncInstagramInbox(store, companyId, branchId),
+    syncFacebookInbox(store, companyId, branchId),
   ])
   return results.reduce((acc, result) => {
     if (result.status === 'fulfilled') {
@@ -1969,6 +1992,7 @@ export async function appHandler(req, res) {
       const callbackUrl = `${baseUrlFromRequest(req)}/api/oauth/${platform}/callback`
       const state = encodeState({
         companyId,
+        branchId: url.searchParams.get('branch_id') || '',
         redirectUri: url.searchParams.get('redirect_uri') || '',
       })
       const authUrl = new URL(FACEBOOK_OAUTH_URL)
@@ -1986,6 +2010,7 @@ export async function appHandler(req, res) {
       const platform = oauthCallback[1]
       const state = decodeState(url.searchParams.get('state'))
       const code = url.searchParams.get('code')
+      const branchId = state.branchId || ''
       const fallbackRedirect = state.redirectUri || '/'
 
       if (url.searchParams.get('error')) {
@@ -2025,14 +2050,15 @@ export async function appHandler(req, res) {
           return renderInstagramAccountChooser(res, {
             tokenData,
             companyId: state.companyId,
+            branchId,
             redirectUri: fallbackRedirect,
             options,
           })
         }
         connected = options.length === 1
-          ? saveSelectedInstagramOAuthConnection(store, state.companyId, tokenData, options[0])
-          : await saveInstagramOAuthConnection(store, state.companyId, tokenData)
-        const igConnection = findCompanyConnection(store, state.companyId, 'instagram')
+          ? saveSelectedInstagramOAuthConnection(store, state.companyId, tokenData, options[0], branchId)
+          : await saveInstagramOAuthConnection(store, state.companyId, tokenData, '', branchId)
+        const igConnection = findCompanyConnection(store, state.companyId, 'instagram', branchId)
         if (igConnection?.credentials?.pageAccessToken && igConnection?.credentials?.pageId) {
           await subscribePageToWebhookEvents(igConnection.credentials.pageAccessToken, igConnection.credentials.pageId, 'messages,messaging_postbacks,messaging_optins')
         }
@@ -2042,14 +2068,15 @@ export async function appHandler(req, res) {
           return renderFacebookPageChooser(res, {
             tokenData,
             companyId: state.companyId,
+            branchId,
             redirectUri: fallbackRedirect,
             options,
           })
         }
         connected = options.length === 1
-          ? saveSelectedFacebookOAuthConnection(store, state.companyId, tokenData, options[0])
-          : await saveFacebookOAuthConnection(store, state.companyId, tokenData)
-        const fbConnection = findCompanyConnection(store, state.companyId, 'facebook')
+          ? saveSelectedFacebookOAuthConnection(store, state.companyId, tokenData, options[0], branchId)
+          : await saveFacebookOAuthConnection(store, state.companyId, tokenData, '', branchId)
+        const fbConnection = findCompanyConnection(store, state.companyId, 'facebook', branchId)
         if (fbConnection?.credentials?.accessToken) {
           await subscribePageToWebhookEvents(fbConnection.credentials.accessToken, fbConnection.externalId, 'messages,messaging_postbacks,messaging_optins,comments')
         }
@@ -2059,6 +2086,7 @@ export async function appHandler(req, res) {
       const success = new URL(fallbackRedirect)
       success.searchParams.set('platform', platform)
       success.searchParams.set('connected', 'true')
+      if (branchId) success.searchParams.set('branch_id', branchId)
       if (connected.instagram?.id) success.searchParams.set('instagram_id', connected.instagram.id)
       if (connected.facebook?.id) success.searchParams.set('facebook_id', connected.facebook.id)
       return redirect(res, success.toString())
@@ -2067,6 +2095,7 @@ export async function appHandler(req, res) {
     if (req.method === 'POST' && url.pathname === '/api/oauth/instagram/choose') {
       const body = await readFormBody(req)
       const companyId = body.get('company_id')
+      const branchId = body.get('branch_id') || ''
       const selectedPageId = body.get('page_id')
       const redirectUri = body.get('redirect_uri') || '/'
       const accessToken = body.get('access_token')
@@ -2086,8 +2115,8 @@ export async function appHandler(req, res) {
         access_token: accessToken,
         token_type: body.get('token_type') || '',
         expires_in: body.get('expires_in') || '',
-      }, selected)
-      const igConnection = findCompanyConnection(store, companyId, 'instagram')
+      }, selected, branchId)
+      const igConnection = findCompanyConnection(store, companyId, 'instagram', branchId)
       if (igConnection?.credentials?.pageAccessToken && igConnection?.credentials?.pageId) {
         await subscribePageToWebhookEvents(igConnection.credentials.pageAccessToken, igConnection.credentials.pageId, 'messages,messaging_postbacks,messaging_optins')
       }
@@ -2096,6 +2125,7 @@ export async function appHandler(req, res) {
       const success = new URL(redirectUri)
       success.searchParams.set('platform', 'instagram')
       success.searchParams.set('connected', 'true')
+      if (branchId) success.searchParams.set('branch_id', branchId)
       success.searchParams.set('instagram_id', connected.instagram.id)
       return redirect(res, success.toString())
     }
@@ -2103,6 +2133,7 @@ export async function appHandler(req, res) {
     if (req.method === 'POST' && url.pathname === '/api/oauth/facebook/choose') {
       const body = await readFormBody(req)
       const companyId = body.get('company_id')
+      const branchId = body.get('branch_id') || ''
       const selectedPageId = body.get('page_id')
       const redirectUri = body.get('redirect_uri') || '/'
       const accessToken = body.get('access_token')
@@ -2122,8 +2153,8 @@ export async function appHandler(req, res) {
         access_token: accessToken,
         token_type: body.get('token_type') || '',
         expires_in: body.get('expires_in') || '',
-      }, selected)
-      const fbConnection = findCompanyConnection(store, companyId, 'facebook')
+      }, selected, branchId)
+      const fbConnection = findCompanyConnection(store, companyId, 'facebook', branchId)
       if (fbConnection?.credentials?.accessToken) {
         await subscribePageToWebhookEvents(fbConnection.credentials.accessToken, fbConnection.externalId, 'messages,messaging_postbacks,messaging_optins,comments')
       }
@@ -2132,6 +2163,7 @@ export async function appHandler(req, res) {
       const success = new URL(redirectUri)
       success.searchParams.set('platform', 'facebook')
       success.searchParams.set('connected', 'true')
+      if (branchId) success.searchParams.set('branch_id', branchId)
       success.searchParams.set('facebook_id', connected.facebook.id)
       return redirect(res, success.toString())
     }
@@ -2224,25 +2256,29 @@ export async function appHandler(req, res) {
 
     const connectionParams = routeParams(url.pathname, '/api/companies/:companyId/connections')
     if (req.method === 'GET' && connectionParams) {
-      return json(res, 200, { connections: listConnections(store, connectionParams.companyId) })
+      const branchId = url.searchParams.get('branch_id') || ''
+      return json(res, 200, { connections: listConnections(store, connectionParams.companyId, branchId) })
     }
 
     if (req.method === 'POST' && connectionParams) {
       const body = await readBody(req)
-      rememberConnection(store, connectionParams.companyId, body.platform, body.connection)
+      const branchId = url.searchParams.get('branch_id') || body.branchId || ''
+      rememberConnection(store, connectionParams.companyId, body.platform, body.connection, branchId)
       await saveStore(store)
       return json(res, 200, { ok: true })
     }
 
     const connectionPlatformParams = routeParams(url.pathname, '/api/companies/:companyId/connections/:platform')
     if (req.method === 'DELETE' && connectionPlatformParams) {
+      const branchId = url.searchParams.get('branch_id') || ''
       store.connections = Object.fromEntries(
         Object.entries(store.connections || {}).filter(([, connection]) => (
           connection.companyId !== connectionPlatformParams.companyId ||
-          connection.platform !== connectionPlatformParams.platform
+          connection.platform !== connectionPlatformParams.platform ||
+          String(connection.branchId || '') !== String(branchId || '')
         ))
       )
-      if (!(await deleteConnectionFromSupabase(connectionPlatformParams.companyId, connectionPlatformParams.platform))) {
+      if (branchId || !(await deleteConnectionFromSupabase(connectionPlatformParams.companyId, connectionPlatformParams.platform))) {
         await saveStore(store)
       }
       return json(res, 200, { ok: true })
@@ -2250,21 +2286,22 @@ export async function appHandler(req, res) {
 
     const growthParams = routeParams(url.pathname, '/api/companies/:companyId/growth')
     if (req.method === 'GET' && growthParams) {
-      const connections = listConnections(store, growthParams.companyId)
-      const instagram = await instagramGrowthMetrics(store, growthParams.companyId).catch(err => ({
+      const branchId = url.searchParams.get('branch_id') || ''
+      const connections = listConnections(store, growthParams.companyId, branchId)
+      const instagram = await instagramGrowthMetrics(store, growthParams.companyId, branchId).catch(err => ({
         platform: 'instagram',
-        connected: Boolean(findCompanyConnection(store, growthParams.companyId, 'instagram')),
+        connected: Boolean(findCompanyConnection(store, growthParams.companyId, 'instagram', branchId)),
         error: err.message || 'Could not load Instagram growth data.',
         summary: null,
       }))
-      const facebook = await facebookGrowthMetrics(store, growthParams.companyId).catch(err => ({
+      const facebook = await facebookGrowthMetrics(store, growthParams.companyId, branchId).catch(err => ({
         platform: 'facebook',
-        connected: Boolean(findCompanyConnection(store, growthParams.companyId, 'facebook')),
+        connected: Boolean(findCompanyConnection(store, growthParams.companyId, 'facebook', branchId)),
         error: err.message || 'Could not load Facebook growth data.',
         summary: null,
       }))
-      const youtube = youtubeGrowthMetrics(store, growthParams.companyId)
-      const whatsapp = whatsappGrowthMetrics(store, growthParams.companyId)
+      const youtube = youtubeGrowthMetrics(store, growthParams.companyId, branchId)
+      const whatsapp = whatsappGrowthMetrics(store, growthParams.companyId, branchId)
       return json(res, 200, {
         connectedPlatforms: connections.length,
         connections,
@@ -2415,10 +2452,11 @@ export async function appHandler(req, res) {
     if (req.method === 'GET' && inboxParams) {
       const type = url.searchParams.get('type') || 'all'
       const shouldSync = url.searchParams.get('sync') === '1'
-      const syncResult = shouldSync ? await syncLiveInbox(store, inboxParams.companyId) : { items: [], errors: [] }
+      const branchId = url.searchParams.get('branch_id') || ''
+      const syncResult = shouldSync ? await syncLiveInbox(store, inboxParams.companyId, branchId) : { items: [], errors: [] }
       const pendingItems = shouldSync
         ? store.items
-          .filter(item => item.companyId === inboxParams.companyId && !item.aiReply && item.status !== 'reply_failed')
+          .filter(item => item.companyId === inboxParams.companyId && String(item.branchId || '') === String(branchId || '') && !item.aiReply && item.status !== 'reply_failed')
           .sort((a, b) => new Date(b.receivedAt || 0) - new Date(a.receivedAt || 0))
           .slice(0, 50)
         : []
@@ -2426,6 +2464,7 @@ export async function appHandler(req, res) {
       if (shouldSync && (syncResult.items.length || replies.length)) await saveStore(store)
       const items = store.items.filter(item => {
         if (item.companyId !== inboxParams.companyId) return false
+        if (String(item.branchId || '') !== String(branchId || '')) return false
         return type === 'all' || item.type === type
       }).sort((a, b) => new Date(b.receivedAt || 0) - new Date(a.receivedAt || 0))
       return json(res, 200, { items, synced: syncResult.items.length, autoReplied: replies.length, syncErrors: syncResult.errors, liveSynced: shouldSync })
@@ -2433,8 +2472,10 @@ export async function appHandler(req, res) {
 
     if (req.method === 'POST' && inboxParams) {
       const body = await readBody(req)
+      const branchId = url.searchParams.get('branch_id') || body.branchId || ''
       const incoming = [{
         companyId: inboxParams.companyId,
+        branchId: branchId || null,
         type: body.type || 'comment',
         platform: body.platform || 'instagram',
         senderName: body.senderName || 'Test Customer',

@@ -235,7 +235,7 @@ function OverviewPanel({ messages, onRefresh, company }) {
   const handleTestDM = async (platform) => {
     setTesting(true)
     try {
-      await createTestDM(company.id, platform)
+      await createTestDM(company.id, platform, { branchId: company.branchId || '' })
       await new Promise(r => setTimeout(r, 500))
       onRefresh?.()
     } finally {
@@ -402,7 +402,7 @@ function BackfillPanel({ company, platform, onCompleted }) {
   )
 }
 
-export default function InboxTab({ company, platform, isAdmin = true }) {
+export default function InboxTab({ company, branchId = '', platform, isAdmin = true }) {
   const [messages, setMessages] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
@@ -420,12 +420,13 @@ export default function InboxTab({ company, platform, isAdmin = true }) {
   const [showFilters, setShowFilters] = useState(false)
   const [selectedIds, setSelectedIds] = useState([])
   const [selectedMessageId, setSelectedMessageId] = useState(null)
+  const branchScope = branchId && branchId !== 'all' ? branchId : ''
 
   useEffect(() => {
     let alive = true
     setLoading(true)
     setError('')
-    fetchInbox(company.id, 'all')
+    fetchInbox(company.id, 'all', { branchId: branchScope })
       .then(data => {
         if (!alive) return
         setMessages((data.items || []).map(normalizeInboxItem))
@@ -442,7 +443,7 @@ export default function InboxTab({ company, platform, isAdmin = true }) {
     return () => {
       alive = false
     }
-  }, [company.id])
+  }, [company.id, branchScope])
 
   useEffect(() => {
     let cancelled = false
@@ -452,7 +453,7 @@ export default function InboxTab({ company, platform, isAdmin = true }) {
       if (busy) return
       busy = true
       try {
-        const data = await fetchInbox(company.id, 'all')
+        const data = await fetchInbox(company.id, 'all', { branchId: branchScope })
         if (cancelled) return
         setMessages((data.items || []).map(normalizeInboxItem))
         setLastUpdated(new Date())
@@ -468,10 +469,10 @@ export default function InboxTab({ company, platform, isAdmin = true }) {
       cancelled = true
       window.clearInterval(timer)
     }
-  }, [company.id])
+  }, [company.id, branchScope])
 
   const reloadInbox = async () => {
-    const data = await fetchInbox(company.id, 'all')
+    const data = await fetchInbox(company.id, 'all', { branchId: branchScope })
     setMessages((data.items || []).map(normalizeInboxItem))
     setSyncedCount(Number(data.synced || 0))
     setAutoRepliedCount(Number(data.autoReplied || 0))
@@ -483,7 +484,7 @@ export default function InboxTab({ company, platform, isAdmin = true }) {
     setSyncing(true)
     setError('')
     try {
-      const data = await fetchInbox(company.id, 'all', { sync: true })
+      const data = await fetchInbox(company.id, 'all', { sync: true, branchId: branchScope })
       setMessages((data.items || []).map(normalizeInboxItem))
       setSyncedCount(Number(data.synced || 0))
       setAutoRepliedCount(Number(data.autoReplied || 0))
@@ -497,7 +498,7 @@ export default function InboxTab({ company, platform, isAdmin = true }) {
   }
 
   const handleReply = async (msgId, text) => {
-    const data = await replyToInboxItem(company.id, msgId, text)
+    const data = await replyToInboxItem(company.id, msgId, text, { branchId: branchScope })
     const updated = normalizeInboxItem(data.item)
     setMessages(msgs => msgs.map(msg => msg.id === msgId ? updated : msg))
   }
@@ -557,7 +558,7 @@ export default function InboxTab({ company, platform, isAdmin = true }) {
     setSyncing(true)
     setError('')
     try {
-      await createTestDM(company.id, platformKey)
+      await createTestDM(company.id, platformKey, { branchId: branchScope })
       await reloadInbox()
     } catch (err) {
       setError(err.message || 'Could not create test DM.')

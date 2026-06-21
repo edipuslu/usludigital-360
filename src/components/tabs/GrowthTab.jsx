@@ -430,16 +430,17 @@ function PlatformSection({ platform, data, activeDetail, onDetailChange }) {
   )
 }
 
-export default function GrowthTab({ company, platform }) {
+export default function GrowthTab({ company, branchId = '', platform }) {
   const [growth, setGrowth] = useState(null)
   const [loading, setLoading] = useState(true)
   const [refreshing, setRefreshing] = useState(false)
   const [activePanel, setActivePanel] = useState(platform || 'overview')
   const [activeDetail, setActiveDetail] = useState({ platform: platform || 'instagram', type: 'posts' })
+  const branchScope = branchId && branchId !== 'all' ? branchId : ''
 
   useEffect(() => {
     loadGrowth()
-  }, [company.id])
+  }, [company.id, branchScope])
 
   useEffect(() => {
     if (platform) {
@@ -451,7 +452,7 @@ export default function GrowthTab({ company, platform }) {
   const loadGrowth = async () => {
     try {
       setLoading(true)
-      setGrowth(await fetchGrowthMetrics(company.id))
+      setGrowth(await fetchGrowthMetrics(company.id, { branchId: branchScope }))
     } catch (err) {
       console.error('Failed to load growth:', err)
     } finally {
@@ -462,7 +463,7 @@ export default function GrowthTab({ company, platform }) {
   const refreshGrowth = async () => {
     try {
       setRefreshing(true)
-      setGrowth(await fetchGrowthMetrics(company.id))
+      setGrowth(await fetchGrowthMetrics(company.id, { branchId: branchScope }))
     } catch (err) {
       console.error('Failed to refresh growth:', err)
     } finally {
