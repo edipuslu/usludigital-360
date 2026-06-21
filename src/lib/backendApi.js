@@ -90,7 +90,6 @@ export function fetchGrowthMetrics(companyId, options = {}) {
 // Save AI config and training data. Only send openaiKey when it is being changed,
 // so normal training saves do not erase a key stored on the backend.
 export function saveBackendAiConfig(company, openaiKey) {
-  const savedLocalKey = typeof localStorage !== 'undefined' ? localStorage.getItem('ud360_openai_key') : ''
   const body = {
     company: {
       id: company.id,
@@ -104,8 +103,6 @@ export function saveBackendAiConfig(company, openaiKey) {
 
   if (arguments.length > 1) {
     body.openaiKey = openaiKey || ''
-  } else if (savedLocalKey) {
-    body.openaiKey = savedLocalKey
   }
 
   return request(`/api/companies/${encodeURIComponent(company.id)}/ai-config`, {

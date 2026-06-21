@@ -1950,7 +1950,7 @@ function estimateBackfillCost(count) {
 }
 
 async function generateAiReply(company, item, options = {}) {
-  const apiKey = company?.openaiKey || process.env.OPENAI_API_KEY
+  const apiKey = process.env.OPENAI_API_KEY || company?.openaiKey
   if (!apiKey) return { reply: '', status: 'needs_openai_key', error: 'OpenAI key is missing on the backend.' }
   if (!options.force && !shouldAutoReply(company, item)) return { reply: '', status: 'received', error: '' }
 
