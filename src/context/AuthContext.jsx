@@ -1,5 +1,6 @@
 import { createContext, useContext, useState, useCallback } from 'react'
 import { USERS } from '../data/mockData'
+import { getCompanies } from '../lib/backendApi'
 
 const AuthContext = createContext(null)
 
@@ -13,10 +14,36 @@ export function AuthProvider({ children }) {
     }
   })
 
-  const login = useCallback((email, password) => {
+  const login = useCallback(async (email, password) => {
     const found = USERS.find(u => u.email === email && u.password === password)
-    if (!found) return { success: false, error: 'Invalid email or password.' }
-    const { password: _, ...safeUser } = found
+    let safeUser = null
+    if (found) {
+      const { password: _, ...userWithoutPassword } = found
+      safeUser = userWithoutPassword
+    } else {
+      try {
+        const data = await getCompanies()
+        const companies = Array.isArray(data.companies) ? data.companies : []
+        const company = companies.find(item => {
+          const loginId = String(item.clientEmail || '').trim().toLowerCase()
+          return loginId && loginId === String(email || '').trim().toLowerCase() && String(item.clientPassword || '') === String(password || '')
+        })
+        if (company) {
+          safeUser = {
+            id: `client-${company.id}`,
+            email: company.clientEmail,
+            role: 'client',
+            name: company.clientName || company.name,
+            avatar: company.initials || 'CL',
+            companyId: company.id,
+          }
+        }
+      } catch {
+        return { success: false, error: 'Could not check company access right now. Try again.' }
+      }
+    }
+
+    if (!safeUser) return { success: false, error: 'Invalid email or password.' }
     setUser(safeUser)
     localStorage.setItem('ud360_user', JSON.stringify(safeUser))
     return { success: true, user: safeUser }

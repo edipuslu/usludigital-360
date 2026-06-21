@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Building2, Plus, Trash2, LogOut, X, AlertTriangle, ArrowUpRight, GitBranch, MapPin, Search, RefreshCw, ShieldCheck } from 'lucide-react'
+import { Building2, Plus, Trash2, LogOut, X, AlertTriangle, ArrowUpRight, GitBranch, MapPin, Search, RefreshCw, ShieldCheck, KeyRound, Eye, EyeOff, Copy, CheckCircle2 } from 'lucide-react'
 import { useAuth } from '../context/AuthContext'
 import { deleteBackendCompany, getCompanies, saveBackendCompany, updateBackendCompany } from '../lib/backendApi'
 import { UsluLoader } from '../components/ui/UIKit'
@@ -21,6 +21,7 @@ export function createCompany({ name, industry }) {
     industry,
     clientEmail: '',
     clientName: '',
+    clientPassword: '',
     status: 'needs_update',
     createdAt: new Date().toISOString(),
     initials: name.split(/\s+/).map(w => w[0]).join('').slice(0, 2).toUpperCase() || 'CO',
@@ -93,6 +94,11 @@ export function createCompany({ name, industry }) {
       spikeAlerts: true,
     },
   }
+}
+
+function generatePassword() {
+  const alphabet = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789'
+  return Array.from({ length: 10 }, () => alphabet[Math.floor(Math.random() * alphabet.length)]).join('')
 }
 
 function BranchModal({ company, onClose, onSave }) {
@@ -201,6 +207,9 @@ export function normalizeCompany(company) {
   if (!company) return company
   return {
     ...company,
+    clientEmail: company.clientEmail || '',
+    clientName: company.clientName || '',
+    clientPassword: company.clientPassword || '',
     platforms: {
       instagram: { connected: false, handle: null, followers: null, lastSync: null, error: null, ...(company.platforms?.instagram || {}) },
       facebook: { connected: false, handle: null, followers: null, lastSync: null, error: null, ...(company.platforms?.facebook || {}) },
@@ -319,6 +328,137 @@ function DeleteModal({ company, onClose, onDelete }) {
   )
 }
 
+function AccessModal({ company, onClose, onSave }) {
+  const [clientEmail, setClientEmail] = useState(company.clientEmail || '')
+  const [clientName, setClientName] = useState(company.clientName || company.name || '')
+  const [clientPassword, setClientPassword] = useState(company.clientPassword || '')
+  const [showPassword, setShowPassword] = useState(false)
+  const [deleteConfirm, setDeleteConfirm] = useState('')
+  const [copied, setCopied] = useState('')
+  const hasAccess = Boolean(company.clientEmail || company.clientPassword)
+  const canDelete = deleteConfirm.trim() === 'DELETE'
+
+  const copyText = async (label, text) => {
+    if (!text) return
+    await navigator.clipboard?.writeText(text)
+    setCopied(label)
+    setTimeout(() => setCopied(''), 1200)
+  }
+
+  const save = () => {
+    onSave({
+      ...company,
+      clientEmail: clientEmail.trim(),
+      clientName: clientName.trim(),
+      clientPassword: clientPassword.trim(),
+    })
+  }
+
+  const removeAccess = () => {
+    if (!canDelete) return
+    onSave({
+      ...company,
+      clientEmail: '',
+      clientName: '',
+      clientPassword: '',
+    })
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 bg-slate-950/60 backdrop-blur-sm flex items-center justify-center p-4">
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl overflow-hidden">
+        <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between">
+          <div>
+            <div className="text-slate-900 font-bold">Client Access for {company.name}</div>
+            <div className="text-slate-500 text-xs mt-0.5">Create and view the login ID and password for this company.</div>
+          </div>
+          <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-slate-100 text-slate-400 cursor-pointer">
+            <X size={18} />
+          </button>
+        </div>
+
+        <div className="p-6 space-y-5">
+          <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
+            <div className="text-xs font-bold uppercase tracking-wide text-slate-400">Company ID</div>
+            <div className="mt-2 flex items-center gap-2">
+              <code className="min-w-0 flex-1 truncate rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-bold text-slate-700">{company.id}</code>
+              <button type="button" onClick={() => copyText('companyId', company.id)} className="btn-secondary px-3 py-2">
+                {copied === 'companyId' ? <CheckCircle2 size={14} /> : <Copy size={14} />}
+                Copy
+              </button>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+            <div>
+              <label className="block text-sm font-semibold text-slate-700 mb-1.5">Client Name</label>
+              <input value={clientName} onChange={e => setClientName(e.target.value)} className="input-field" placeholder="Client name" />
+            </div>
+            <div>
+              <label className="block text-sm font-semibold text-slate-700 mb-1.5">Login ID / Email</label>
+              <div className="flex gap-2">
+                <input value={clientEmail} onChange={e => setClientEmail(e.target.value)} className="input-field flex-1" placeholder="client@company.com" />
+                <button type="button" onClick={() => copyText('email', clientEmail)} className="btn-secondary px-3 py-2" disabled={!clientEmail}>
+                  {copied === 'email' ? <CheckCircle2 size={14} /> : <Copy size={14} />}
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <div>
+            <label className="block text-sm font-semibold text-slate-700 mb-1.5">Password</label>
+            <div className="grid grid-cols-1 gap-2 md:grid-cols-[1fr_auto_auto_auto]">
+              <div className="relative">
+                <input
+                  value={clientPassword}
+                  onChange={e => setClientPassword(e.target.value)}
+                  type={showPassword ? 'text' : 'password'}
+                  className="input-field pr-10"
+                  placeholder="Create a password"
+                />
+                <button type="button" onClick={() => setShowPassword(value => !value)} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-700">
+                  {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                </button>
+              </div>
+              <button type="button" onClick={() => setClientPassword(generatePassword())} className="btn-secondary justify-center">
+                Generate
+              </button>
+              <button type="button" onClick={() => copyText('password', clientPassword)} className="btn-secondary justify-center" disabled={!clientPassword}>
+                {copied === 'password' ? <CheckCircle2 size={14} /> : <Copy size={14} />} Copy
+              </button>
+              <button type="button" onClick={save} disabled={!clientEmail.trim() || !clientPassword.trim()} className={clsx('btn-primary justify-center', (!clientEmail.trim() || !clientPassword.trim()) && 'opacity-50 cursor-not-allowed')}>
+                Save Access
+              </button>
+            </div>
+          </div>
+
+          {hasAccess && (
+            <div className="rounded-xl border border-red-200 bg-red-50 p-4">
+              <div className="flex items-start gap-3">
+                <AlertTriangle size={16} className="mt-0.5 text-red-500" />
+                <div className="flex-1">
+                  <div className="text-sm font-bold text-red-900">Delete client login access</div>
+                  <div className="mt-1 text-xs text-red-700">To delete the login ID and password, type DELETE. This does not delete the company.</div>
+                  <div className="mt-3 flex flex-col gap-2 sm:flex-row">
+                    <input value={deleteConfirm} onChange={e => setDeleteConfirm(e.target.value)} className="input-field bg-white sm:max-w-xs" placeholder="DELETE" />
+                    <button type="button" onClick={removeAccess} disabled={!canDelete} className={clsx('btn-danger justify-center', !canDelete && 'opacity-50 cursor-not-allowed')}>
+                      <Trash2 size={14} /> Delete Access
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+
+        <div className="px-6 py-4 border-t border-slate-100 bg-slate-50 flex items-center justify-end gap-2">
+          <button onClick={onClose} className="btn-secondary">Close</button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 export default function AdminDashboard() {
   const navigate = useNavigate()
   const { user, logout } = useAuth()
@@ -328,6 +468,7 @@ export default function AdminDashboard() {
   const [showCreate, setShowCreate] = useState(false)
   const [deleteCompany, setDeleteCompany] = useState(null)
   const [branchCompany, setBranchCompany] = useState(null)
+  const [accessCompany, setAccessCompany] = useState(null)
   const [query, setQuery] = useState('')
 
   const loadFromBackend = async alive => {
@@ -406,6 +547,19 @@ export default function AdminDashboard() {
       setError(err.message || 'Branches were saved on this device, but backend sync failed.')
     }
     setBranchCompany(null)
+  }
+
+  const saveAccess = async company => {
+    const normalized = normalizeCompany(company)
+    const next = companies.map(current => current.id === normalized.id ? normalized : current)
+    persist(next)
+    try {
+      await updateBackendCompany(normalized, { allowBranchUpdate: true })
+      setError('')
+    } catch (err) {
+      setError(err.message || 'Client access was saved on this device, but backend sync failed.')
+    }
+    setAccessCompany(null)
   }
 
   const signOut = () => {
@@ -493,12 +647,13 @@ export default function AdminDashboard() {
                   const connected = Object.values(company.platforms).filter(p => p.connected).length
                   const branchCount = company.branches?.length || 0
                   return (
-                    <div key={company.id} className="grid grid-cols-1 gap-4 px-5 py-5 transition-colors hover:bg-slate-50 lg:grid-cols-[1fr_150px_130px_170px_300px] lg:items-center">
+                    <div key={company.id} className="grid grid-cols-1 gap-4 px-5 py-5 transition-colors hover:bg-slate-50 lg:grid-cols-[1fr_150px_130px_190px_340px] lg:items-center">
                       <div className="flex min-w-0 items-center gap-3">
                         <div className="flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-lg bg-slate-950 text-sm font-bold text-white">{company.initials}</div>
                         <div className="min-w-0">
                           <div className="truncate text-sm font-extrabold text-slate-950">{company.name}</div>
                           <div className="mt-0.5 truncate text-xs font-medium text-slate-500">{company.industry || 'No industry added'}</div>
+                          <div className="mt-1 truncate text-[11px] font-semibold text-slate-400">ID: {company.id}</div>
                         </div>
                       </div>
                       <div>
@@ -510,8 +665,17 @@ export default function AdminDashboard() {
                         <div className="mt-1 text-sm font-extrabold text-slate-900">{branchCount}</div>
                       </div>
                       <div>
-                        <div className="text-xs font-semibold text-slate-400">AI Training</div>
-                        <div className="mt-1 text-sm font-extrabold capitalize text-slate-900">{company.aiTraining.status.replace('_', ' ')}</div>
+                        <div className="text-xs font-semibold text-slate-400">Client Access</div>
+                        <div className="mt-1 min-w-0">
+                          {company.clientEmail && company.clientPassword ? (
+                            <>
+                              <div className="truncate text-sm font-extrabold text-slate-900">{company.clientEmail}</div>
+                              <div className="truncate text-xs font-semibold text-slate-400">Password saved</div>
+                            </>
+                          ) : (
+                            <div className="text-sm font-extrabold text-amber-700">Not created</div>
+                          )}
+                        </div>
                       </div>
                       <div className="flex flex-wrap items-center gap-2 lg:justify-end">
                         <button onClick={() => {
@@ -522,6 +686,9 @@ export default function AdminDashboard() {
                         </button>
                         <button onClick={() => setBranchCompany(company)} className="btn-secondary justify-center">
                           <GitBranch size={14} /> Branches
+                        </button>
+                        <button onClick={() => setAccessCompany(company)} className="btn-secondary justify-center">
+                          <KeyRound size={14} /> Access
                         </button>
                         <button onClick={() => setDeleteCompany(company)} className="btn-danger">
                           <Trash2 size={14} /> Delete
@@ -538,6 +705,7 @@ export default function AdminDashboard() {
       {showCreate && <CompanyModal onClose={() => setShowCreate(false)} onCreate={create} />}
       {deleteCompany && <DeleteModal company={deleteCompany} onClose={() => setDeleteCompany(null)} onDelete={remove} />}
       {branchCompany && <BranchModal company={branchCompany} onClose={() => setBranchCompany(null)} onSave={saveBranches} />}
+      {accessCompany && <AccessModal company={accessCompany} onClose={() => setAccessCompany(null)} onSave={saveAccess} />}
     </div>
   )
 }
