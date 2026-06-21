@@ -383,7 +383,8 @@ export default function CompanyWorkspace() {
       const current = prev.find(c => c.id === company.id) || prev[0]
       const nextCompany = typeof updater === 'function' ? updater(current) : { ...current, ...updater }
       const next = prev.map(c => c.id === current.id ? nextCompany : c)
-      updateBackendCompany(nextCompany)
+      const { branches: _branches, ...companyWithoutBranches } = nextCompany
+      updateBackendCompany(companyWithoutBranches)
         .then(() => setSyncError(''))
         .catch(err => setSyncError(err.message || 'Saved locally, but backend sync failed.'))
       return next

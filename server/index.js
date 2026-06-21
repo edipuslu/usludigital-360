@@ -602,6 +602,7 @@ async function saveCompanyConfigsToSupabase(base, headers, companies = []) {
         openaiKey: company.openaiKey || '',
         goal: company.goal || 'push_to_whatsapp',
         whatsappLink: company.whatsappLink || '',
+        branches: company.branches || [],
         aiTraining: company.aiTraining || {},
         automation: company.automation || {},
         settings: company.settings || {},
@@ -2104,10 +2105,14 @@ export async function appHandler(req, res) {
       const body = await readBody(req)
       if (!body.company?.id) return json(res, 400, { error: 'company.id is required.' })
       const workspaceOpenaiKey = getWorkspaceOpenaiKey(store)
+      const existingCompany = store.companies[body.company.id] || {}
       store.companies[body.company.id] = {
-        ...(store.companies[body.company.id] || {}),
+        ...existingCompany,
         ...body.company,
-        openaiKey: body.company.openaiKey || store.companies[body.company.id]?.openaiKey || workspaceOpenaiKey,
+        branches: Array.isArray(existingCompany.branches) && existingCompany.branches.length
+          ? existingCompany.branches
+          : body.company.branches || [],
+        openaiKey: body.company.openaiKey || existingCompany.openaiKey || workspaceOpenaiKey,
         updatedAt: new Date().toISOString(),
       }
       await saveStore(store)
@@ -2117,13 +2122,18 @@ export async function appHandler(req, res) {
     const companyParams = routeParams(url.pathname, '/api/companies/:companyId')
     if (req.method === 'PUT' && companyParams) {
       const body = await readBody(req)
+      const incomingCompany = body.company || {}
+      const allowBranchUpdate = body.allowBranchUpdate === true
       const existingCompany = store.companies[companyParams.companyId] || companyDefaults({
         id: companyParams.companyId,
-        name: body.company?.name || 'Company',
+        name: incomingCompany.name || 'Company',
       })
       store.companies[companyParams.companyId] = {
         ...existingCompany,
-        ...(body.company || {}),
+        ...incomingCompany,
+        branches: allowBranchUpdate
+          ? (Array.isArray(incomingCompany.branches) ? incomingCompany.branches : existingCompany.branches || [])
+          : existingCompany.branches || [],
         id: companyParams.companyId,
         updatedAt: new Date().toISOString(),
       }
@@ -2232,6 +2242,7 @@ export async function appHandler(req, res) {
         ...existing,
         ...(body.company || {}),
         id: aiParams.companyId,
+        branches: existing.branches || [],
         aiTraining: {
           ...(existing.aiTraining || {}),
           ...(body.company?.aiTraining || {}),

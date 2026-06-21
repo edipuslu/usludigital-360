@@ -400,7 +400,7 @@ export default function AdminDashboard() {
     const next = companies.map(current => current.id === company.id ? company : current)
     persist(next)
     try {
-      await updateBackendCompany(company)
+      await updateBackendCompany(company, { allowBranchUpdate: true })
       setError('')
     } catch (err) {
       setError(err.message || 'Branches were saved on this device, but backend sync failed.')

@@ -43,10 +43,13 @@ export function saveBackendCompany(company) {
   })
 }
 
-export function updateBackendCompany(company) {
+export function updateBackendCompany(company, options = {}) {
   return request(`/api/companies/${encodeURIComponent(company.id)}`, {
     method: 'PUT',
-    body: JSON.stringify({ company }),
+    body: JSON.stringify({
+      company,
+      allowBranchUpdate: Boolean(options.allowBranchUpdate),
+    }),
   })
 }
 
