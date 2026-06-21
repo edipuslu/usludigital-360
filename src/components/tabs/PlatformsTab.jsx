@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
-import { X, ExternalLink, ChevronRight, Copy, CheckCircle2, AlertCircle, Link2, Info, Server, KeyRound, Bot, Database, LogIn, Loader } from 'lucide-react'
-import { PlatformIcon, SectionHeader } from '../ui/UIKit'
+import { X, ExternalLink, ChevronRight, Copy, CheckCircle2, AlertCircle, Link2, Info, LogIn, Loader } from 'lucide-react'
+import { PlatformIcon } from '../ui/UIKit'
 import { backendUrl, deleteConnection, getConnections, registerConnection, saveBackendAiConfig } from '../../lib/backendApi'
 import clsx from 'clsx'
 
@@ -768,22 +768,6 @@ function PlatformCard({ platform, guide, data, backendConnections = [], onConnec
   )
 }
 
-function RequirementCard({ icon: Icon, title, children }) {
-  return (
-    <div className="bg-white border border-slate-200 rounded-xl p-4">
-      <div className="flex items-start gap-3">
-        <div className="w-9 h-9 rounded-lg bg-blue-50 border border-blue-100 flex items-center justify-center flex-shrink-0">
-          <Icon size={16} className="text-blue-600" />
-        </div>
-        <div>
-          <div className="text-slate-900 text-sm font-bold mb-1">{title}</div>
-          <div className="text-slate-500 text-xs leading-relaxed">{children}</div>
-        </div>
-      </div>
-    </div>
-  )
-}
-
 export default function PlatformsTab({ company, onUpdate, onNotify, selectedPlatform = null, compact = false }) {
   const [backendConnections, setBackendConnections] = useState({})
 
@@ -907,47 +891,6 @@ export default function PlatformsTab({ company, onUpdate, onNotify, selectedPlat
 
   return (
     <div className="space-y-6 animate-slide-in">
-      <SectionHeader
-        title="Platform Connections"
-        description="Connect and manage Instagram, Facebook, YouTube, and WhatsApp in one place. Analytics pages only show results."
-      />
-
-      <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 flex items-start gap-3">
-        <AlertCircle size={16} className="text-amber-600 mt-0.5 flex-shrink-0" />
-        <div>
-          <div className="text-amber-900 font-semibold text-sm mb-0.5">All platform logins live here</div>
-          <div className="text-amber-800 text-sm leading-relaxed">
-            Use this page to connect, reconnect, or disconnect accounts. Social Media Analytics is only for viewing followers, posts, comments, and growth.
-            Instagram DM AI replies can be tested now with Meta App Roles/Test Users; public users need Meta approval.
-          </div>
-        </div>
-      </div>
-
-      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
-        <RequirementCard icon={Server} title="1. Backend Webhook">
-          Deploy an endpoint like <span className="font-mono">/meta/webhook</span> with GET verification and POST event handling.
-        </RequirementCard>
-        <RequirementCard icon={KeyRound} title="2. Meta App + Permissions">
-          Create a Meta app, add testers in Development Mode, connect the Page/Instagram account, and subscribe messages/comments webhooks.
-        </RequirementCard>
-        <RequirementCard icon={Bot} title="3. AI Provider">
-          Add an AI key, usually OpenAI or a cheaper compatible provider. The backend sends each comment to the model with company context.
-        </RequirementCard>
-        <RequirementCard icon={Database} title="4. Storage + Rules">
-          Store tokens, company training, blacklist words, reply tone, logs, and whether auto-reply is ON or OFF.
-        </RequirementCard>
-      </div>
-
-      <div className="bg-blue-50 border border-blue-200 rounded-xl p-4 flex items-start gap-3">
-        <Info size={16} className="text-blue-600 mt-0.5 flex-shrink-0" />
-        <div>
-          <div className="text-blue-900 font-semibold text-sm mb-0.5">How live replies work after connection</div>
-          <div className="text-blue-700 text-sm leading-relaxed">
-            New comments and messages are received by the backend webhook, saved to the inbox, sent to the AI when automation is enabled, and then replied back through the connected platform.
-          </div>
-        </div>
-      </div>
-
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
         {visibleEntries.map(([key, guide]) => (
           <PlatformCard
