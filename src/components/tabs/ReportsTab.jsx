@@ -5,8 +5,13 @@ import clsx from 'clsx'
 import html2pdf from 'html2pdf.js'
 
 const MONTHLY_REPORT_LIMIT = 3
+const DEFAULT_REPORT_FROM_EMAIL = 'edipusluprsnl@gmail.com'
 
 const getCurrentMonth = () => new Date().toLocaleDateString('en-US', { month: 'long', year: 'numeric' })
+
+function parseRecipientEmails(value) {
+  return [...new Set(String(value || '').split(/[,\n;]/).map(email => email.trim().toLowerCase()).filter(Boolean))]
+}
 
 const thunderLogoSvg = `
   <div style="width: 44px; height: 44px; border-radius: 12px; background: #030918; display: flex; align-items: center; justify-content: center;">
@@ -23,8 +28,8 @@ function ReportCard({ report, isAdmin, company, onNotify, onDelete }) {
   const [deleting, setDeleting] = useState(false)
   const [showEmailDialog, setShowEmailDialog] = useState(false)
   const [emailForm, setEmailForm] = useState({
-    fromEmail: company.settings?.notificationEmail || '',
-    toEmail: company.clientEmail || ''
+    fromEmail: DEFAULT_REPORT_FROM_EMAIL,
+    toEmails: company.clientEmail || ''
   })
 
   const handleSendClick = () => {
@@ -32,8 +37,18 @@ function ReportCard({ report, isAdmin, company, onNotify, onDelete }) {
   }
 
   const handleConfirmSend = async () => {
-    if (!emailForm.toEmail || !emailForm.toEmail.includes('@')) {
-      onNotify?.('Please enter a valid recipient email address.', 'error')
+    const recipients = parseRecipientEmails(emailForm.toEmails)
+    const invalidRecipient = recipients.find(email => !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email))
+    if (!recipients.length) {
+      onNotify?.('Please enter at least one recipient email address.', 'error')
+      return
+    }
+    if (recipients.length > 3) {
+      onNotify?.('You can send a report to maximum 3 email addresses.', 'error')
+      return
+    }
+    if (invalidRecipient) {
+      onNotify?.(`Invalid recipient email: ${invalidRecipient}`, 'error')
       return
     }
     if (!emailForm.fromEmail || !emailForm.fromEmail.includes('@')) {
@@ -49,8 +64,11 @@ function ReportCard({ report, isAdmin, company, onNotify, onDelete }) {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           fromEmail: emailForm.fromEmail,
-          toEmail: emailForm.toEmail,
+          toEmails: recipients,
+          reportId: report.id,
           month: report.month,
+          summary: report.summary,
+          bestPost: report.bestPost,
           totalReplies: report.totalReplies,
           waClicks: report.waClicks,
         }),
@@ -65,7 +83,7 @@ function ReportCard({ report, isAdmin, company, onNotify, onDelete }) {
       setSending(false)
       setSent(true)
       setShowEmailDialog(false)
-      onNotify?.(`Report sent to ${emailForm.toEmail}`, 'success')
+      onNotify?.(`Report sent to ${recipients.join(', ')}`, 'success')
       setTimeout(() => setSent(false), 3000)
     } catch (error) {
       setSending(false)
@@ -280,35 +298,37 @@ function ReportCard({ report, isAdmin, company, onNotify, onDelete }) {
           <div className="bg-white rounded-xl shadow-2xl max-w-md w-full p-6 space-y-5">
             <div>
               <h3 className="text-slate-900 font-bold text-lg">Send Report by Email</h3>
-              <p className="text-slate-500 text-sm mt-1">Enter sender and recipient email addresses</p>
+              <p className="text-slate-500 text-sm mt-1">Send this report from your configured Gmail account to up to 3 recipients.</p>
             </div>
 
             <div>
-              <label className="block text-sm font-semibold text-slate-700 mb-2">From Email</label>
+              <label className="block text-sm font-semibold text-slate-700 mb-2">From Gmail</label>
               <input
                 type="email"
                 value={emailForm.fromEmail}
                 onChange={e => setEmailForm(prev => ({ ...prev, fromEmail: e.target.value }))}
-                placeholder="admin@usludigital.com"
+                placeholder={DEFAULT_REPORT_FROM_EMAIL}
                 className="input-field w-full"
               />
-              <p className="text-xs text-slate-400 mt-1">Your email address</p>
+              <p className="text-xs text-slate-400 mt-1">Must match the Gmail account configured in Vercel.</p>
             </div>
 
             <div>
-              <label className="block text-sm font-semibold text-slate-700 mb-2">To Email</label>
-              <input
-                type="email"
-                value={emailForm.toEmail}
-                onChange={e => setEmailForm(prev => ({ ...prev, toEmail: e.target.value }))}
-                placeholder="client@business.com"
-                className="input-field w-full"
+              <label className="block text-sm font-semibold text-slate-700 mb-2">Recipient Emails</label>
+              <textarea
+                value={emailForm.toEmails}
+                onChange={e => setEmailForm(prev => ({ ...prev, toEmails: e.target.value }))}
+                placeholder="client@business.com, manager@business.com"
+                rows={3}
+                className="input-field w-full resize-none"
               />
-              <p className="text-xs text-slate-400 mt-1">Client or recipient email</p>
+              <p className="text-xs text-slate-400 mt-1">Separate emails with commas or new lines. Maximum 3.</p>
             </div>
 
             <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
-              <p className="text-xs text-blue-900"><strong>Preview:</strong> {report.month} report will be sent from <strong>{emailForm.fromEmail}</strong> to <strong>{emailForm.toEmail}</strong></p>
+              <p className="text-xs text-blue-900">
+                <strong>Preview:</strong> {report.month} report will be sent from <strong>{emailForm.fromEmail || DEFAULT_REPORT_FROM_EMAIL}</strong> to <strong>{parseRecipientEmails(emailForm.toEmails).join(', ') || 'no recipients yet'}</strong>.
+              </p>
             </div>
 
             <div className="flex gap-3 pt-3">

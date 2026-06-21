@@ -4,6 +4,7 @@ import { existsSync } from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { createHash, createHmac } from 'node:crypto'
+import nodemailer from 'nodemailer'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const DATA_DIR = process.env.VERCEL ? '/tmp/usludigital-360-data' : path.join(__dirname, 'data')
@@ -28,6 +29,8 @@ const SUPABASE_URL = process.env.SUPABASE_URL || ''
 const SUPABASE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_ANON_KEY || ''
 const SUPABASE_STORE_TABLE = process.env.SUPABASE_STORE_TABLE || 'ud360_store'
 const SUPABASE_STORE_ID = process.env.SUPABASE_STORE_ID || 'default'
+const GMAIL_USER = process.env.GMAIL_USER || process.env.REPORT_FROM_EMAIL || ''
+const GMAIL_APP_PASSWORD = process.env.GMAIL_APP_PASSWORD || process.env.GMAIL_PASS || ''
 const GRAPH_BASE_URL = 'https://graph.facebook.com/v20.0'
 const FACEBOOK_OAUTH_URL = 'https://www.facebook.com/v20.0/dialog/oauth'
 const META_SCOPES = [
@@ -183,6 +186,92 @@ async function readBody(req) {
   const raw = Buffer.concat(chunks).toString('utf8')
   if (!raw) return {}
   return JSON.parse(raw)
+}
+
+function parseReportRecipients(value) {
+  const raw = Array.isArray(value) ? value : String(value || '').split(/[,\n;]/)
+  const recipients = raw.map(email => String(email || '').trim().toLowerCase()).filter(Boolean)
+  const unique = [...new Set(recipients)]
+  const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+  const invalid = unique.filter(email => !emailPattern.test(email))
+  return { recipients: unique, invalid }
+}
+
+function reportEmailHtml({ company, report }) {
+  const month = report.month || new Date().toLocaleDateString('en-US', { month: 'long', year: 'numeric' })
+  const replies = Number(report.totalReplies || 0).toLocaleString()
+  const clicks = Number(report.waClicks || 0).toLocaleString()
+  const summary = escapeHtml(report.summary || 'Monthly report generated from the current workspace metrics.')
+  return `
+    <div style="margin:0;padding:0;background:#f8fafc;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Arial,sans-serif;color:#0f172a;">
+      <div style="max-width:680px;margin:0 auto;padding:32px 20px;">
+        <div style="background:#ffffff;border:1px solid #e2e8f0;border-radius:18px;overflow:hidden;">
+          <div style="background:#030918;color:#ffffff;padding:28px;">
+            <div style="display:flex;align-items:center;gap:12px;margin-bottom:22px;">
+              <div style="width:44px;height:44px;border-radius:12px;background:#ffffff;display:flex;align-items:center;justify-content:center;">
+                <svg width="24" height="24" viewBox="0 0 64 64" aria-hidden="true">
+                  <path d="M37 7 17 35h14l-4 22 20-29H34l3-21Z" fill="#030918"></path>
+                </svg>
+              </div>
+              <div>
+                <div style="font-size:20px;font-weight:800;">Uslu360Digital</div>
+                <div style="font-size:12px;color:#94a3b8;font-weight:700;text-transform:uppercase;letter-spacing:.7px;">Monthly Performance Report</div>
+              </div>
+            </div>
+            <div style="font-size:13px;color:#94a3b8;font-weight:700;text-transform:uppercase;letter-spacing:.8px;">${escapeHtml(company.name || 'Company')}</div>
+            <h1 style="margin:8px 0 10px;font-size:38px;line-height:1.05;letter-spacing:-1.3px;">${escapeHtml(month)}</h1>
+            <p style="margin:0;color:#cbd5e1;font-size:14px;line-height:1.6;">${summary}</p>
+          </div>
+          <div style="padding:26px;">
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:22px;">
+              <div style="border:1px solid #e2e8f0;border-radius:14px;padding:18px;">
+                <div style="font-size:11px;color:#64748b;font-weight:800;text-transform:uppercase;margin-bottom:8px;">AI Replies Sent</div>
+                <div style="font-size:34px;font-weight:850;color:#255ff4;">${replies}</div>
+              </div>
+              <div style="border:1px solid #e2e8f0;border-radius:14px;padding:18px;">
+                <div style="font-size:11px;color:#64748b;font-weight:800;text-transform:uppercase;margin-bottom:8px;">WhatsApp Clicks</div>
+                <div style="font-size:34px;font-weight:850;color:#f42582;">${clicks}</div>
+              </div>
+            </div>
+            <div style="border:1px solid #e2e8f0;border-radius:14px;padding:18px;background:#f8fafc;">
+              <div style="font-size:14px;font-weight:800;margin-bottom:8px;">Best Performing Content</div>
+              <div style="font-size:14px;color:#255ff4;font-weight:700;">${escapeHtml(report.bestPost || 'No post selected yet')}</div>
+            </div>
+            <p style="margin:24px 0 0;color:#64748b;font-size:12px;line-height:1.6;">
+              This report was sent from Uslu360Digital for ${escapeHtml(company.name || 'this workspace')}.
+            </p>
+          </div>
+        </div>
+      </div>
+    </div>
+  `
+}
+
+async function sendReportEmail({ company, report, recipients, fromEmail }) {
+  if (!GMAIL_USER || !GMAIL_APP_PASSWORD) {
+    throw new Error('Gmail sending is not configured. Add GMAIL_USER and GMAIL_APP_PASSWORD in Vercel Environment Variables.')
+  }
+
+  const sender = fromEmail || GMAIL_USER
+  if (sender.toLowerCase() !== GMAIL_USER.toLowerCase()) {
+    throw new Error(`Sender must match configured Gmail account: ${GMAIL_USER}`)
+  }
+
+  const transporter = nodemailer.createTransport({
+    service: 'gmail',
+    auth: {
+      user: GMAIL_USER,
+      pass: GMAIL_APP_PASSWORD,
+    },
+  })
+
+  return transporter.sendMail({
+    from: `"Uslu360Digital Reports" <${GMAIL_USER}>`,
+    to: recipients,
+    subject: `${company.name || 'Company'} ${report.month || 'Monthly'} Report`,
+    html: reportEmailHtml({ company, report }),
+    text: `${company.name || 'Company'} ${report.month || 'Monthly'} Report\n\nAI Replies: ${report.totalReplies || 0}\nWhatsApp Clicks: ${report.waClicks || 0}\n\n${report.summary || ''}`,
+  })
 }
 
 async function readFormBody(req) {
@@ -2409,6 +2498,40 @@ export async function appHandler(req, res) {
       }, { force: true })
       if (result.error) return json(res, result.status === 'needs_openai_key' ? 400 : 502, { error: result.error, status: result.status })
       return json(res, 200, { reply: result.reply, model: result.model || OPENAI_MODEL })
+    }
+
+    const sendReportParams = routeParams(url.pathname, '/api/companies/:companyId/send-report')
+    if (req.method === 'POST' && sendReportParams) {
+      const body = await readBody(req)
+      const company = store.companies[sendReportParams.companyId]
+      if (!company) return json(res, 404, { error: 'Company not found.' })
+
+      const { recipients, invalid } = parseReportRecipients(body.toEmails || body.toEmail)
+      if (!recipients.length) return json(res, 400, { error: 'Add at least one recipient email.' })
+      if (recipients.length > 3) return json(res, 400, { error: 'You can send a report to maximum 3 email addresses.' })
+      if (invalid.length) return json(res, 400, { error: `Invalid recipient email: ${invalid[0]}` })
+
+      const fromEmail = String(body.fromEmail || GMAIL_USER || '').trim().toLowerCase()
+      if (!fromEmail || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(fromEmail)) {
+        return json(res, 400, { error: 'Add a valid sender email.' })
+      }
+
+      const report = {
+        id: body.reportId || `manual-${Date.now()}`,
+        month: body.month,
+        summary: body.summary,
+        bestPost: body.bestPost,
+        totalReplies: body.totalReplies,
+        waClicks: body.waClicks,
+      }
+
+      const info = await sendReportEmail({ company, report, recipients, fromEmail })
+      return json(res, 200, {
+        ok: true,
+        recipients,
+        fromEmail,
+        messageId: info.messageId || '',
+      })
     }
 
     const inboxReplyParams = routeParams(url.pathname, '/api/companies/:companyId/inbox/:itemId/reply')
