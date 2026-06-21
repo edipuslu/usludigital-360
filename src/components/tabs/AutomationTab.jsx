@@ -1,6 +1,6 @@
 import { useState } from 'react'
-import { Save, Plus, X, Zap, MessageSquare, Link2, Volume2, ShieldOff, Clock } from 'lucide-react'
-import { PlatformIcon, Toggle, SectionHeader, UsluLoader } from '../ui/UIKit'
+import { Save, Plus, X, Zap, MessageSquare, Link2, Volume2, ShieldOff, Clock, CheckCircle2 } from 'lucide-react'
+import { PlatformIcon, Toggle, UsluLoader } from '../ui/UIKit'
 import { saveBackendAiConfig } from '../../lib/backendApi'
 import clsx from 'clsx'
 
@@ -37,93 +37,109 @@ function PlatformAutomation({ platform, settings, onChange }) {
   }
 
   return (
-    <div className="card p-6 space-y-5">
-      <div className="flex items-center gap-3 pb-3 border-b border-slate-100">
-        <div className="w-9 h-9 rounded-lg bg-slate-50 border border-slate-100 flex items-center justify-center">
-          <PlatformIcon platform={platform} size={18} connected={true} />
+    <div className="overflow-hidden rounded-xl border border-slate-200 bg-white">
+      <div className="flex items-center justify-between gap-4 border-b border-slate-200 px-6 py-5">
+        <div className="flex items-center gap-3">
+          <div className="flex h-10 w-10 items-center justify-center rounded-lg border border-slate-200 bg-slate-50">
+            <PlatformIcon platform={platform} size={19} connected={true} />
+          </div>
+          <div>
+            <div className="text-lg font-extrabold text-slate-950">{PLATFORM_LABELS[platform]}</div>
+            <div className="text-sm text-slate-500">Reply controls, tone, and blocked words.</div>
+          </div>
         </div>
-        <div>
-          <div className="text-slate-900 font-bold text-sm">{PLATFORM_LABELS[platform]}</div>
-          <div className="text-slate-400 text-xs">Automation settings</div>
-        </div>
-      </div>
-
-      {/* Toggles */}
-      <div className="space-y-4">
-        <div className="flex items-center gap-2 mb-1">
-          <MessageSquare size={13} className="text-slate-400" />
-          <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Auto-Reply</span>
-        </div>
-        {!isYoutube && (
-          <Toggle
-            checked={settings.dmReply}
-            onChange={v => onChange({ ...settings, dmReply: v })}
-            label="DM Auto-Reply"
-            description="AI automatically replies to direct messages"
-          />
-        )}
-        <Toggle
-          checked={settings.commentReply}
-          onChange={v => onChange({ ...settings, commentReply: v })}
-          label="Comment Auto-Reply"
-          description={isYoutube ? 'AI replies to video comments' : 'AI replies to post comments publicly'}
-        />
-      </div>
-
-      {/* Tone */}
-      <div className="border-t border-slate-100 pt-4">
-        <div className="flex items-center gap-2 mb-3">
-          <Volume2 size={13} className="text-slate-400" />
-          <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Reply Tone</span>
-        </div>
-        <div className="grid grid-cols-2 gap-2">
-          {TONES.map(tone => (
-            <button
-              key={tone}
-              onClick={() => onChange({ ...settings, tone })}
-              className={clsx(
-                'py-2 px-3 rounded-lg text-sm font-medium cursor-pointer transition-all border capitalize',
-                settings.tone === tone
-                  ? 'bg-blue-600 text-white border-blue-600 shadow-sm'
-                  : 'bg-slate-50 text-slate-600 border-slate-200 hover:border-slate-300 hover:bg-slate-100'
-              )}
-            >
-              {tone}
-            </button>
-          ))}
+        <div className="hidden rounded-full bg-slate-100 px-3 py-1 text-xs font-bold text-slate-500 sm:block">
+          {settings.dmReply || settings.commentReply ? 'Enabled' : 'Paused'}
         </div>
       </div>
 
-      {/* Blacklist */}
-      <div className="border-t border-slate-100 pt-4">
-        <div className="flex items-center gap-2 mb-3">
-          <ShieldOff size={13} className="text-slate-400" />
-          <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Blacklist Words</span>
+      <div className="divide-y divide-slate-200">
+        <div className="grid grid-cols-1 gap-6 px-6 py-5 lg:grid-cols-[220px_1fr]">
+          <div>
+            <div className="flex items-center gap-2 text-sm font-extrabold text-slate-950">
+              <MessageSquare size={15} className="text-blue-600" />
+              Auto-reply
+            </div>
+            <p className="mt-1 text-xs leading-relaxed text-slate-500">Choose where AI can answer for this channel.</p>
+          </div>
+          <div className="space-y-4">
+            {!isYoutube && (
+              <Toggle
+                checked={settings.dmReply}
+                onChange={v => onChange({ ...settings, dmReply: v })}
+                label="DM Auto-Reply"
+                description="AI automatically replies to direct messages"
+              />
+            )}
+            <Toggle
+              checked={settings.commentReply}
+              onChange={v => onChange({ ...settings, commentReply: v })}
+              label="Comment Auto-Reply"
+              description={isYoutube ? 'AI replies to video comments' : 'AI replies to post comments publicly'}
+            />
+          </div>
         </div>
-        <p className="text-slate-400 text-xs mb-3">AI won't reply if a comment contains these words</p>
-        {settings.blacklist.length > 0 && (
-          <div className="flex flex-wrap gap-1.5 mb-3">
-            {settings.blacklist.map(word => (
-              <span key={word} className="flex items-center gap-1 bg-red-50 border border-red-200 text-red-700 text-xs px-2 py-1 rounded-full font-medium">
-                {word}
-                <button onClick={() => removeBlacklist(word)} className="cursor-pointer hover:text-red-900">
-                  <X size={10} />
-                </button>
-              </span>
+
+        <div className="grid grid-cols-1 gap-6 px-6 py-5 lg:grid-cols-[220px_1fr]">
+          <div>
+            <div className="flex items-center gap-2 text-sm font-extrabold text-slate-950">
+              <Volume2 size={15} className="text-blue-600" />
+              Reply tone
+            </div>
+            <p className="mt-1 text-xs leading-relaxed text-slate-500">Set the voice customers will receive.</p>
+          </div>
+          <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+            {TONES.map(tone => (
+              <button
+                key={tone}
+                onClick={() => onChange({ ...settings, tone })}
+                className={clsx(
+                  'h-10 rounded-lg border px-3 text-sm font-bold capitalize cursor-pointer transition-colors',
+                  settings.tone === tone
+                    ? 'border-blue-600 bg-blue-600 text-white'
+                    : 'border-slate-200 bg-white text-slate-600 hover:border-blue-200 hover:bg-blue-50'
+                )}
+              >
+                {tone}
+              </button>
             ))}
           </div>
-        )}
-        <div className="flex gap-2">
-          <input
-            value={newBlack}
-            onChange={e => setNewBlack(e.target.value)}
-            onKeyDown={e => e.key === 'Enter' && addBlacklist()}
-            placeholder="Add word…"
-            className="input-field text-xs flex-1"
-          />
-          <button onClick={addBlacklist} className="btn-secondary text-xs py-2">
-            <Plus size={12} /> Add
-          </button>
+        </div>
+
+        <div className="grid grid-cols-1 gap-6 px-6 py-5 lg:grid-cols-[220px_1fr]">
+          <div>
+            <div className="flex items-center gap-2 text-sm font-extrabold text-slate-950">
+              <ShieldOff size={15} className="text-blue-600" />
+              Blocked words
+            </div>
+            <p className="mt-1 text-xs leading-relaxed text-slate-500">AI will not reply when these words appear.</p>
+          </div>
+          <div>
+            {settings.blacklist.length > 0 && (
+              <div className="mb-3 flex flex-wrap gap-1.5">
+                {settings.blacklist.map(word => (
+                  <span key={word} className="flex items-center gap-1 rounded-full border border-red-200 bg-red-50 px-2.5 py-1 text-xs font-bold text-red-700">
+                    {word}
+                    <button type="button" onClick={() => removeBlacklist(word)} className="cursor-pointer hover:text-red-900" aria-label={`Remove ${word}`}>
+                      <X size={10} />
+                    </button>
+                  </span>
+                ))}
+              </div>
+            )}
+            <div className="flex gap-2">
+              <input
+                value={newBlack}
+                onChange={e => setNewBlack(e.target.value)}
+                onKeyDown={e => e.key === 'Enter' && addBlacklist()}
+                placeholder="Add word"
+                className="input-field text-xs flex-1"
+              />
+              <button onClick={addBlacklist} className="btn-secondary text-xs py-2">
+                <Plus size={12} /> Add
+              </button>
+            </div>
+          </div>
         </div>
       </div>
     </div>
@@ -181,22 +197,52 @@ export default function AutomationTab({ company, onUpdate, onNotify }) {
 
   return (
     <div className="space-y-6 animate-slide-in">
-      <SectionHeader
-        title="Automation Settings"
-        description="Control how AI behaves across each platform — reply types, tone and restrictions"
-        action={
-          <button onClick={handleSave} className="btn-primary">
-            {saved ? <><UsluLoader size="xs" />Saving...</> : <><Save size={14} />Save Changes</>}
-          </button>
-        }
-      />
+      <div className="flex flex-col gap-5 rounded-xl border border-slate-200 bg-white p-6 lg:flex-row lg:items-center lg:justify-between">
+        <div className="flex items-start gap-4">
+          <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-slate-950 text-white">
+            <Zap size={22} fill="white" />
+          </div>
+          <div>
+            <h1 className="text-3xl font-extrabold tracking-tight text-slate-950">Automation</h1>
+            <p className="mt-1 max-w-2xl text-sm font-medium text-slate-500">
+              Control when AI replies, what goal it follows, and how each platform behaves.
+            </p>
+          </div>
+        </div>
+        <button onClick={handleSave} className="btn-primary h-11 justify-center">
+          {saved ? <><UsluLoader size="xs" />Saving...</> : <><Save size={14} />Save Changes</>}
+        </button>
+      </div>
+
+      <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
+        {[
+          ['Schedule', settings.schedule?.enabled !== false ? 'Active' : 'Paused', Clock],
+          ['Goal', GOALS.find(g => g.value === goal)?.label || 'Custom', Zap],
+          ['Channels', `${PLATFORMS.filter(p => settings[p]?.dmReply || settings[p]?.commentReply).length}/${PLATFORMS.length} enabled`, CheckCircle2],
+        ].map(([label, value, Icon]) => (
+          <div key={label} className="rounded-xl border border-slate-200 bg-white p-4">
+            <div className="flex items-center justify-between gap-3">
+              <div>
+                <div className="text-xs font-bold uppercase text-slate-400">{label}</div>
+                <div className="mt-1 text-lg font-extrabold text-slate-950">{value}</div>
+              </div>
+              <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-blue-50 text-blue-600">
+                <Icon size={18} />
+              </div>
+            </div>
+          </div>
+        ))}
+      </div>
 
       {/* Activation schedule */}
-      <div className="card p-5">
-        <div className="flex items-center justify-between gap-3 mb-4">
-          <div className="flex items-center gap-2">
-            <Clock size={16} className="text-blue-600" />
-            <h3 className="text-slate-900 font-bold text-base">AI Activation Time</h3>
+      <div className="overflow-hidden rounded-xl border border-slate-200 bg-white">
+        <div className="flex items-center justify-between gap-3 border-b border-slate-200 px-6 py-5">
+          <div>
+            <div className="flex items-center gap-2">
+              <Clock size={16} className="text-blue-600" />
+              <h3 className="text-lg font-extrabold text-slate-950">AI Activation Time</h3>
+            </div>
+            <p className="mt-1 text-sm text-slate-500">Times are controlled in Morocco time. Leave stop time empty to keep AI running nonstop.</p>
           </div>
           <Toggle
             checked={settings.schedule?.enabled !== false}
@@ -205,10 +251,7 @@ export default function AutomationTab({ company, onUpdate, onNotify }) {
             description=""
           />
         </div>
-        <p className="text-slate-500 text-sm mb-4">
-          Times are controlled in Morocco time. Leave stop time empty to keep AI running nonstop.
-        </p>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 gap-4 p-6 md:grid-cols-2">
           <div>
             <label className="block text-sm font-semibold text-slate-700 mb-1.5">Start replying from</label>
             <input
@@ -237,12 +280,15 @@ export default function AutomationTab({ company, onUpdate, onNotify }) {
       </div>
 
       {/* Business Goal */}
-      <div className="card p-5">
-        <div className="flex items-center gap-2 mb-4">
-          <Zap size={16} className="text-blue-600" />
-          <h3 className="text-slate-900 font-bold text-base">Business Goal</h3>
+      <div className="overflow-hidden rounded-xl border border-slate-200 bg-white">
+        <div className="border-b border-slate-200 px-6 py-5">
+          <div className="flex items-center gap-2">
+            <Zap size={16} className="text-blue-600" />
+            <h3 className="text-lg font-extrabold text-slate-950">Business Goal</h3>
+          </div>
+          <p className="mt-1 text-sm text-slate-500">Choose what the automation should optimize for.</p>
         </div>
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-4">
+        <div className="grid grid-cols-1 gap-3 p-6 sm:grid-cols-2">
           {GOALS.map(g => (
             <button
               key={g.value}
@@ -265,7 +311,7 @@ export default function AutomationTab({ company, onUpdate, onNotify }) {
           ))}
         </div>
         {goal === 'push_to_whatsapp' && (
-          <div>
+          <div className="border-t border-slate-200 px-6 py-5">
             <label className="block text-sm font-semibold text-slate-700 mb-1.5">
               <Link2 size={13} className="inline mr-1.5 text-slate-400" />
               WhatsApp Redirect Link
@@ -282,30 +328,41 @@ export default function AutomationTab({ company, onUpdate, onNotify }) {
       </div>
 
       {/* Platform tabs */}
-      <div>
-        <div className="flex gap-2 mb-4 overflow-x-auto pb-1">
-          {PLATFORMS.map(p => (
-            <button
-              key={p}
-              onClick={() => setActiveP(p)}
-              className={clsx(
-                'flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold cursor-pointer transition-all flex-shrink-0',
-                activeP === p
-                  ? 'bg-slate-900 text-white shadow-sm'
-                  : 'bg-white border border-slate-200 text-slate-600 hover:border-slate-300 hover:bg-slate-50'
-              )}
-            >
-              <PlatformIcon platform={p} size={14} connected={company.platforms[p]?.connected} />
-              {PLATFORM_LABELS[p]}
-            </button>
-          ))}
+      <div className="grid grid-cols-1 gap-5 lg:grid-cols-[260px_1fr]">
+        <aside className="rounded-xl border border-slate-200 bg-white p-3">
+          <div className="px-3 py-2 text-xs font-bold uppercase text-slate-400">Channels</div>
+          <div className="space-y-1">
+            {PLATFORMS.map(p => {
+              const enabled = settings[p]?.dmReply || settings[p]?.commentReply
+              return (
+                <button
+                  key={p}
+                  onClick={() => setActiveP(p)}
+                  className={clsx(
+                    'flex w-full items-center justify-between gap-3 rounded-lg px-3 py-3 text-left text-sm font-bold cursor-pointer transition-colors',
+                    activeP === p
+                      ? 'bg-slate-950 text-white'
+                      : 'text-slate-600 hover:bg-slate-50 hover:text-slate-950'
+                  )}
+                >
+                  <span className="flex min-w-0 items-center gap-2">
+                    <PlatformIcon platform={p} size={16} connected={company.platforms[p]?.connected} />
+                    <span className="truncate">{PLATFORM_LABELS[p]}</span>
+                  </span>
+                  <span className={clsx('h-2 w-2 rounded-full', enabled ? 'bg-emerald-500' : 'bg-slate-300')} />
+                </button>
+              )
+            })}
+          </div>
+        </aside>
+        <div className="min-w-0">
+          <PlatformAutomation
+            key={activeP}
+            platform={activeP}
+            settings={settings[activeP] || DEFAULT_AUTOMATION[activeP]}
+            onChange={s => setSettings(prev => ({ ...prev, [activeP]: s }))}
+          />
         </div>
-        <PlatformAutomation
-          key={activeP}
-          platform={activeP}
-          settings={settings[activeP] || DEFAULT_AUTOMATION[activeP]}
-          onChange={s => setSettings(prev => ({ ...prev, [activeP]: s }))}
-        />
       </div>
     </div>
   )

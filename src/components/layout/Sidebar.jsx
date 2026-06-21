@@ -32,7 +32,7 @@ function IconButton({ icon: Icon, label, active, badge, onClick }) {
     <button
       type="button"
       onClick={onClick}
-      title={label}
+      aria-label={label}
       className={clsx(
         'relative h-11 w-11 rounded-lg flex items-center justify-center cursor-pointer transition-colors',
         active ? 'bg-slate-200 text-slate-950' : 'text-slate-500 hover:bg-slate-100 hover:text-slate-900'
@@ -105,7 +105,7 @@ export default function Sidebar({
           <button
             type="button"
             onClick={handleLogout}
-            title="Sign out"
+            aria-label="Sign out"
             className="mt-2 h-11 w-11 rounded-lg flex items-center justify-center text-slate-400 hover:bg-red-50 hover:text-red-500 cursor-pointer transition-colors"
           >
             <LogOut size={20} />
