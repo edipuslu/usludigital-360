@@ -52,17 +52,17 @@ export default function LoginPage() {
     <div className="h-screen flex overflow-hidden" style={{ background: '#060912' }}>
       {/* Left panel */}
       <div className="hidden lg:flex w-[52%] h-screen items-center justify-center overflow-hidden">
-        <img src="/images/IMAGE_homepage.png" alt="Usludigital 360 Dashboard" className="w-full h-full object-contain" />
+        <img src="/images/IMAGE_homepage.png" alt="Uslu360Digital Dashboard" className="w-full h-full object-contain" />
       </div>
 
       {/* Right panel */}
       <div className="flex-1 flex items-center justify-center p-6 lg:p-8 overflow-hidden" style={{ background: '#F8FAFC' }}>
         <div className="w-full max-w-md">
           <div className="lg:hidden flex items-center gap-3 mb-8">
-            <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-blue-500 to-blue-700 flex items-center justify-center">
+            <div className="w-9 h-9 rounded-xl bg-slate-950 flex items-center justify-center">
               <Zap size={18} className="text-white" fill="white" />
             </div>
-            <div className="text-slate-900 font-bold text-lg">Usludigital <span className="text-blue-600">360</span></div>
+            <div className="text-slate-900 font-bold text-lg">Uslu360Digital</div>
           </div>
 
           <div className="mb-8">
