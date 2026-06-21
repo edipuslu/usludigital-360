@@ -5,8 +5,6 @@ import { useAuth } from '../context/AuthContext'
 import { deleteBackendCompany, getCompanies, saveBackendCompany, updateBackendCompany } from '../lib/backendApi'
 import clsx from 'clsx'
 
-const STORAGE_KEY = 'ud360_companies_v2'
-
 const emptyDaily = Array.from({ length: 30 }, (_, i) => ({ day: i + 1, date: `Jun ${i + 1}`, clicks: 0, replies: 0 }))
 const emptyHeatmap = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'].map(day => ({
   day,
@@ -198,20 +196,6 @@ function BranchModal({ company, onClose, onSave }) {
   )
 }
 
-export function loadCompanies() {
-  try {
-    const stored = localStorage.getItem(STORAGE_KEY)
-    const parsed = stored ? JSON.parse(stored) : []
-    return Array.isArray(parsed) ? parsed.map(normalizeCompany) : []
-  } catch {
-    return []
-  }
-}
-
-export function saveCompanies(companies) {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify((companies || []).map(normalizeCompany)))
-}
-
 export function normalizeCompany(company) {
   if (!company) return company
   return {
@@ -337,7 +321,7 @@ function DeleteModal({ company, onClose, onDelete }) {
 export default function AdminDashboard() {
   const navigate = useNavigate()
   const { user, logout } = useAuth()
-  const [companies, setCompanies] = useState(loadCompanies)
+  const [companies, setCompanies] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [showCreate, setShowCreate] = useState(false)
@@ -350,12 +334,7 @@ export default function AdminDashboard() {
       .then(data => {
         if (!alive) return
         const backendCompanies = Array.isArray(data.companies) ? data.companies.map(normalizeCompany) : []
-        if (backendCompanies.length > 0 || loadCompanies().length === 0) {
-          setCompanies(backendCompanies)
-          saveCompanies(backendCompanies)
-          setError('')
-          return
-        }
+        setCompanies(backendCompanies)
         setError('')
       })
       .catch(err => {
@@ -375,7 +354,6 @@ export default function AdminDashboard() {
 
   const persist = next => {
     setCompanies(next)
-    saveCompanies(next)
   }
 
   const create = async payload => {

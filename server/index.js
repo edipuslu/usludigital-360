@@ -1868,7 +1868,12 @@ export async function appHandler(req, res) {
     const store = await loadStore()
 
     if (req.method === 'GET' && url.pathname === '/health') {
-      return json(res, 200, { ok: true, service: 'usludigital-360-api' })
+      return json(res, 200, {
+        ok: true,
+        service: 'usludigital-360-api',
+        storage: SUPABASE_URL && SUPABASE_KEY ? 'supabase' : 'temporary',
+        companies: Object.keys(store.companies || {}).length,
+      })
     }
 
     const oauthAuthorize = url.pathname.match(/^\/(?:api\/)?oauth\/([^/]+)\/authorize$/)

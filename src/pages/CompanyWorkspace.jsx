@@ -4,7 +4,7 @@ import { Bell, Settings, CheckCircle2, Mail, Save, Trash2, AlertCircle, GitBranc
 import Sidebar from '../components/layout/Sidebar'
 import { PlatformIcon } from '../components/ui/UIKit'
 import { useAuth } from '../context/AuthContext'
-import { loadCompanies, normalizeCompany, saveCompanies } from './AdminDashboard'
+import { normalizeCompany } from './AdminDashboard'
 import { getCompanies, updateBackendCompany } from '../lib/backendApi'
 import OverviewTab from '../components/tabs/OverviewTab'
 import PlatformsTab from '../components/tabs/PlatformsTab'
@@ -280,9 +280,7 @@ export default function CompanyWorkspace() {
   const navigate = useNavigate()
   const { user, isAdmin } = useAuth()
   const [activeTab, setActiveTab] = useState('overview')
-  const [workspaces, setWorkspaces] = useState(() => {
-    return loadCompanies()
-  })
+  const [workspaces, setWorkspaces] = useState([])
   const [loading, setLoading] = useState(true)
   const [syncError, setSyncError] = useState('')
   const [activeBranchId, setActiveBranchId] = useState('all')
@@ -293,12 +291,7 @@ export default function CompanyWorkspace() {
       .then(data => {
         if (!alive) return
         const backendCompanies = Array.isArray(data.companies) ? data.companies.map(normalizeCompany) : []
-        if (backendCompanies.length > 0 || loadCompanies().length === 0) {
-          setWorkspaces(backendCompanies)
-          saveCompanies(backendCompanies)
-          setSyncError('')
-          return
-        }
+        setWorkspaces(backendCompanies)
         setSyncError('')
       })
       .catch(err => {
@@ -326,7 +319,6 @@ export default function CompanyWorkspace() {
       const current = prev.find(c => c.id === company.id) || prev[0]
       const nextCompany = typeof updater === 'function' ? updater(current) : { ...current, ...updater }
       const next = prev.map(c => c.id === current.id ? nextCompany : c)
-      saveCompanies(next)
       updateBackendCompany(nextCompany)
         .then(() => setSyncError(''))
         .catch(err => setSyncError(err.message || 'Saved locally, but backend sync failed.'))
