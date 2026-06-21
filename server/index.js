@@ -257,10 +257,12 @@ async function loadStore() {
     }
 
     const companyConfigs = await loadCompanyConfigsFromSupabase(base, headers)
+    const branchesByCompany = await loadBranchesFromSupabase(base, headers)
     const companies = Array.isArray(companyRows) && companyRows.length > 0
       ? Object.fromEntries(companyRows.map(row => {
         const defaults = companyDefaults(row)
         const config = companyConfigs[row.id] || {}
+        const tableBranches = branchesByCompany[row.id] || []
         return [row.id, {
           ...defaults,
           openaiKey: config.openaiKey || defaults.openaiKey || '',
@@ -273,12 +275,13 @@ async function loadStore() {
             schedule: { ...defaults.automation.schedule, ...(config.automation?.schedule || {}) },
           },
           settings: { ...defaults.settings, ...(config.settings || {}) },
-          branches: row.branches || config.branches || defaults.branches,
+          branches: tableBranches.length ? tableBranches : row.branches || config.branches || defaults.branches,
           updatedAt: config.updatedAt || defaults.updatedAt,
         }]
       }))
       : Object.fromEntries(Object.entries(storedData?.companies || {}).map(([id, company]) => {
         const defaults = companyDefaults({ id, name: company?.name || 'Company' })
+        const tableBranches = branchesByCompany[id] || []
         return [id, {
           ...defaults,
           ...company,
@@ -290,7 +293,7 @@ async function loadStore() {
             schedule: { ...defaults.automation.schedule, ...(company?.automation?.schedule || {}) },
           },
           settings: { ...defaults.settings, ...(company?.settings || {}) },
-          branches: company?.branches || defaults.branches,
+          branches: tableBranches.length ? tableBranches : company?.branches || defaults.branches,
         }]
       }))
     const connections = {}
@@ -342,7 +345,7 @@ async function loadStore() {
   }
 }
 
-async function saveStore(store) {
+async function saveStore(store, options = {}) {
   if (SUPABASE_URL && SUPABASE_KEY) {
     const base = SUPABASE_URL.replace(/\/$/, '')
     const headers = {
@@ -350,6 +353,7 @@ async function saveStore(store) {
       Authorization: `Bearer ${SUPABASE_KEY}`,
       'Content-Type': 'application/json',
     }
+    const companies = Object.values(store.companies || {})
     const storeUrl = `${base}/rest/v1/${SUPABASE_STORE_TABLE}`
     const response = await fetch(storeUrl, {
       method: 'POST',
@@ -364,6 +368,7 @@ async function saveStore(store) {
       }),
     })
     if (response.ok) {
+      await saveBranchesToSupabase(base, headers, companies, options)
       return
     }
 
@@ -372,7 +377,6 @@ async function saveStore(store) {
       throw new Error(error?.message || `Supabase save failed with HTTP ${response.status}`)
     }
 
-    const companies = Object.values(store.companies || {})
     if (!companies.length) return
 
     const upsertResponse = await fetch(`${base}/rest/v1/companies`, {
@@ -419,6 +423,7 @@ async function saveStore(store) {
     }
 
     await saveCompanyConfigsToSupabase(base, headers, companies)
+    await saveBranchesToSupabase(base, headers, companies, options)
     await saveInboxItemsToSupabase(base, headers, store.items || [])
     return
   }
@@ -573,6 +578,70 @@ async function loadCompanyConfigsFromSupabase(base, headers) {
     }
   }
   return configs
+}
+
+function normalizeBranchRow(row) {
+  return {
+    id: row.id,
+    name: row.name || row.branch_name || 'Branch',
+    location: row.location || row.address || row.city || '',
+    status: row.status || 'active',
+    phone: row.phone || row.phone_number || '',
+    email: row.email || '',
+    createdAt: row.created_at || row.createdAt || new Date().toISOString(),
+    updatedAt: row.updated_at || row.updatedAt || row.created_at || row.createdAt || new Date().toISOString(),
+  }
+}
+
+async function loadBranchesFromSupabase(base, headers) {
+  const response = await fetch(`${base}/rest/v1/branches?select=*&order=created_at.desc`, { headers })
+  const rows = await response.json().catch(() => [])
+  if (!response.ok || !Array.isArray(rows)) return {}
+
+  return rows.reduce((groups, row) => {
+    if (!row.company_id || !row.id) return groups
+    groups[row.company_id] ||= []
+    groups[row.company_id].push(normalizeBranchRow(row))
+    return groups
+  }, {})
+}
+
+async function saveBranchesToSupabase(base, headers, companies = [], options = {}) {
+  const replaceCompanyIds = new Set(options.replaceBranchCompanyIds || [])
+  const branchCompanies = companies.filter(company => company?.id)
+  for (const company of branchCompanies) {
+    const branches = Array.isArray(company.branches) ? company.branches : []
+    if (!branches.length && !replaceCompanyIds.has(company.id)) continue
+
+    const deleteResponse = await fetch(`${base}/rest/v1/branches?company_id=eq.${encodeURIComponent(company.id)}`, {
+      method: 'DELETE',
+      headers,
+    })
+    if (!deleteResponse.ok && deleteResponse.status !== 404) continue
+
+    if (!branches.length) continue
+
+    const insertResponse = await fetch(`${base}/rest/v1/branches`, {
+      method: 'POST',
+      headers: {
+        ...headers,
+        Prefer: 'resolution=merge-duplicates',
+      },
+      body: JSON.stringify(branches.map(branch => ({
+        id: branch.id,
+        company_id: company.id,
+        name: branch.name || 'Branch',
+        location: branch.location || '',
+        status: branch.status || 'active',
+        created_at: branch.createdAt || new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      }))),
+    })
+    if (!insertResponse.ok && insertResponse.status !== 404) {
+      const error = await insertResponse.json().catch(() => ({}))
+      throw new Error(error?.message || `Supabase branches save failed with HTTP ${insertResponse.status}`)
+    }
+  }
 }
 
 async function saveCompanyConfigsToSupabase(base, headers, companies = []) {
@@ -2137,7 +2206,7 @@ export async function appHandler(req, res) {
         id: companyParams.companyId,
         updatedAt: new Date().toISOString(),
       }
-      await saveStore(store)
+      await saveStore(store, allowBranchUpdate ? { replaceBranchCompanyIds: [companyParams.companyId] } : {})
       return json(res, 200, { ok: true, company: store.companies[companyParams.companyId] })
     }
 
