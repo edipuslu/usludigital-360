@@ -418,7 +418,6 @@ export default function CompanyWorkspace() {
     <div className="flex min-h-screen bg-slate-50">
       <Sidebar
         companyId={company.id}
-        companyName={company.name}
         currentSection={activeTab}
         onNavigate={setActiveTab}
         notificationCount={(company.notifications || []).filter(n => !n.read).length}

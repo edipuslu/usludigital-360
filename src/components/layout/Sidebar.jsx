@@ -22,14 +22,6 @@ const ACCOUNT_NAV = [
   { icon: Settings, label: 'Settings', key: 'settings' },
 ]
 
-const INBOX_NAV = [
-  { label: 'All chats', key: 'inbox' },
-  { label: 'Instagram Inbox', key: 'inbox-instagram' },
-  { label: 'Facebook Inbox', key: 'inbox-facebook' },
-  { label: 'YouTube Inbox', key: 'inbox-youtube' },
-  { label: 'WhatsApp Inbox', key: 'inbox-whatsapp' },
-]
-
 function isActive(currentSection, key) {
   if (key === 'inbox') return currentSection === 'inbox' || currentSection?.startsWith('inbox-')
   if (key === 'growth') return currentSection === 'growth' || currentSection?.startsWith('growth-')
@@ -73,16 +65,7 @@ function TextNavItem({ label, active, onClick, badge }) {
   )
 }
 
-function currentMainItem(currentSection, items) {
-  return items.find(item => isActive(currentSection, item.key)) || items[0]
-}
-
-function currentSidebarItem(currentSection, mainItems) {
-  return ACCOUNT_NAV.find(item => item.key === currentSection) || currentMainItem(currentSection, mainItems)
-}
-
 export default function Sidebar({
-  companyName,
   onNavigate,
   currentSection,
   notificationCount = 0,
@@ -94,8 +77,6 @@ export default function Sidebar({
   const navigate = useNavigate()
   const role = user?.email === 'admin@usludigital.com' ? 'admin' : 'client'
   const mainItems = MAIN_NAV.filter(item => item.roles.includes(role))
-  const selected = currentSidebarItem(currentSection, mainItems)
-  const showInboxMenu = selected?.key === 'inbox'
   const showBranchMenu = branches.length > 0
 
   const handleLogout = () => {
@@ -157,31 +138,9 @@ export default function Sidebar({
         </div>
       </div>
 
-      <div className="hidden w-[280px] flex-col bg-slate-50/70 px-6 py-7 lg:flex">
-        <div className={clsx('mb-6', !showInboxMenu && !showBranchMenu && 'mb-0')}>
-          <div className="truncate text-3xl font-extrabold tracking-tight text-slate-950">
-            {selected?.label || 'Dashboard'}
-          </div>
-          {companyName && (
-            <div className="mt-1 truncate text-xs font-semibold text-slate-400">{companyName}</div>
-          )}
-        </div>
-
-        {showInboxMenu && (
-          <div className="mb-7 space-y-1">
-            {INBOX_NAV.map(item => (
-              <TextNavItem
-                key={item.key}
-                label={item.label}
-                active={currentSection === item.key}
-                onClick={() => onNavigate?.(item.key)}
-              />
-            ))}
-          </div>
-        )}
-
-        {showBranchMenu && (
-          <div className="border-t border-slate-200 pt-5">
+      {showBranchMenu && (
+        <div className="hidden w-[280px] flex-col border-l border-slate-200 bg-slate-50/70 px-6 py-7 lg:flex">
+          <div>
             <div className="mb-3 flex items-center gap-2 px-1 text-xs font-bold uppercase tracking-wide text-slate-400">
               <GitBranch size={13} />
               Branches
@@ -212,8 +171,8 @@ export default function Sidebar({
               ))}
             </div>
           </div>
-        )}
-      </div>
+        </div>
+      )}
     </aside>
   )
 }
