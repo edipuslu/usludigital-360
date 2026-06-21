@@ -725,8 +725,7 @@ export default function InboxTab({ company, platform, isAdmin = true }) {
             </div>
           ) : (
             <div className="flex h-full min-h-[620px] flex-col items-center justify-center px-8 text-center">
-              <EmptyInboxArt />
-              <h2 className="mt-7 max-w-md text-xl font-bold text-slate-900">
+              <h2 className="max-w-md text-xl font-bold text-slate-900">
                 {messages.length === 0 ? 'Send a message to your bot to try Inbox' : 'Select a conversation to view details'}
               </h2>
               <p className="mt-3 max-w-md text-sm leading-relaxed text-slate-500">
