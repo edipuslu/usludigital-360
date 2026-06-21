@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
-import { MessageCircle, Send, Search, Filter, Heart, MessageSquare, Calendar, User, ExternalLink, Loader, AlertTriangle, Calculator, RefreshCw, Plus } from 'lucide-react'
-import { PlatformIcon, SectionHeader } from '../ui/UIKit'
+import { MessageCircle, Send, Search, Filter, Heart, MessageSquare, Calendar, User, ExternalLink, Loader, AlertTriangle, Calculator, RefreshCw, Plus, Settings, Archive, Clock } from 'lucide-react'
+import { PlatformIcon } from '../ui/UIKit'
 import { estimateBackfillReplies, fetchInbox, replyToInboxItem, runBackfillReplies, createTestDM } from '../../lib/backendApi'
 import clsx from 'clsx'
 
@@ -153,6 +153,73 @@ function PlatformSection({ platform, messages, onReply, isDM = false, isAdmin = 
         </div>
       )}
     </div>
+  )
+}
+
+function EmptyInboxArt() {
+  return (
+    <div className="relative mx-auto h-60 w-64">
+      <div className="absolute left-10 top-16 h-28 w-24 bg-cyan-300" />
+      <div className="absolute left-10 top-16 grid h-28 w-24 grid-cols-2 grid-rows-3 overflow-hidden">
+        {Array.from({ length: 6 }).map((_, i) => (
+          <div key={i} className={i % 2 === 0 ? 'bg-cyan-300' : 'bg-pink-700'} />
+        ))}
+      </div>
+      <div className="absolute left-24 top-10 h-24 w-40 rounded-[48px] bg-pink-700" />
+      <div className="absolute left-28 top-24 h-24 w-36 rounded-[36px] bg-pink-700" />
+      <div className="absolute left-20 top-[120px] h-16 w-28 rounded-[40px] bg-fuchsia-500" />
+      <div className="absolute left-28 top-20 h-28 w-20 bg-white [clip-path:polygon(18%_0,80%_0,80%_100%,42%_88%,32%_56%,0_42%)]" />
+      <div className="absolute left-[120px] top-24 h-20 w-16 bg-cyan-300 [clip-path:polygon(0_0,100%_0,100%_100%,0_78%)]" />
+      <div className="absolute left-44 top-20 space-y-4">
+        <div className="h-4 w-24 bg-cyan-300" />
+        <div className="h-4 w-24 bg-cyan-300" />
+        <div className="h-4 w-24 bg-cyan-300" />
+      </div>
+    </div>
+  )
+}
+
+function ConversationListItem({ msg, active, selected, onClick, onToggleSelect }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={clsx(
+        'flex w-full gap-3 border-b border-slate-200 px-4 py-4 text-left transition-colors hover:bg-slate-50',
+        active && 'bg-slate-100'
+      )}
+    >
+      <input
+        type="checkbox"
+        checked={selected}
+        onChange={e => {
+          e.stopPropagation()
+          onToggleSelect?.()
+        }}
+        onClick={e => e.stopPropagation()}
+        className="mt-1 h-4 w-4 rounded border-slate-300"
+      />
+      <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full bg-slate-200">
+        <User size={17} className="text-slate-500" />
+      </div>
+      <div className="min-w-0 flex-1">
+        <div className="flex items-center justify-between gap-2">
+          <div className="truncate text-sm font-bold text-slate-900">{msg.authorName}</div>
+          <div className="flex flex-shrink-0 items-center gap-1 text-xs text-slate-400">
+            <PlatformIcon platform={msg.platform} size={12} connected={true} />
+            {msg.date}
+          </div>
+        </div>
+        <div className="mt-1 truncate text-sm text-slate-500">{msg.content || 'No message text'}</div>
+        <div className="mt-2 flex items-center gap-2">
+          <span className={clsx('rounded px-2 py-0.5 text-[10px] font-bold uppercase', msg.isDM ? 'bg-blue-50 text-blue-700' : 'bg-slate-100 text-slate-600')}>
+            {msg.isDM ? 'DM' : 'Comment'}
+          </span>
+          {msg.aiReplied && <span className="rounded bg-emerald-50 px-2 py-0.5 text-[10px] font-bold uppercase text-emerald-700">AI replied</span>}
+          {msg.status === 'reply_failed' && <span className="rounded bg-red-50 px-2 py-0.5 text-[10px] font-bold uppercase text-red-700">Failed</span>}
+        </div>
+      </div>
+    </button>
   )
 }
 
@@ -336,7 +403,6 @@ function BackfillPanel({ company, platform, onCompleted }) {
 }
 
 export default function InboxTab({ company, platform, isAdmin = true }) {
-  const [activeSection, setActiveSection] = useState('comments')
   const [messages, setMessages] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
@@ -345,6 +411,15 @@ export default function InboxTab({ company, platform, isAdmin = true }) {
   const [syncWarnings, setSyncWarnings] = useState([])
   const [syncing, setSyncing] = useState(false)
   const [lastUpdated, setLastUpdated] = useState(null)
+  const [search, setSearch] = useState('')
+  const [statusFilter, setStatusFilter] = useState('open')
+  const [onlyUnread, setOnlyUnread] = useState(false)
+  const [sortOrder, setSortOrder] = useState('newest')
+  const [channelFilter, setChannelFilter] = useState(platform || 'all')
+  const [labelFilter, setLabelFilter] = useState('all')
+  const [showFilters, setShowFilters] = useState(false)
+  const [selectedIds, setSelectedIds] = useState([])
+  const [selectedMessageId, setSelectedMessageId] = useState(null)
 
   useEffect(() => {
     let alive = true
@@ -427,111 +502,252 @@ export default function InboxTab({ company, platform, isAdmin = true }) {
     setMessages(msgs => msgs.map(msg => msg.id === msgId ? updated : msg))
   }
 
-  const platformsToShow = platform ? [platform] : PLATFORMS
-  const visibleMessages = useMemo(
-    () => platform ? messages.filter(message => message.platform === platform) : messages,
-    [messages, platform]
-  )
+  const visibleMessages = useMemo(() => {
+    const term = search.trim().toLowerCase()
+    return messages
+      .filter(message => !platform || message.platform === platform)
+      .filter(message => channelFilter === 'all' || message.platform === channelFilter)
+      .filter(message => {
+        if (statusFilter === 'all') return true
+        if (statusFilter === 'replied') return message.aiReplied
+        if (statusFilter === 'failed') return message.status === 'reply_failed'
+        return message.status !== 'closed'
+      })
+      .filter(message => !onlyUnread || !message.aiReplied)
+      .filter(message => labelFilter !== 'favorites' || message.likes > 0)
+      .filter(message => labelFilter !== 'reminders' || message.status === 'reply_failed')
+      .filter(message => !term || `${message.authorName} ${message.content} ${message.aiReply}`.toLowerCase().includes(term))
+      .sort((a, b) => {
+        const aTime = new Date(a.date).getTime() || 0
+        const bTime = new Date(b.date).getTime() || 0
+        return sortOrder === 'newest' ? bTime - aTime : aTime - bTime
+      })
+  }, [messages, platform, channelFilter, statusFilter, onlyUnread, labelFilter, search, sortOrder])
+
   const commentCount = visibleMessages.filter(m => !m.isDM).length
   const dmCount = visibleMessages.filter(m => m.isDM).length
-  const platformLabel = platform ? PLATFORM_LABELS[platform] : 'All Platforms'
+  const failedCount = messages.filter(m => m.status === 'reply_failed').length
+  const favoritesCount = messages.filter(m => m.likes > 0).length
+  const selectedMessage = visibleMessages.find(message => message.id === selectedMessageId) || null
+  const allVisibleSelected = visibleMessages.length > 0 && visibleMessages.every(message => selectedIds.includes(message.id))
+
+  useEffect(() => {
+    if (!visibleMessages.length) {
+      setSelectedMessageId(null)
+      return
+    }
+    if (!selectedMessageId || !visibleMessages.some(message => message.id === selectedMessageId)) {
+      setSelectedMessageId(visibleMessages[0].id)
+    }
+  }, [visibleMessages, selectedMessageId])
+
+  const toggleSelectAll = () => {
+    if (allVisibleSelected) {
+      setSelectedIds(ids => ids.filter(id => !visibleMessages.some(message => message.id === id)))
+      return
+    }
+    setSelectedIds(ids => Array.from(new Set([...ids, ...visibleMessages.map(message => message.id)])))
+  }
+
+  const toggleSelected = id => {
+    setSelectedIds(ids => ids.includes(id) ? ids.filter(existing => existing !== id) : [...ids, id])
+  }
+
+  const handleTestDM = async platformKey => {
+    setSyncing(true)
+    setError('')
+    try {
+      await createTestDM(company.id, platformKey)
+      await reloadInbox()
+    } catch (err) {
+      setError(err.message || 'Could not create test DM.')
+    } finally {
+      setSyncing(false)
+    }
+  }
 
   return (
-    <div className="space-y-6 animate-slide-in">
-      {!loading && !platform && <OverviewPanel messages={messages} company={company} onRefresh={reloadInbox} />}
-
-      {!loading && isAdmin && (
-        <div className="flex items-center justify-between gap-3 rounded-lg border border-slate-200 bg-white px-4 py-3">
-          <div>
-            <div className="text-slate-900 text-sm font-bold">Inbox updates in the background</div>
-            <div className="text-slate-500 text-xs mt-0.5">
-              Cached messages load instantly. New webhook messages appear automatically; Instagram DMs can auto-reply in Development Mode for accepted Meta test users.
-              {lastUpdated && ` Last updated ${lastUpdated.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}.`}
-            </div>
-          </div>
-          <button onClick={syncLiveMessages} disabled={syncing} className="btn-secondary justify-center flex-shrink-0">
-            {syncing ? <Loader size={14} className="animate-spin" /> : <RefreshCw size={14} />} Sync now
-          </button>
+    <div className="animate-slide-in">
+      <div className="-mx-8 -mt-8 grid grid-cols-1 items-center gap-4 border-b border-slate-200 bg-slate-50 px-8 py-5 lg:grid-cols-[260px_1fr_auto]">
+        <h1 className="text-3xl font-extrabold tracking-tight text-slate-950">Inbox</h1>
+        <div className="relative mx-auto w-full max-w-xl">
+          <Search size={19} className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" />
+          <input
+            value={search}
+            onChange={e => setSearch(e.target.value)}
+            className="h-12 w-full rounded-lg border border-slate-200 bg-white pl-12 pr-4 text-base outline-none focus:border-blue-300 focus:ring-2 focus:ring-blue-100"
+            placeholder="Search through Inbox conversations"
+          />
         </div>
-      )}
+        <button
+          type="button"
+          onClick={() => setShowFilters(value => !value)}
+          className="flex h-12 w-12 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-700 hover:bg-slate-100"
+          title="Inbox settings"
+        >
+          <Settings size={22} />
+        </button>
+      </div>
 
-      {!loading && isAdmin && (
-        <BackfillPanel company={company} platform={platform} onCompleted={reloadInbox} />
-      )}
-
-      {!loading && !platform && syncedCount > 0 && (
-        <div className="rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-medium text-emerald-700">
-          Synced {syncedCount} new message{syncedCount === 1 ? '' : 's'} from connected accounts.
-          {autoRepliedCount > 0 && ` AI replied to ${autoRepliedCount}.`}
-        </div>
-      )}
-      {!loading && !platform && syncWarnings.length > 0 && (
-        <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-medium text-amber-800">
-          Some inbox data could not sync from Meta: {syncWarnings.slice(0, 2).map(formatSyncWarning).join(' · ')}
-        </div>
-      )}
-
-      {!loading && platform && (
-        <>
-          <SectionHeader title={`${platformLabel} Inbox`} description={`View ${platformLabel} comments and DMs only.`} action={
-            <div className="flex items-center gap-1 bg-white border border-slate-200 rounded-lg p-1">
-              {[['comments', `Comments (${commentCount})`], ['dms', `DMs (${dmCount})`]].map(([v, l]) => (
-                <button key={v} onClick={() => setActiveSection(v)} className={clsx('px-4 py-2 rounded-md text-xs font-semibold cursor-pointer', activeSection === v ? 'bg-blue-600 text-white shadow-sm' : 'text-slate-500 hover:text-slate-700')}>
-                  {l}
-                </button>
-              ))}
-            </div>
-          } />
-
-          {!loading && syncedCount > 0 && (
+      {(error || syncWarnings.length > 0 || syncedCount > 0) && (
+        <div className="space-y-2 border-b border-slate-200 bg-white px-4 py-3">
+          {error && <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm font-medium text-red-700">{error}</div>}
+          {syncedCount > 0 && (
             <div className="rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-medium text-emerald-700">
               Synced {syncedCount} new message{syncedCount === 1 ? '' : 's'} from connected accounts.
               {autoRepliedCount > 0 && ` AI replied to ${autoRepliedCount}.`}
             </div>
           )}
-          {!loading && syncWarnings.length > 0 && (
+          {syncWarnings.length > 0 && (
             <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-medium text-amber-800">
               Some inbox data could not sync from Meta: {syncWarnings.slice(0, 2).map(formatSyncWarning).join(' · ')}
             </div>
           )}
-
-          <div className="flex gap-3">
-            <div className="flex-1 relative">
-              <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-              <input type="text" placeholder="Search by name or content…" className="input-field pl-9 w-full" />
-            </div>
-            <button className="btn-secondary"><Filter size={14} /> Filter</button>
-          </div>
-
-          {error && (
-            <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm font-medium text-red-700">
-              {error}
-            </div>
-          )}
-
-          {activeSection === 'comments' ? (
-            <div>
-              <h2 className="text-slate-900 font-bold text-lg mb-4">{platformLabel} Comments</h2>
-              <div className="space-y-6">
-                <PlatformSection platform={platform} messages={messages} onReply={handleReply} isDM={false} isAdmin={isAdmin} />
-              </div>
-            </div>
-          ) : (
-            <div>
-              <h2 className="text-slate-900 font-bold text-lg mb-4">{platformLabel} Direct Messages</h2>
-              <div className="space-y-6">
-                <PlatformSection platform={platform} messages={messages} onReply={handleReply} isDM={true} isAdmin={isAdmin} />
-              </div>
-            </div>
-          )}
-        </>
-      )}
-
-      {loading && (
-        <div className="flex items-center justify-center py-16">
-          <Loader size={28} className="animate-spin text-blue-600" />
         </div>
       )}
+
+      <div className="-mx-8 grid min-h-[calc(100vh-137px)] grid-cols-1 bg-white lg:grid-cols-[300px_420px_1fr]">
+        <aside className="border-r border-slate-200 bg-slate-50/70 p-5">
+          <button
+            type="button"
+            onClick={() => setLabelFilter('all')}
+            className={clsx('mb-2 flex w-full items-center justify-between rounded-lg px-3 py-3 text-left text-sm font-bold', labelFilter === 'all' ? 'bg-slate-200 text-slate-950' : 'text-slate-600 hover:bg-slate-100')}
+          >
+            <span className="flex items-center gap-2"><Archive size={17} /> All chats</span>
+            <span className="text-slate-400">{messages.length}</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => setLabelFilter('reminders')}
+            className={clsx('mb-7 flex w-full items-center justify-between rounded-lg px-3 py-3 text-left text-sm font-semibold', labelFilter === 'reminders' ? 'bg-slate-200 text-slate-950' : 'text-slate-600 hover:bg-slate-100')}
+          >
+            <span className="flex items-center gap-2"><Clock size={17} /> Reminders</span>
+            <span className="text-slate-400">{failedCount}</span>
+          </button>
+
+          <div className="mb-3 flex items-center justify-between px-3 text-sm font-semibold text-slate-500">
+            <span>Labels</span>
+            <Plus size={16} />
+          </div>
+          <button
+            type="button"
+            onClick={() => setLabelFilter('favorites')}
+            className={clsx('flex w-full items-center justify-between rounded-lg px-3 py-3 text-left text-sm font-bold', labelFilter === 'favorites' ? 'bg-slate-200 text-slate-950' : 'text-slate-600 hover:bg-slate-100')}
+          >
+            <span className="flex items-center gap-2"><Heart size={17} className="text-red-500" /> Favorites</span>
+            <span className="text-slate-400">{favoritesCount}</span>
+          </button>
+
+          <div className="mt-8 rounded-lg border border-slate-200 bg-white p-4 text-xs text-slate-500">
+            <div className="font-bold text-slate-800">Live inbox</div>
+            <div className="mt-1">
+              {lastUpdated ? `Updated ${lastUpdated.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}` : 'Waiting for first sync'}
+            </div>
+            {isAdmin && (
+              <button onClick={syncLiveMessages} disabled={syncing} className="mt-3 inline-flex h-9 w-full items-center justify-center gap-2 rounded-lg border border-slate-200 font-bold text-slate-700 hover:bg-slate-50 disabled:opacity-50">
+                {syncing ? <Loader size={13} className="animate-spin" /> : <RefreshCw size={13} />} Sync now
+              </button>
+            )}
+          </div>
+        </aside>
+
+        <section className="border-r border-slate-200">
+          <div className="flex flex-wrap items-center gap-2 border-b border-slate-200 px-5 py-4">
+            <input type="checkbox" checked={allVisibleSelected} onChange={toggleSelectAll} className="mr-2 h-5 w-5 rounded border-slate-300" />
+            <select value={statusFilter} onChange={e => setStatusFilter(e.target.value)} className="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm font-semibold text-slate-700">
+              <option value="open">Open Chats</option>
+              <option value="all">All Chats</option>
+              <option value="replied">AI Replied</option>
+              <option value="failed">Failed</option>
+            </select>
+            <button
+              type="button"
+              onClick={() => setOnlyUnread(value => !value)}
+              className={clsx('h-10 rounded-lg border px-4 text-sm font-semibold', onlyUnread ? 'border-blue-200 bg-blue-50 text-blue-700' : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50')}
+            >
+              Unread
+            </button>
+            <select value={sortOrder} onChange={e => setSortOrder(e.target.value)} className="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm font-semibold text-slate-700">
+              <option value="newest">Sort: Newest</option>
+              <option value="oldest">Sort: Oldest</option>
+            </select>
+            <select value={channelFilter} onChange={e => setChannelFilter(e.target.value)} disabled={Boolean(platform)} className="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm font-semibold text-slate-700 disabled:opacity-60">
+              <option value="all">All Channels</option>
+              {PLATFORMS.map(item => <option key={item} value={item}>{PLATFORM_LABELS[item]}</option>)}
+            </select>
+            <button type="button" onClick={() => setShowFilters(value => !value)} className="inline-flex h-10 items-center gap-2 rounded-lg border border-slate-200 bg-white px-4 text-sm font-semibold text-slate-700 hover:bg-slate-50">
+              <Filter size={15} /> Filter
+            </button>
+          </div>
+
+          {showFilters && (
+            <div className="border-b border-slate-200 bg-slate-50 p-4">
+              {isAdmin && <BackfillPanel company={company} platform={platform} onCompleted={reloadInbox} />}
+              {isAdmin && (
+                <button onClick={() => handleTestDM(platform || 'instagram')} disabled={syncing} className="mt-3 inline-flex h-10 items-center gap-2 rounded-lg bg-blue-600 px-4 text-sm font-bold text-white hover:bg-blue-700 disabled:opacity-50">
+                  {syncing ? <Loader size={14} className="animate-spin" /> : <Plus size={14} />} Test DM
+                </button>
+              )}
+            </div>
+          )}
+
+          <div className="h-[calc(100vh-215px)] overflow-y-auto">
+            {loading ? (
+              <div className="flex h-full items-center justify-center">
+                <Loader size={28} className="animate-spin text-blue-600" />
+              </div>
+            ) : visibleMessages.length === 0 ? (
+              <div className="flex h-full flex-col items-center justify-center px-8 text-center">
+                <div className="text-lg font-bold text-slate-900">No opened conversations</div>
+                <button type="button" onClick={() => setStatusFilter('all')} className="mt-8 text-sm font-bold text-blue-600 hover:text-blue-700">
+                  Go To Closed Conversations
+                </button>
+              </div>
+            ) : (
+              visibleMessages.map(message => (
+                <ConversationListItem
+                  key={message.id}
+                  msg={message}
+                  active={selectedMessageId === message.id}
+                  selected={selectedIds.includes(message.id)}
+                  onClick={() => setSelectedMessageId(message.id)}
+                  onToggleSelect={() => toggleSelected(message.id)}
+                />
+              ))
+            )}
+          </div>
+        </section>
+
+        <section className="min-h-full">
+          {selectedMessage ? (
+            <div className="mx-auto max-w-3xl p-8">
+              <MessageCard msg={selectedMessage} onReply={handleReply} isAdmin={isAdmin} />
+            </div>
+          ) : (
+            <div className="flex h-full min-h-[620px] flex-col items-center justify-center px-8 text-center">
+              <EmptyInboxArt />
+              <h2 className="mt-7 max-w-md text-xl font-bold text-slate-900">
+                {messages.length === 0 ? 'Send a message to your bot to try Inbox' : 'Select a conversation to view details'}
+              </h2>
+              <p className="mt-3 max-w-md text-sm leading-relaxed text-slate-500">
+                Comments and DMs from connected channels appear here and update automatically.
+              </p>
+              {isAdmin && (
+                <button
+                  type="button"
+                  onClick={() => handleTestDM(platform || 'instagram')}
+                  disabled={syncing}
+                  className="mt-6 inline-flex h-12 items-center gap-3 rounded-lg bg-slate-100 px-5 text-sm font-bold text-slate-900 hover:bg-slate-200 disabled:opacity-50"
+                >
+                  <PlatformIcon platform={platform || 'instagram'} size={22} connected={true} />
+                  {PLATFORM_LABELS[platform || 'instagram']}
+                  <span className="text-blue-600">{syncing ? 'Opening...' : 'Open'}</span>
+                </button>
+              )}
+            </div>
+          )}
+        </section>
+      </div>
     </div>
   )
 }
