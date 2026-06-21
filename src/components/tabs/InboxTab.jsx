@@ -45,106 +45,6 @@ function formatSyncWarning(warning) {
   return warning
 }
 
-function MiniEye({ x = 0, y = 0, size = 10 }) {
-  return (
-    <span className="flex items-center justify-center rounded-full bg-white" style={{ width: size + 8, height: size + 8 }}>
-      <span
-        className="block rounded-full bg-slate-950 transition-transform duration-100"
-        style={{ width: size, height: size, transform: `translate(${x}px, ${y}px)` }}
-      />
-    </span>
-  )
-}
-
-function AnimatedInboxCharacters({ compact = false }) {
-  const wrapRef = useRef(null)
-  const [look, setLook] = useState({ x: 0, y: 0 })
-
-  useEffect(() => {
-    const handleMove = event => {
-      if (!wrapRef.current) return
-      const rect = wrapRef.current.getBoundingClientRect()
-      const centerX = rect.left + rect.width / 2
-      const centerY = rect.top + rect.height / 2
-      setLook({
-        x: Math.max(-4, Math.min(4, (event.clientX - centerX) / 60)),
-        y: Math.max(-3, Math.min(3, (event.clientY - centerY) / 70)),
-      })
-    }
-    window.addEventListener('mousemove', handleMove)
-    return () => window.removeEventListener('mousemove', handleMove)
-  }, [])
-
-  return (
-    <div
-      ref={wrapRef}
-      className={clsx('relative mx-auto', compact ? 'h-28 w-44' : 'h-44 w-72')}
-      aria-hidden="true"
-    >
-      <div
-        className="absolute bottom-0 left-8 rounded-t-lg transition-transform duration-300"
-        style={{
-          width: compact ? 48 : 76,
-          height: compact ? 104 : 164,
-          background: CHARACTER_COLORS.blue,
-          transform: `skewX(${-look.x}deg)`,
-        }}
-      >
-        <div className="absolute left-3 top-5 flex gap-2">
-          <MiniEye x={look.x} y={look.y} size={compact ? 5 : 7} />
-          <MiniEye x={look.x} y={look.y} size={compact ? 5 : 7} />
-        </div>
-      </div>
-      <div
-        className="absolute bottom-0 rounded-t-full transition-transform duration-300"
-        style={{
-          left: compact ? 0 : 4,
-          width: compact ? 82 : 130,
-          height: compact ? 66 : 104,
-          background: CHARACTER_COLORS.orange,
-          transform: `skewX(${look.x}deg)`,
-        }}
-      >
-        <div className="absolute left-8 top-8 flex gap-3">
-          <span className="h-2.5 w-2.5 rounded-full bg-slate-950" />
-          <span className="h-2.5 w-2.5 rounded-full bg-slate-950" />
-        </div>
-      </div>
-      <div
-        className="absolute bottom-0 rounded-t-lg transition-transform duration-300"
-        style={{
-          left: compact ? 82 : 134,
-          width: compact ? 48 : 78,
-          height: compact ? 86 : 136,
-          background: CHARACTER_COLORS.red,
-          transform: `skewX(${look.x * 0.8}deg)`,
-        }}
-      >
-        <div className="absolute left-3 top-5 flex gap-2">
-          <MiniEye x={-look.x} y={look.y} size={compact ? 5 : 7} />
-          <MiniEye x={-look.x} y={look.y} size={compact ? 5 : 7} />
-        </div>
-      </div>
-      <div
-        className="absolute bottom-0 rounded-t-full transition-transform duration-300"
-        style={{
-          right: compact ? 6 : 14,
-          width: compact ? 66 : 104,
-          height: compact ? 74 : 116,
-          background: CHARACTER_COLORS.pink,
-          transform: `skewX(${-look.x * 0.7}deg)`,
-        }}
-      >
-        <div className="absolute left-6 top-7 flex gap-3">
-          <span className="h-2.5 w-2.5 rounded-full bg-slate-950" />
-          <span className="h-2.5 w-2.5 rounded-full bg-slate-950" />
-        </div>
-        <div className="absolute left-7 top-14 h-1 w-10 rounded-full bg-slate-950" />
-      </div>
-    </div>
-  )
-}
-
 function MessageCard({ msg, onReply, isReply = false, isAdmin = true }) {
   const [showReplyBox, setShowReplyBox] = useState(false)
   const [replyText, setReplyText] = useState('')
@@ -851,13 +751,12 @@ export default function InboxTab({ company, branchId = '', platform, isAdmin = t
             {loading ? (
               <div className="flex h-full items-center justify-center">
                 <div className="text-center">
-                  <AnimatedInboxCharacters compact />
+                  <UsluLoader size="lg" />
                   <div className="mt-4 text-sm font-bold text-slate-900">Loading conversations</div>
                 </div>
               </div>
             ) : visibleMessages.length === 0 ? (
               <div className="flex h-full flex-col items-center justify-center px-8 text-center">
-                <AnimatedInboxCharacters compact />
                 <div className="text-lg font-bold text-slate-900">No opened conversations</div>
                 <button type="button" onClick={() => setStatusFilter('all')} className="mt-8 text-sm font-bold text-blue-600 hover:text-blue-700">
                   Go To Closed Conversations
@@ -885,7 +784,6 @@ export default function InboxTab({ company, branchId = '', platform, isAdmin = t
             </div>
           ) : (
             <div className="flex h-full min-h-[620px] flex-col items-center justify-center px-8 text-center">
-              <AnimatedInboxCharacters />
               <h2 className="max-w-md text-xl font-bold text-slate-900">
                 {messages.length === 0 ? 'Send a message to your bot to try Inbox' : 'Select a conversation to view details'}
               </h2>

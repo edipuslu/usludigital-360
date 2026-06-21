@@ -1,20 +1,320 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Eye, EyeOff, Zap, ArrowRight, CheckCircle2, Shield, Brain, BarChart3 } from 'lucide-react'
+import { Eye, EyeOff, Zap, ArrowRight, CheckCircle2 } from 'lucide-react'
 import { useAuth } from '../context/AuthContext'
 import { UsluLoader } from '../components/ui/UIKit'
 
-const Feature = ({ icon: Icon, title, desc }) => (
-  <div className="flex items-start gap-3">
-    <div className="w-8 h-8 rounded-lg bg-blue-500/20 border border-blue-500/30 flex items-center justify-center flex-shrink-0 mt-0.5">
-      <Icon size={15} className="text-blue-400" />
+const CHARACTER_COLORS = {
+  red: '#f42f25',
+  orange: '#f49725',
+  blue: '#255ff4',
+  pink: '#f42582',
+}
+
+const Pupil = ({ size = 12, maxDistance = 5, forceLookX, forceLookY }) => {
+  const [mouse, setMouse] = useState({ x: 0, y: 0 })
+  const pupilRef = useRef(null)
+
+  useEffect(() => {
+    const handleMouseMove = e => setMouse({ x: e.clientX, y: e.clientY })
+    window.addEventListener('mousemove', handleMouseMove)
+    return () => window.removeEventListener('mousemove', handleMouseMove)
+  }, [])
+
+  const getPosition = () => {
+    if (forceLookX !== undefined && forceLookY !== undefined) return { x: forceLookX, y: forceLookY }
+    if (!pupilRef.current) return { x: 0, y: 0 }
+
+    const rect = pupilRef.current.getBoundingClientRect()
+    const centerX = rect.left + rect.width / 2
+    const centerY = rect.top + rect.height / 2
+    const deltaX = mouse.x - centerX
+    const deltaY = mouse.y - centerY
+    const distance = Math.min(Math.sqrt(deltaX ** 2 + deltaY ** 2), maxDistance)
+    const angle = Math.atan2(deltaY, deltaX)
+
+    return { x: Math.cos(angle) * distance, y: Math.sin(angle) * distance }
+  }
+
+  const position = getPosition()
+
+  return (
+    <div
+      ref={pupilRef}
+      className="rounded-full bg-slate-950"
+      style={{
+        width: size,
+        height: size,
+        transform: `translate(${position.x}px, ${position.y}px)`,
+        transition: 'transform 100ms ease-out',
+      }}
+    />
+  )
+}
+
+const EyeBall = ({ size = 48, pupilSize = 16, maxDistance = 10, isBlinking = false, forceLookX, forceLookY }) => {
+  const [mouse, setMouse] = useState({ x: 0, y: 0 })
+  const eyeRef = useRef(null)
+
+  useEffect(() => {
+    const handleMouseMove = e => setMouse({ x: e.clientX, y: e.clientY })
+    window.addEventListener('mousemove', handleMouseMove)
+    return () => window.removeEventListener('mousemove', handleMouseMove)
+  }, [])
+
+  const getPosition = () => {
+    if (forceLookX !== undefined && forceLookY !== undefined) return { x: forceLookX, y: forceLookY }
+    if (!eyeRef.current) return { x: 0, y: 0 }
+
+    const rect = eyeRef.current.getBoundingClientRect()
+    const centerX = rect.left + rect.width / 2
+    const centerY = rect.top + rect.height / 2
+    const deltaX = mouse.x - centerX
+    const deltaY = mouse.y - centerY
+    const distance = Math.min(Math.sqrt(deltaX ** 2 + deltaY ** 2), maxDistance)
+    const angle = Math.atan2(deltaY, deltaX)
+
+    return { x: Math.cos(angle) * distance, y: Math.sin(angle) * distance }
+  }
+
+  const position = getPosition()
+
+  return (
+    <div
+      ref={eyeRef}
+      className="rounded-full flex items-center justify-center bg-white transition-all duration-150"
+      style={{
+        width: size,
+        height: isBlinking ? 2 : size,
+        overflow: 'hidden',
+      }}
+    >
+      {!isBlinking && (
+        <div
+          className="rounded-full bg-slate-950"
+          style={{
+            width: pupilSize,
+            height: pupilSize,
+            transform: `translate(${position.x}px, ${position.y}px)`,
+            transition: 'transform 100ms ease-out',
+          }}
+        />
+      )}
     </div>
-    <div>
-      <div className="text-white text-sm font-semibold">{title}</div>
-      <div className="text-slate-400 text-xs mt-0.5 leading-relaxed">{desc}</div>
+  )
+}
+
+const AnimatedLoginCharacters = ({ isTyping, showPassword, passwordValue }) => {
+  const [mouse, setMouse] = useState({ x: 0, y: 0 })
+  const [isPinkBlinking, setIsPinkBlinking] = useState(false)
+  const [isRedBlinking, setIsRedBlinking] = useState(false)
+  const [isLookingAtEachOther, setIsLookingAtEachOther] = useState(false)
+  const [isPinkPeeking, setIsPinkPeeking] = useState(false)
+  const pinkRef = useRef(null)
+  const redRef = useRef(null)
+  const blueRef = useRef(null)
+  const orangeRef = useRef(null)
+  const hasPassword = passwordValue.length > 0
+
+  useEffect(() => {
+    const handleMouseMove = e => setMouse({ x: e.clientX, y: e.clientY })
+    window.addEventListener('mousemove', handleMouseMove)
+    return () => window.removeEventListener('mousemove', handleMouseMove)
+  }, [])
+
+  useEffect(() => {
+    const scheduleBlink = setter => {
+      const timeout = setTimeout(() => {
+        setter(true)
+        setTimeout(() => {
+          setter(false)
+          scheduleBlink(setter)
+        }, 150)
+      }, Math.random() * 4000 + 3000)
+      return timeout
+    }
+
+    const pinkTimeout = scheduleBlink(setIsPinkBlinking)
+    const redTimeout = scheduleBlink(setIsRedBlinking)
+    return () => {
+      clearTimeout(pinkTimeout)
+      clearTimeout(redTimeout)
+    }
+  }, [])
+
+  useEffect(() => {
+    if (!isTyping) {
+      setIsLookingAtEachOther(false)
+      return undefined
+    }
+
+    setIsLookingAtEachOther(true)
+    const timer = setTimeout(() => setIsLookingAtEachOther(false), 800)
+    return () => clearTimeout(timer)
+  }, [isTyping])
+
+  useEffect(() => {
+    if (!hasPassword || !showPassword) {
+      setIsPinkPeeking(false)
+      return undefined
+    }
+
+    const timeout = setTimeout(() => {
+      setIsPinkPeeking(true)
+      setTimeout(() => setIsPinkPeeking(false), 800)
+    }, Math.random() * 3000 + 1600)
+
+    return () => clearTimeout(timeout)
+  }, [hasPassword, showPassword, isPinkPeeking])
+
+  const calculatePosition = ref => {
+    if (!ref.current) return { faceX: 0, faceY: 0, bodySkew: 0 }
+
+    const rect = ref.current.getBoundingClientRect()
+    const centerX = rect.left + rect.width / 2
+    const centerY = rect.top + rect.height / 3
+    const deltaX = mouse.x - centerX
+    const deltaY = mouse.y - centerY
+
+    return {
+      faceX: Math.max(-15, Math.min(15, deltaX / 20)),
+      faceY: Math.max(-10, Math.min(10, deltaY / 30)),
+      bodySkew: Math.max(-6, Math.min(6, -deltaX / 120)),
+    }
+  }
+
+  const pinkPos = calculatePosition(pinkRef)
+  const redPos = calculatePosition(redRef)
+  const bluePos = calculatePosition(blueRef)
+  const orangePos = calculatePosition(orangeRef)
+  const passwordMode = hasPassword && showPassword
+  const privateTyping = isTyping || (hasPassword && !showPassword)
+
+  return (
+    <div className="relative w-[550px] h-[430px] max-w-full scale-[0.92] xl:scale-100 origin-bottom">
+      <div
+        ref={pinkRef}
+        className="absolute bottom-0 transition-all duration-700 ease-in-out"
+        style={{
+          left: 70,
+          width: 180,
+          height: privateTyping ? 430 : 390,
+          backgroundColor: CHARACTER_COLORS.pink,
+          borderRadius: '12px 12px 0 0',
+          zIndex: 1,
+          transform: passwordMode
+            ? 'skewX(0deg)'
+            : privateTyping
+              ? `skewX(${(pinkPos.bodySkew || 0) - 12}deg) translateX(40px)`
+              : `skewX(${pinkPos.bodySkew || 0}deg)`,
+          transformOrigin: 'bottom center',
+        }}
+      >
+        <div
+          className="absolute flex gap-8 transition-all duration-700 ease-in-out"
+          style={{
+            left: passwordMode ? 20 : isLookingAtEachOther ? 55 : 45 + pinkPos.faceX,
+            top: passwordMode ? 35 : isLookingAtEachOther ? 65 : 40 + pinkPos.faceY,
+          }}
+        >
+          <EyeBall size={18} pupilSize={7} maxDistance={5} isBlinking={isPinkBlinking} forceLookX={passwordMode ? (isPinkPeeking ? 4 : -4) : isLookingAtEachOther ? 3 : undefined} forceLookY={passwordMode ? (isPinkPeeking ? 5 : -4) : isLookingAtEachOther ? 4 : undefined} />
+          <EyeBall size={18} pupilSize={7} maxDistance={5} isBlinking={isPinkBlinking} forceLookX={passwordMode ? (isPinkPeeking ? 4 : -4) : isLookingAtEachOther ? 3 : undefined} forceLookY={passwordMode ? (isPinkPeeking ? 5 : -4) : isLookingAtEachOther ? 4 : undefined} />
+        </div>
+      </div>
+
+      <div
+        ref={redRef}
+        className="absolute bottom-0 transition-all duration-700 ease-in-out"
+        style={{
+          left: 240,
+          width: 120,
+          height: 310,
+          backgroundColor: CHARACTER_COLORS.red,
+          borderRadius: '10px 10px 0 0',
+          zIndex: 2,
+          transform: passwordMode
+            ? 'skewX(0deg)'
+            : isLookingAtEachOther
+              ? `skewX(${(redPos.bodySkew || 0) * 1.5 + 10}deg) translateX(20px)`
+              : privateTyping
+                ? `skewX(${(redPos.bodySkew || 0) * 1.5}deg)`
+                : `skewX(${redPos.bodySkew || 0}deg)`,
+          transformOrigin: 'bottom center',
+        }}
+      >
+        <div
+          className="absolute flex gap-6 transition-all duration-700 ease-in-out"
+          style={{
+            left: passwordMode ? 10 : isLookingAtEachOther ? 32 : 26 + redPos.faceX,
+            top: passwordMode ? 28 : isLookingAtEachOther ? 12 : 32 + redPos.faceY,
+          }}
+        >
+          <EyeBall size={16} pupilSize={6} maxDistance={4} isBlinking={isRedBlinking} forceLookX={passwordMode ? -4 : isLookingAtEachOther ? 0 : undefined} forceLookY={passwordMode ? -4 : isLookingAtEachOther ? -4 : undefined} />
+          <EyeBall size={16} pupilSize={6} maxDistance={4} isBlinking={isRedBlinking} forceLookX={passwordMode ? -4 : isLookingAtEachOther ? 0 : undefined} forceLookY={passwordMode ? -4 : isLookingAtEachOther ? -4 : undefined} />
+        </div>
+      </div>
+
+      <div
+        ref={orangeRef}
+        className="absolute bottom-0 transition-all duration-700 ease-in-out"
+        style={{
+          left: 0,
+          width: 240,
+          height: 200,
+          zIndex: 3,
+          backgroundColor: CHARACTER_COLORS.orange,
+          borderRadius: '120px 120px 0 0',
+          transform: passwordMode ? 'skewX(0deg)' : `skewX(${orangePos.bodySkew || 0}deg)`,
+          transformOrigin: 'bottom center',
+        }}
+      >
+        <div
+          className="absolute flex gap-8 transition-all duration-200 ease-out"
+          style={{
+            left: passwordMode ? 50 : 82 + orangePos.faceX,
+            top: passwordMode ? 85 : 90 + orangePos.faceY,
+          }}
+        >
+          <Pupil forceLookX={passwordMode ? -5 : undefined} forceLookY={passwordMode ? -4 : undefined} />
+          <Pupil forceLookX={passwordMode ? -5 : undefined} forceLookY={passwordMode ? -4 : undefined} />
+        </div>
+      </div>
+
+      <div
+        ref={blueRef}
+        className="absolute bottom-0 transition-all duration-700 ease-in-out"
+        style={{
+          left: 310,
+          width: 140,
+          height: 230,
+          backgroundColor: CHARACTER_COLORS.blue,
+          borderRadius: '70px 70px 0 0',
+          zIndex: 4,
+          transform: passwordMode ? 'skewX(0deg)' : `skewX(${bluePos.bodySkew || 0}deg)`,
+          transformOrigin: 'bottom center',
+        }}
+      >
+        <div
+          className="absolute flex gap-6 transition-all duration-200 ease-out"
+          style={{
+            left: passwordMode ? 20 : 52 + bluePos.faceX,
+            top: passwordMode ? 35 : 40 + bluePos.faceY,
+          }}
+        >
+          <Pupil forceLookX={passwordMode ? -5 : undefined} forceLookY={passwordMode ? -4 : undefined} />
+          <Pupil forceLookX={passwordMode ? -5 : undefined} forceLookY={passwordMode ? -4 : undefined} />
+        </div>
+        <div
+          className="absolute w-20 h-1 bg-slate-950 rounded-full transition-all duration-200 ease-out"
+          style={{
+            left: passwordMode ? 10 : 40 + bluePos.faceX,
+            top: passwordMode ? 88 : 88 + bluePos.faceY,
+          }}
+        />
+      </div>
     </div>
-  </div>
-)
+  )
+}
 
 export default function LoginPage() {
   const { login } = useAuth()
@@ -23,6 +323,7 @@ export default function LoginPage() {
   const [showPw, setShowPw] = useState(false)
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
+  const [isTyping, setIsTyping] = useState(false)
 
   useEffect(() => {
     document.body.style.overflow = 'hidden'
@@ -55,8 +356,36 @@ export default function LoginPage() {
   return (
     <div className="h-screen flex overflow-hidden" style={{ background: '#060912' }}>
       {/* Left panel */}
-      <div className="hidden lg:flex w-[52%] h-screen items-center justify-center overflow-hidden">
-        <img src="/images/IMAGE_homepage.png" alt="Uslu360Digital Dashboard" className="w-full h-full object-contain" />
+      <div className="hidden lg:flex relative w-[52%] h-screen flex-col overflow-hidden px-12 py-10 text-white">
+        <div className="relative z-10 flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-2xl bg-white flex items-center justify-center">
+              <Zap size={20} className="text-slate-950" fill="#020617" />
+            </div>
+            <div>
+              <div className="font-bold text-lg leading-none">Uslu360Digital</div>
+              <div className="text-white/50 text-xs mt-1">AI automation workspace</div>
+            </div>
+          </div>
+          <div className="rounded-full border border-white/15 px-3 py-1 text-xs text-white/70">Live dashboard</div>
+        </div>
+
+        <div className="relative z-10 flex flex-1 items-center justify-center">
+          <AnimatedLoginCharacters isTyping={isTyping} showPassword={showPw} passwordValue={form.password} />
+        </div>
+
+        <div className="relative z-10 grid grid-cols-3 gap-3 text-sm">
+          {[
+            ['Comments', 'AI replies'],
+            ['DMs', 'Smart inbox'],
+            ['Reports', 'Monthly growth'],
+          ].map(([label, value]) => (
+            <div key={label} className="rounded-2xl border border-white/10 bg-white/[0.04] p-4">
+              <div className="text-white/45 text-xs">{label}</div>
+              <div className="mt-1 font-semibold">{value}</div>
+            </div>
+          ))}
+        </div>
       </div>
 
       {/* Right panel */}
@@ -81,6 +410,8 @@ export default function LoginPage() {
                 type="email"
                 value={form.email}
                 onChange={e => setForm(f => ({ ...f, email: e.target.value }))}
+                onFocus={() => setIsTyping(true)}
+                onBlur={() => setIsTyping(false)}
                 placeholder="you@example.com"
                 required
                 className="input-field"
@@ -93,7 +424,7 @@ export default function LoginPage() {
                 <button
                   type="button"
                   onClick={() => setError('Password reset is ready for backend email delivery. Use a demo account for now.')}
-                  className="text-blue-600 text-xs font-medium hover:text-blue-700 cursor-pointer"
+                  className="text-[#255ff4] text-xs font-medium hover:text-[#1c49d7] cursor-pointer"
                 >
                   Forgot password?
                 </button>
@@ -103,6 +434,8 @@ export default function LoginPage() {
                   type={showPw ? 'text' : 'password'}
                   value={form.password}
                   onChange={e => setForm(f => ({ ...f, password: e.target.value }))}
+                  onFocus={() => setIsTyping(true)}
+                  onBlur={() => setIsTyping(false)}
                   placeholder="••••••••"
                   required
                   className="input-field pr-10"
@@ -118,16 +451,16 @@ export default function LoginPage() {
             </div>
 
             {error && (
-              <div className="bg-red-50 border border-red-200 rounded-lg px-3 py-2.5 flex items-center gap-2">
-                <div className="w-1.5 h-1.5 rounded-full bg-red-500 flex-shrink-0" />
-                <span className="text-red-700 text-sm">{error}</span>
+              <div className="bg-[#f42f25]/10 border border-[#f42f25]/25 rounded-lg px-3 py-2.5 flex items-center gap-2">
+                <div className="w-1.5 h-1.5 rounded-full bg-[#f42f25] flex-shrink-0" />
+                <span className="text-[#b91f18] text-sm">{error}</span>
               </div>
             )}
 
             <button
               type="submit"
               disabled={loading}
-              className="w-full bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 text-white rounded-lg py-3 text-sm font-semibold cursor-pointer transition-all duration-150 flex items-center justify-center gap-2 shadow-sm"
+              className="w-full bg-[#255ff4] hover:bg-[#1c49d7] disabled:bg-[#255ff4]/60 text-white rounded-lg py-3 text-sm font-semibold cursor-pointer transition-all duration-150 flex items-center justify-center gap-2 shadow-sm"
             >
               {loading ? (
                 <>
@@ -157,7 +490,7 @@ export default function LoginPage() {
                     <div className="text-slate-800 text-xs font-semibold">{demo.label}</div>
                     <div className="text-slate-500 text-xs mt-0.5 font-mono">{demo.email}</div>
                   </div>
-                  <div className="flex items-center gap-1.5 text-blue-600 text-xs font-medium opacity-0 group-hover:opacity-100 transition-opacity">
+                  <div className="flex items-center gap-1.5 text-[#255ff4] text-xs font-medium opacity-0 group-hover:opacity-100 transition-opacity">
                     <CheckCircle2 size={13} />
                     Use
                   </div>
