@@ -309,8 +309,8 @@ const AnimatedLoginCharacters = ({ isTyping, showPassword, passwordValue }) => {
             top: passwordMode ? 85 : 90 + orangePos.faceY,
           }}
         >
-          <Pupil forceLookX={passwordMode ? -5 : undefined} forceLookY={passwordMode ? -4 : undefined} />
-          <Pupil forceLookX={passwordMode ? -5 : undefined} forceLookY={passwordMode ? -4 : undefined} />
+          <EyeBall size={19} pupilSize={7} maxDistance={5} forceLookX={passwordMode ? -5 : undefined} forceLookY={passwordMode ? -4 : undefined} />
+          <EyeBall size={19} pupilSize={7} maxDistance={5} forceLookX={passwordMode ? -5 : undefined} forceLookY={passwordMode ? -4 : undefined} />
         </div>
         <Smile
           className="absolute transition-all duration-200 ease-out"
@@ -344,8 +344,8 @@ const AnimatedLoginCharacters = ({ isTyping, showPassword, passwordValue }) => {
             top: passwordMode ? 35 : 40 + bluePos.faceY,
           }}
         >
-          <Pupil forceLookX={passwordMode ? -5 : undefined} forceLookY={passwordMode ? -4 : undefined} />
-          <Pupil forceLookX={passwordMode ? -5 : undefined} forceLookY={passwordMode ? -4 : undefined} />
+          <EyeBall size={18} pupilSize={7} maxDistance={5} forceLookX={passwordMode ? -5 : undefined} forceLookY={passwordMode ? -4 : undefined} />
+          <EyeBall size={18} pupilSize={7} maxDistance={5} forceLookX={passwordMode ? -5 : undefined} forceLookY={passwordMode ? -4 : undefined} />
         </div>
         <Smile
           className="absolute transition-all duration-200 ease-out"
