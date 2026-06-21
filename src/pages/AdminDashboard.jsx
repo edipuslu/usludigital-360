@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Building2, Plus, Trash2, LogOut, X, AlertTriangle, ArrowUpRight, LayoutDashboard, GitBranch, MapPin } from 'lucide-react'
+import { Building2, Plus, Trash2, LogOut, X, AlertTriangle, ArrowUpRight, GitBranch, MapPin, Search, RefreshCw, ShieldCheck } from 'lucide-react'
 import { useAuth } from '../context/AuthContext'
 import { deleteBackendCompany, getCompanies, saveBackendCompany, updateBackendCompany } from '../lib/backendApi'
 import clsx from 'clsx'
@@ -327,29 +327,42 @@ export default function AdminDashboard() {
   const [showCreate, setShowCreate] = useState(false)
   const [deleteCompany, setDeleteCompany] = useState(null)
   const [branchCompany, setBranchCompany] = useState(null)
+  const [query, setQuery] = useState('')
 
-  useEffect(() => {
-    let alive = true
+  const loadFromBackend = async alive => {
+    setLoading(true)
     getCompanies()
       .then(data => {
-        if (!alive) return
+        if (alive === false) return
         const backendCompanies = Array.isArray(data.companies) ? data.companies.map(normalizeCompany) : []
         setCompanies(backendCompanies)
         setError('')
       })
       .catch(err => {
-        if (!alive) return
+        if (alive === false) return
         setError(err.message || 'Could not load companies from backend.')
       })
-      .finally(() => alive && setLoading(false))
+      .finally(() => alive !== false && setLoading(false))
+  }
+
+  useEffect(() => {
+    let alive = true
+    loadFromBackend(alive)
     return () => {
       alive = false
     }
   }, [])
 
+  const filteredCompanies = useMemo(() => {
+    const term = query.trim().toLowerCase()
+    if (!term) return companies
+    return companies.filter(company => `${company.name} ${company.industry} ${company.clientEmail}`.toLowerCase().includes(term))
+  }, [companies, query])
+
   const totals = useMemo(() => ({
     companies: companies.length,
     connected: companies.reduce((sum, company) => sum + Object.values(company.platforms).filter(p => p.connected).length, 0),
+    branches: companies.reduce((sum, company) => sum + (company.branches?.length || 0), 0),
   }), [companies])
 
   const persist = next => {
@@ -399,118 +412,136 @@ export default function AdminDashboard() {
   }
 
   return (
-    <div className="flex min-h-screen bg-slate-50">
-      <aside
-        className="w-[240px] h-screen sticky top-0 flex-shrink-0 flex flex-col"
-        style={{ background: 'linear-gradient(180deg, #07091A 0%, #060812 100%)' }}
-      >
-        <div className="flex-1 overflow-y-auto px-2 pt-6">
-          <button className="w-full flex items-center gap-3 rounded-lg text-sm font-medium cursor-pointer transition-all duration-150 relative group px-3 py-2.5 bg-blue-600/20 text-white">
-            <div className="absolute left-0 top-1/2 -translate-y-1/2 w-0.5 h-5 bg-blue-500 rounded-full" />
-            <LayoutDashboard size={16} className="text-blue-400" />
-            <span className="flex-1 text-left">Companies</span>
-          </button>
+    <div className="min-h-screen bg-slate-50">
+      <header className="sticky top-0 z-20 border-b border-slate-200 bg-white">
+        <div className="flex min-h-[76px] items-center justify-between gap-4 px-8">
+          <div className="min-w-0">
+            <h1 className="text-3xl font-extrabold tracking-tight text-slate-950">Admin Workspace</h1>
+            <div className="mt-1 text-sm font-medium text-slate-500">{user?.email || 'admin@usludigital.com'}</div>
+          </div>
+          <div className="flex items-center gap-2">
+            <button onClick={() => loadFromBackend(true)} disabled={loading} className="inline-flex h-11 items-center gap-2 rounded-lg border border-slate-200 bg-white px-4 text-sm font-bold text-slate-700 hover:bg-slate-50 disabled:opacity-50">
+              <RefreshCw size={15} className={loading ? 'animate-spin' : ''} /> Refresh
+            </button>
+            <button onClick={() => setShowCreate(true)} className="btn-primary h-11"><Plus size={14} /> New Company</button>
+            <button onClick={signOut} className="inline-flex h-11 items-center gap-2 rounded-lg border border-slate-200 bg-white px-4 text-sm font-bold text-slate-600 hover:bg-red-50 hover:text-red-600">
+              <LogOut size={15} /> Sign out
+            </button>
+          </div>
         </div>
+      </header>
 
-        <div className="border-t border-white/10 p-3">
-          <button
-            onClick={signOut}
-            className="flex items-center gap-2 text-slate-500 hover:text-red-400 text-xs font-medium cursor-pointer transition-colors rounded-lg hover:bg-red-500/10 px-2 py-1.5 w-full"
-          >
-            <LogOut size={13} />
-            Sign out
-          </button>
-        </div>
-      </aside>
-
-      <div className="flex-1 flex flex-col min-w-0">
-        <header className="bg-white border-b border-slate-200 px-8 py-4 flex items-center justify-between sticky top-0 z-20">
-          <h1 className="text-slate-900 text-xl font-bold">Companies</h1>
-          <button onClick={() => setShowCreate(true)} className="btn-primary"><Plus size={14} /> New Company</button>
-        </header>
-
-        <main className="flex-1 p-8 space-y-6 animate-fade-in">
+      <main className="mx-auto max-w-7xl px-8 py-8 space-y-7 animate-fade-in">
           {error && (
             <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-medium text-amber-800">
               {error}
             </div>
           )}
 
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <div className="card p-5">
-              <div className="text-slate-500 text-sm">Companies</div>
-              <div className="text-3xl font-bold text-slate-900 mt-2">{totals.companies}</div>
+          <section className="rounded-lg bg-slate-950 px-6 py-5 text-white">
+            <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+              <div>
+                <div className="flex items-center gap-2 text-sm font-bold text-slate-300">
+                  <ShieldCheck size={16} />
+                  Company control center
+                </div>
+                <h2 className="mt-2 text-2xl font-extrabold">Create companies, open dashboards, and manage branches.</h2>
+              </div>
+              <button onClick={() => setShowCreate(true)} className="inline-flex h-11 items-center justify-center gap-2 rounded-full bg-teal-500 px-6 text-sm font-bold text-slate-950 hover:bg-teal-400">
+                Add company <ArrowUpRight size={16} />
+              </button>
             </div>
-            <div className="card p-5">
-              <div className="text-slate-500 text-sm">Connected Platforms</div>
-              <div className="text-3xl font-bold text-slate-900 mt-2">{totals.connected}</div>
-            </div>
-            <div className="card p-5">
-              <div className="text-slate-500 text-sm">Admin Role</div>
-              <div className="text-lg font-bold text-slate-900 mt-3">Manage companies only</div>
-            </div>
-          </div>
+          </section>
 
-          {loading ? (
-            <div className="card p-12 text-center">
-              <div className="text-slate-900 font-bold text-lg">Loading companies...</div>
-              <p className="text-slate-500 text-sm mt-1">Checking the shared backend workspace.</p>
+          <section className="grid grid-cols-1 gap-4 md:grid-cols-3">
+            {[
+              ['Companies', totals.companies],
+              ['Connected channels', totals.connected],
+              ['Branches', totals.branches],
+            ].map(([label, value]) => (
+              <div key={label} className="rounded-lg border border-slate-200 bg-white p-5">
+                <div className="text-sm font-semibold text-slate-500">{label}</div>
+                <div className="mt-2 text-3xl font-extrabold text-slate-950">{value}</div>
+              </div>
+            ))}
+          </section>
+
+          <section className="rounded-lg border border-slate-200 bg-white">
+            <div className="flex flex-col gap-4 border-b border-slate-200 px-5 py-4 lg:flex-row lg:items-center lg:justify-between">
+              <div>
+                <h2 className="text-xl font-extrabold text-slate-950">Companies</h2>
+                <p className="mt-1 text-sm text-slate-500">Open one company to set up channels, AI, inbox, analytics, and reports.</p>
+              </div>
+              <div className="relative w-full max-w-md">
+                <Search size={18} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                <input
+                  value={query}
+                  onChange={e => setQuery(e.target.value)}
+                  className="h-11 w-full rounded-lg border border-slate-200 bg-white pl-10 pr-4 text-sm outline-none focus:border-blue-300 focus:ring-2 focus:ring-blue-100"
+                  placeholder="Search companies"
+                />
+              </div>
             </div>
-          ) : companies.length === 0 ? (
-            <div className="card p-12 text-center">
-              <Building2 size={42} className="text-slate-300 mx-auto mb-4" />
-              <div className="text-slate-900 font-bold text-lg">No companies yet</div>
-              <p className="text-slate-500 text-sm mt-1 mb-5">Create a company first. Then open it to connect social platforms and set up automation.</p>
-              <button onClick={() => setShowCreate(true)} className="btn-primary mx-auto"><Plus size={14} /> New Company</button>
-            </div>
-          ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5">
-              {companies.map(company => {
-                const connected = Object.values(company.platforms).filter(p => p.connected).length
-                return (
-                  <div key={company.id} className="card card-hover p-5">
-                    <div className="flex items-start justify-between gap-3 mb-5">
-                      <div className="flex items-center gap-3">
-                        <div className="w-11 h-11 rounded-xl bg-blue-600 text-white flex items-center justify-center text-sm font-bold">{company.initials}</div>
-                        <div>
-                          <div className="text-slate-900 font-bold text-sm">{company.name}</div>
-                          <div className="text-slate-400 text-xs mt-0.5">{company.industry || 'No industry added'}</div>
+
+            {loading ? (
+              <div className="p-12 text-center">
+                <RefreshCw size={28} className="mx-auto mb-3 animate-spin text-blue-600" />
+                <div className="text-lg font-bold text-slate-900">Loading companies...</div>
+                <p className="mt-1 text-sm text-slate-500">Checking Supabase through the backend.</p>
+              </div>
+            ) : filteredCompanies.length === 0 ? (
+              <div className="p-12 text-center">
+                <Building2 size={42} className="mx-auto mb-4 text-slate-300" />
+                <div className="text-lg font-bold text-slate-900">{companies.length === 0 ? 'No companies yet' : 'No company found'}</div>
+                <p className="mt-1 mb-5 text-sm text-slate-500">
+                  {companies.length === 0 ? 'Create a company first. Then open it to connect social platforms and set up automation.' : 'Try a different search term.'}
+                </p>
+                {companies.length === 0 && <button onClick={() => setShowCreate(true)} className="btn-primary mx-auto"><Plus size={14} /> New Company</button>}
+              </div>
+            ) : (
+              <div className="divide-y divide-slate-200">
+                {filteredCompanies.map(company => {
+                  const connected = Object.values(company.platforms).filter(p => p.connected).length
+                  const branchCount = company.branches?.length || 0
+                  return (
+                    <div key={company.id} className="grid grid-cols-1 gap-4 px-5 py-5 transition-colors hover:bg-slate-50 lg:grid-cols-[1fr_150px_130px_170px_300px] lg:items-center">
+                      <div className="flex min-w-0 items-center gap-3">
+                        <div className="flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-lg bg-slate-950 text-sm font-bold text-white">{company.initials}</div>
+                        <div className="min-w-0">
+                          <div className="truncate text-sm font-extrabold text-slate-950">{company.name}</div>
+                          <div className="mt-0.5 truncate text-xs font-medium text-slate-500">{company.industry || 'No industry added'}</div>
                         </div>
                       </div>
-                      <div className="text-xs font-semibold text-slate-500">{connected}/4 connected</div>
-                    </div>
-                    <div className="grid grid-cols-2 gap-3 mb-5">
-                      <div className="bg-slate-50 rounded-lg p-3">
-                        <div className="text-slate-400 text-xs">AI Training</div>
-                        <div className="text-slate-900 font-bold text-sm capitalize mt-1">{company.aiTraining.status.replace('_', ' ')}</div>
+                      <div>
+                        <div className="text-xs font-semibold text-slate-400">Channels</div>
+                        <div className="mt-1 text-sm font-extrabold text-slate-900">{connected}/5 connected</div>
                       </div>
-                      <div className="bg-slate-50 rounded-lg p-3">
-                        <div className="text-slate-400 text-xs">Reports</div>
-                        <div className="text-slate-900 font-bold text-sm mt-1">{company.reports.length}</div>
+                      <div>
+                        <div className="text-xs font-semibold text-slate-400">Branches</div>
+                        <div className="mt-1 text-sm font-extrabold text-slate-900">{branchCount}</div>
                       </div>
-                      <div className="bg-slate-50 rounded-lg p-3 col-span-2">
-                        <div className="text-slate-400 text-xs">Branches</div>
-                        <div className="text-slate-900 font-bold text-sm mt-1">{company.branches?.length || 0}</div>
+                      <div>
+                        <div className="text-xs font-semibold text-slate-400">AI Training</div>
+                        <div className="mt-1 text-sm font-extrabold capitalize text-slate-900">{company.aiTraining.status.replace('_', ' ')}</div>
+                      </div>
+                      <div className="flex flex-wrap items-center gap-2 lg:justify-end">
+                        <button onClick={() => navigate(`/company/${company.id}`)} className="btn-primary justify-center">
+                          Open <ArrowUpRight size={14} />
+                        </button>
+                        <button onClick={() => setBranchCompany(company)} className="btn-secondary justify-center">
+                          <GitBranch size={14} /> Branches
+                        </button>
+                        <button onClick={() => setDeleteCompany(company)} className="btn-danger">
+                          <Trash2 size={14} /> Delete
+                        </button>
                       </div>
                     </div>
-                    <div className="flex flex-wrap items-center gap-2">
-                      <button onClick={() => navigate(`/company/${company.id}`)} className="btn-primary min-w-[120px] flex-1 justify-center">
-                        Open <ArrowUpRight size={14} />
-                      </button>
-                      <button onClick={() => setBranchCompany(company)} className="btn-secondary justify-center">
-                        <GitBranch size={14} /> Branches
-                      </button>
-                      <button onClick={() => setDeleteCompany(company)} className="btn-danger">
-                        <Trash2 size={14} /> Delete
-                      </button>
-                    </div>
-                  </div>
-                )
-              })}
-            </div>
-          )}
-        </main>
-      </div>
+                  )
+                })}
+              </div>
+            )}
+          </section>
+      </main>
 
       {showCreate && <CompanyModal onClose={() => setShowCreate(false)} onCreate={create} />}
       {deleteCompany && <DeleteModal company={deleteCompany} onClose={() => setDeleteCompany(null)} onDelete={remove} />}
