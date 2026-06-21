@@ -17,7 +17,7 @@ import GrowthTab from '../components/tabs/GrowthTab'
 import clsx from 'clsx'
 
 const TABS = [
-  { key: 'overview', label: 'Overview', roles: ['admin', 'client'] },
+  { key: 'overview', label: 'Home', roles: ['admin', 'client'] },
   { key: 'platforms', label: 'Platforms', roles: ['admin'] },
   { key: 'inbox', label: 'Inbox', roles: ['admin', 'client'] },
   { key: 'ai-training', label: 'AI Training', roles: ['admin'] },
@@ -27,7 +27,7 @@ const TABS = [
 ]
 
 const SECTION_LABELS = {
-  overview: 'Overview',
+  overview: 'Home',
   platforms: 'Platforms',
   inbox: 'Inbox',
   'inbox-instagram': 'Instagram Inbox',
@@ -281,7 +281,7 @@ export default function CompanyWorkspace() {
   const visibleTabs = TABS.filter(tab => tab.roles.includes(userRole))
 
   const tabContent = {
-    overview: <OverviewTab company={company} onNavigate={setActiveTab} />,
+    overview: <OverviewTab company={company} onNavigate={setActiveTab} isAdmin={isAdmin} />,
     platforms: <PlatformsTab company={company} onUpdate={updateCompany} onNotify={addNotification} />,
     inbox: <InboxTab company={company} onNotify={addNotification} isAdmin={isAdmin} />,
     'inbox-instagram': <InboxTab company={company} platform="instagram" onNotify={addNotification} isAdmin={isAdmin} />,
@@ -337,7 +337,7 @@ export default function CompanyWorkspace() {
               {syncError}
             </div>
           )}
-          {branches.length > 0 && (
+          {activeTab !== 'overview' && branches.length > 0 && (
             <div className="mb-5 flex items-center justify-between gap-3 rounded-lg border border-slate-200 bg-white px-4 py-3">
               <div className="min-w-0">
                 <div className="flex items-center gap-2 text-sm font-bold text-slate-900">

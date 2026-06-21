@@ -8,7 +8,7 @@ import { useAuth } from '../../context/AuthContext'
 import clsx from 'clsx'
 
 const MAIN_NAV = [
-  { icon: LayoutDashboard, label: 'Overview', key: 'overview', roles: ['admin', 'client'] },
+  { icon: LayoutDashboard, label: 'Home', key: 'overview', roles: ['admin', 'client'] },
   { icon: Globe, label: 'Platforms', key: 'platforms', roles: ['admin'] },
   { icon: Inbox, label: 'Inbox', key: 'inbox', roles: ['admin', 'client'] },
   { icon: TrendingUp, label: 'Social Media Analytics', key: 'growth', roles: ['admin', 'client'] },
