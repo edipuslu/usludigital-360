@@ -120,6 +120,7 @@ function companyDefaults(row = {}) {
       funnel: { reached: 0, replied: 0, clickedWA: 0, converted: 0 },
     },
     reports: [],
+    branches: row.branches || [],
     notifications: [],
     settings: {
       workspaceName: name,

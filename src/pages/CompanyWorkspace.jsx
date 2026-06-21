@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import { Bell, Settings, ChevronRight, Zap, ExternalLink, CheckCircle2, Mail, Clock, Save, Trash2, AlertCircle } from 'lucide-react'
+import { Bell, Settings, CheckCircle2, Mail, Clock, Save, Trash2, AlertCircle, GitBranch, MapPin } from 'lucide-react'
 import Sidebar from '../components/layout/Sidebar'
 import { StatusBadge } from '../components/ui/UIKit'
 import { useAuth } from '../context/AuthContext'
@@ -181,6 +181,7 @@ export default function CompanyWorkspace() {
   })
   const [loading, setLoading] = useState(true)
   const [syncError, setSyncError] = useState('')
+  const [activeBranchId, setActiveBranchId] = useState('all')
 
   useEffect(() => {
     let alive = true
@@ -202,6 +203,15 @@ export default function CompanyWorkspace() {
   }, [])
 
   const company = useMemo(() => workspaces.find(c => c.id === companyId) || workspaces[0], [companyId, workspaces])
+  const branches = company?.branches || []
+  const activeBranch = branches.find(branch => branch.id === activeBranchId)
+
+  useEffect(() => {
+    if (activeBranchId !== 'all' && company && !branches.some(branch => branch.id === activeBranchId)) {
+      setActiveBranchId('all')
+    }
+  }, [activeBranchId, company, branches])
+
   const updateCompany = updater => {
     setWorkspaces(prev => {
       const current = prev.find(c => c.id === company.id) || prev[0]
@@ -313,6 +323,9 @@ export default function CompanyWorkspace() {
         currentSection={activeTab}
         onNavigate={setActiveTab}
         notificationCount={(company.notifications || []).filter(n => !n.read).length}
+        branches={branches}
+        activeBranchId={activeBranchId}
+        onBranchChange={setActiveBranchId}
       />
 
       <div className="flex-1 flex flex-col min-w-0">
@@ -322,6 +335,23 @@ export default function CompanyWorkspace() {
           {syncError && (
             <div className="mb-5 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-medium text-amber-800">
               {syncError}
+            </div>
+          )}
+          {branches.length > 0 && (
+            <div className="mb-5 flex items-center justify-between gap-3 rounded-lg border border-slate-200 bg-white px-4 py-3">
+              <div className="min-w-0">
+                <div className="flex items-center gap-2 text-sm font-bold text-slate-900">
+                  <GitBranch size={15} className="text-slate-400" />
+                  {activeBranch ? activeBranch.name : 'All branches'}
+                </div>
+                <div className="mt-0.5 flex items-center gap-1 text-xs text-slate-500">
+                  <MapPin size={11} className="text-slate-400" />
+                  <span className="truncate">{activeBranch?.location || 'Viewing company-wide information'}</span>
+                </div>
+              </div>
+              <div className="text-xs font-semibold text-slate-400">
+                Read only
+              </div>
             </div>
           )}
           {tabContent[activeTab]}

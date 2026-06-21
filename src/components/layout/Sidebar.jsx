@@ -1,6 +1,7 @@
 import {
   LayoutDashboard, BarChart3, Brain, FileText,
   Bell, Settings, LogOut, Zap, Globe, ArrowLeft, Inbox, TrendingUp,
+  GitBranch, MapPin,
 } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../../context/AuthContext'
@@ -81,13 +82,22 @@ function currentSidebarItem(currentSection, mainItems) {
   return ACCOUNT_NAV.find(item => item.key === currentSection) || currentMainItem(currentSection, mainItems)
 }
 
-export default function Sidebar({ companyName, onNavigate, currentSection, notificationCount = 0 }) {
+export default function Sidebar({
+  companyName,
+  onNavigate,
+  currentSection,
+  notificationCount = 0,
+  branches = [],
+  activeBranchId = 'all',
+  onBranchChange,
+}) {
   const { user, isAdmin, logout } = useAuth()
   const navigate = useNavigate()
   const role = user?.email === 'admin@usludigital.com' ? 'admin' : 'client'
   const mainItems = MAIN_NAV.filter(item => item.roles.includes(role))
   const selected = currentSidebarItem(currentSection, mainItems)
   const showInboxMenu = selected?.key === 'inbox'
+  const showBranchMenu = branches.length > 0
 
   const handleLogout = () => {
     logout()
@@ -148,15 +158,18 @@ export default function Sidebar({ companyName, onNavigate, currentSection, notif
         </div>
       </div>
 
-      <div className="hidden w-[260px] flex-col bg-slate-50/70 px-7 py-7 lg:flex">
-        <div className={clsx('mb-6', !showInboxMenu && 'mb-0')}>
+      <div className="hidden w-[280px] flex-col bg-slate-50/70 px-6 py-7 lg:flex">
+        <div className={clsx('mb-6', !showInboxMenu && !showBranchMenu && 'mb-0')}>
           <div className="truncate text-3xl font-extrabold tracking-tight text-slate-950">
             {selected?.label || 'Dashboard'}
           </div>
+          {companyName && (
+            <div className="mt-1 truncate text-xs font-semibold text-slate-400">{companyName}</div>
+          )}
         </div>
 
         {showInboxMenu && (
-          <div className="space-y-1">
+          <div className="mb-7 space-y-1">
             {INBOX_NAV.map(item => (
               <TextNavItem
                 key={item.key}
@@ -165,6 +178,40 @@ export default function Sidebar({ companyName, onNavigate, currentSection, notif
                 onClick={() => onNavigate?.(item.key)}
               />
             ))}
+          </div>
+        )}
+
+        {showBranchMenu && (
+          <div className="border-t border-slate-200 pt-5">
+            <div className="mb-3 flex items-center gap-2 px-1 text-xs font-bold uppercase tracking-wide text-slate-400">
+              <GitBranch size={13} />
+              Branches
+            </div>
+            <div className="space-y-1">
+              <TextNavItem
+                label="All branches"
+                active={activeBranchId === 'all'}
+                onClick={() => onBranchChange?.('all')}
+                badge={branches.length}
+              />
+              {branches.map(branch => (
+                <button
+                  key={branch.id}
+                  type="button"
+                  onClick={() => onBranchChange?.(branch.id)}
+                  className={clsx(
+                    'w-full rounded-lg px-3 py-2.5 text-left cursor-pointer transition-colors',
+                    activeBranchId === branch.id ? 'bg-slate-200 text-slate-950' : 'text-slate-500 hover:bg-slate-100 hover:text-slate-900'
+                  )}
+                >
+                  <div className="truncate text-sm font-semibold">{branch.name}</div>
+                  <div className="mt-1 flex items-center gap-1 text-xs text-slate-400">
+                    <MapPin size={10} />
+                    <span className="truncate">{branch.location || 'No location'}</span>
+                  </div>
+                </button>
+              ))}
+            </div>
           </div>
         )}
       </div>

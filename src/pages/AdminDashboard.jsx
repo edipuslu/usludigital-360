@@ -1,8 +1,8 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Building2, Plus, Trash2, LogOut, Zap, X, AlertTriangle, ArrowUpRight, LayoutDashboard } from 'lucide-react'
+import { Building2, Plus, Trash2, LogOut, X, AlertTriangle, ArrowUpRight, LayoutDashboard, GitBranch, MapPin } from 'lucide-react'
 import { useAuth } from '../context/AuthContext'
-import { deleteBackendCompany, getCompanies, saveBackendCompany } from '../lib/backendApi'
+import { deleteBackendCompany, getCompanies, saveBackendCompany, updateBackendCompany } from '../lib/backendApi'
 import clsx from 'clsx'
 
 const STORAGE_KEY = 'ud360_companies_v2'
@@ -72,6 +72,7 @@ export function createCompany({ name, industry }) {
       funnel: { reached: 0, replied: 0, clickedWA: 0, converted: 0 },
     },
     reports: [],
+    branches: [],
     notifications: [
       {
         id: `setup-${Date.now()}`,
@@ -91,6 +92,108 @@ export function createCompany({ name, industry }) {
       spikeAlerts: true,
     },
   }
+}
+
+function BranchModal({ company, onClose, onSave }) {
+  const [branches, setBranches] = useState(company.branches || [])
+  const [name, setName] = useState('')
+  const [location, setLocation] = useState('')
+
+  const addBranch = () => {
+    const trimmedName = name.trim()
+    if (!trimmedName) return
+    setBranches(current => [
+      ...current,
+      {
+        id: crypto.randomUUID ? crypto.randomUUID() : `branch-${Date.now().toString(36)}`,
+        name: trimmedName,
+        location: location.trim(),
+        status: 'active',
+        createdAt: new Date().toISOString(),
+      },
+    ])
+    setName('')
+    setLocation('')
+  }
+
+  const removeBranch = id => {
+    setBranches(current => current.filter(branch => branch.id !== id))
+  }
+
+  const save = () => {
+    onSave({
+      ...company,
+      branches,
+    })
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 bg-slate-950/60 backdrop-blur-sm flex items-center justify-center p-4">
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl overflow-hidden">
+        <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between">
+          <div>
+            <div className="text-slate-900 font-bold">Branches for {company.name}</div>
+            <div className="text-slate-500 text-xs mt-0.5">Only admin can add or remove branches. Clients can only view and switch tabs.</div>
+          </div>
+          <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-slate-100 text-slate-400 cursor-pointer">
+            <X size={18} />
+          </button>
+        </div>
+
+        <div className="p-6 space-y-5">
+          <div className="grid grid-cols-1 md:grid-cols-[1fr_1fr_auto] gap-3">
+            <div>
+              <label className="block text-sm font-semibold text-slate-700 mb-1.5">Branch Name</label>
+              <input value={name} onChange={e => setName(e.target.value)} className="input-field" placeholder="Istanbul Branch" autoFocus />
+            </div>
+            <div>
+              <label className="block text-sm font-semibold text-slate-700 mb-1.5">Location</label>
+              <input value={location} onChange={e => setLocation(e.target.value)} className="input-field" placeholder="City or address" />
+            </div>
+            <div className="flex items-end">
+              <button onClick={addBranch} disabled={!name.trim()} className={clsx('btn-primary h-[42px] justify-center', !name.trim() && 'opacity-50 cursor-not-allowed')}>
+                <Plus size={14} /> Add
+              </button>
+            </div>
+          </div>
+
+          <div className="rounded-xl border border-slate-200 overflow-hidden">
+            {branches.length === 0 ? (
+              <div className="py-10 text-center">
+                <GitBranch size={28} className="text-slate-300 mx-auto mb-2" />
+                <div className="text-slate-800 text-sm font-bold">No branches added</div>
+                <div className="text-slate-400 text-xs mt-1">Add a branch here and it will appear in the company sidebar.</div>
+              </div>
+            ) : (
+              <div className="divide-y divide-slate-100">
+                {branches.map(branch => (
+                  <div key={branch.id} className="flex items-center justify-between gap-3 p-4">
+                    <div className="min-w-0">
+                      <div className="text-slate-900 text-sm font-bold truncate">{branch.name}</div>
+                      <div className="text-slate-500 text-xs mt-1 flex items-center gap-1">
+                        <MapPin size={11} className="text-slate-400" />
+                        <span className="truncate">{branch.location || 'No location added'}</span>
+                      </div>
+                    </div>
+                    <button onClick={() => removeBranch(branch.id)} className="btn-danger px-3 py-2 flex-shrink-0">
+                      <Trash2 size={13} /> Remove
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+
+        <div className="px-6 py-4 border-t border-slate-100 bg-slate-50 flex items-center justify-end gap-2">
+          <button onClick={onClose} className="btn-secondary">Cancel</button>
+          <button onClick={save} className="btn-primary">
+            Save Branches
+          </button>
+        </div>
+      </div>
+    </div>
+  )
 }
 
 export function loadCompanies() {
@@ -189,6 +292,7 @@ export default function AdminDashboard() {
   const [error, setError] = useState('')
   const [showCreate, setShowCreate] = useState(false)
   const [deleteCompany, setDeleteCompany] = useState(null)
+  const [branchCompany, setBranchCompany] = useState(null)
 
   useEffect(() => {
     let alive = true
@@ -242,6 +346,18 @@ export default function AdminDashboard() {
       setError(err.message || 'Company was removed on this device, but backend delete failed.')
     }
     setDeleteCompany(null)
+  }
+
+  const saveBranches = async company => {
+    const next = companies.map(current => current.id === company.id ? company : current)
+    persist(next)
+    try {
+      await updateBackendCompany(company)
+      setError('')
+    } catch (err) {
+      setError(err.message || 'Branches were saved on this device, but backend sync failed.')
+    }
+    setBranchCompany(null)
   }
 
   const signOut = () => {
@@ -339,10 +455,17 @@ export default function AdminDashboard() {
                         <div className="text-slate-400 text-xs">Reports</div>
                         <div className="text-slate-900 font-bold text-sm mt-1">{company.reports.length}</div>
                       </div>
+                      <div className="bg-slate-50 rounded-lg p-3 col-span-2">
+                        <div className="text-slate-400 text-xs">Branches</div>
+                        <div className="text-slate-900 font-bold text-sm mt-1">{company.branches?.length || 0}</div>
+                      </div>
                     </div>
-                    <div className="flex items-center gap-2">
-                      <button onClick={() => navigate(`/company/${company.id}`)} className="btn-primary flex-1 justify-center">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <button onClick={() => navigate(`/company/${company.id}`)} className="btn-primary min-w-[120px] flex-1 justify-center">
                         Open <ArrowUpRight size={14} />
+                      </button>
+                      <button onClick={() => setBranchCompany(company)} className="btn-secondary justify-center">
+                        <GitBranch size={14} /> Branches
                       </button>
                       <button onClick={() => setDeleteCompany(company)} className="btn-danger">
                         <Trash2 size={14} /> Delete
@@ -358,6 +481,7 @@ export default function AdminDashboard() {
 
       {showCreate && <CompanyModal onClose={() => setShowCreate(false)} onCreate={create} />}
       {deleteCompany && <DeleteModal company={deleteCompany} onClose={() => setDeleteCompany(null)} onDelete={remove} />}
+      {branchCompany && <BranchModal company={branchCompany} onClose={() => setBranchCompany(null)} onSave={saveBranches} />}
     </div>
   )
 }
