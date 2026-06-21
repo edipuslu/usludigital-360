@@ -11,6 +11,8 @@ const CHARACTER_COLORS = {
   pink: '#f42582',
 }
 
+const FIREWORK_COLORS = [CHARACTER_COLORS.red, CHARACTER_COLORS.orange, CHARACTER_COLORS.blue, CHARACTER_COLORS.pink, '#ffffff']
+
 const Pupil = ({ size = 12, maxDistance = 5, forceLookX, forceLookY }) => {
   const [mouse, setMouse] = useState({ x: 0, y: 0 })
   const pupilRef = useRef(null)
@@ -361,6 +363,34 @@ const AnimatedLoginCharacters = ({ isTyping, showPassword, passwordValue }) => {
   )
 }
 
+const FireworksLayer = ({ bursts }) => (
+  <div className="login-fireworks-layer" aria-hidden="true">
+    {bursts.map(burst => (
+      <div
+        key={burst.id}
+        className="login-firework"
+        style={{ '--burst-x': `${burst.x}px`, '--burst-y': `${burst.y}px` }}
+      >
+        <span className="login-firework__ring login-firework__ring--outer" />
+        <span className="login-firework__ring login-firework__ring--inner" />
+        {burst.particles.map(particle => (
+          <span
+            key={particle.id}
+            className="login-firework__spark"
+            style={{
+              '--spark-x': `${particle.x}px`,
+              '--spark-y': `${particle.y}px`,
+              '--spark-color': particle.color,
+              '--spark-size': `${particle.size}px`,
+              '--spark-delay': `${particle.delay}ms`,
+            }}
+          />
+        ))}
+      </div>
+    ))}
+  </div>
+)
+
 export default function LoginPage() {
   const { login } = useAuth()
   const navigate = useNavigate()
@@ -369,6 +399,7 @@ export default function LoginPage() {
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
   const [isTyping, setIsTyping] = useState(false)
+  const [fireworks, setFireworks] = useState([])
 
   useEffect(() => {
     document.body.style.overflow = 'hidden'
@@ -378,6 +409,30 @@ export default function LoginPage() {
       document.documentElement.style.overflow = 'unset'
     }
   }, [])
+
+  const createFirework = event => {
+    if (event.button !== 0) return
+    if (window.matchMedia?.('(prefers-reduced-motion: reduce)').matches) return
+
+    const id = `${Date.now()}-${Math.random()}`
+    const particles = Array.from({ length: 46 }, (_, index) => {
+      const angle = (Math.PI * 2 * index) / 46 + (Math.random() - 0.5) * 0.55
+      const distance = 58 + Math.random() * 118
+      return {
+        id: `${id}-${index}`,
+        x: Math.cos(angle) * distance,
+        y: Math.sin(angle) * distance - Math.random() * 26,
+        color: FIREWORK_COLORS[index % FIREWORK_COLORS.length],
+        size: 3 + Math.random() * 4,
+        delay: Math.random() * 80,
+      }
+    })
+
+    setFireworks(current => [...current.slice(-5), { id, x: event.clientX, y: event.clientY, particles }])
+    window.setTimeout(() => {
+      setFireworks(current => current.filter(burst => burst.id !== id))
+    }, 1200)
+  }
 
   const handleSubmit = async e => {
     e.preventDefault()
@@ -399,7 +454,8 @@ export default function LoginPage() {
   const fillDemo = (email, password) => setForm({ email, password })
 
   return (
-    <div className="h-screen flex overflow-hidden" style={{ background: '#060912' }}>
+    <div onPointerDown={createFirework} className="h-screen flex overflow-hidden" style={{ background: '#060912' }}>
+      <FireworksLayer bursts={fireworks} />
       {/* Left panel */}
       <div className="hidden lg:flex relative w-[52%] h-screen flex-col overflow-hidden px-12 py-10 text-white">
         <div className="relative z-10 flex items-center justify-between">
