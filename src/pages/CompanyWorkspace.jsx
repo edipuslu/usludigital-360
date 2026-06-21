@@ -321,7 +321,9 @@ export default function CompanyWorkspace() {
   const [syncError, setSyncError] = useState('')
   const [activeBranchId, setActiveBranchId] = useState('all')
   const activeTab = tabFromSection(section)
-  const selectedCompanyId = user?.companyId || window.sessionStorage.getItem('ud360_active_company_id')
+  const selectedCompanyId = isAdmin
+    ? window.sessionStorage.getItem('ud360_active_company_id')
+    : user?.companyId || window.sessionStorage.getItem('ud360_active_company_id')
 
   useEffect(() => {
     let alive = true
