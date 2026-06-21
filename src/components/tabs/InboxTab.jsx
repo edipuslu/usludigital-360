@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
-import { MessageCircle, Send, Search, Filter, Heart, MessageSquare, Calendar, User, ExternalLink, Loader, AlertTriangle, Calculator, RefreshCw, Plus, Settings, Archive, Clock } from 'lucide-react'
-import { PlatformIcon } from '../ui/UIKit'
+import { MessageCircle, Send, Search, Filter, Heart, MessageSquare, Calendar, User, ExternalLink, AlertTriangle, Calculator, RefreshCw, Plus, Settings, Archive, Clock } from 'lucide-react'
+import { PlatformIcon, UsluLoader } from '../ui/UIKit'
 import { estimateBackfillReplies, fetchInbox, replyToInboxItem, runBackfillReplies, createTestDM } from '../../lib/backendApi'
 import clsx from 'clsx'
 
@@ -105,7 +105,7 @@ function MessageCard({ msg, onReply, isReply = false, isAdmin = true }) {
               <textarea value={replyText} onChange={e => setReplyText(e.target.value)} placeholder="Type your reply…" rows={2} className="input-field flex-1 resize-none text-xs" />
               <div className="flex flex-col gap-2">
                 <button onClick={handleSendReply} disabled={!replyText.trim() || sending} className="btn-primary text-xs py-2 px-3 justify-center disabled:opacity-50">
-                  {sending ? <Loader size={12} className="animate-spin" /> : <Send size={12} />}
+                  {sending ? <UsluLoader size="xs" /> : <Send size={12} />}
                 </button>
                 <button onClick={() => { setShowReplyBox(false); setReplyText('') }} className="btn-secondary text-xs py-2 px-3 justify-center">Cancel</button>
               </div>
@@ -251,7 +251,7 @@ function OverviewPanel({ messages, onRefresh, company }) {
           <p className="text-slate-500 text-sm mt-1">Choose a platform to inspect comments and DMs.</p>
         </div>
         <button onClick={() => handleTestDM('instagram')} disabled={testing} className="btn-secondary text-xs">
-          {testing ? <Loader size={12} className="animate-spin" /> : <Plus size={12} />} Test DM
+          {testing ? <UsluLoader size="xs" /> : <Plus size={12} />} Test DM
         </button>
       </div>
 
@@ -365,7 +365,7 @@ function BackfillPanel({ company, platform, onCompleted }) {
             </div>
             <div className="flex items-end">
               <button onClick={handleEstimate} disabled={loading} className="btn-secondary w-full justify-center">
-                {loading ? <Loader size={14} className="animate-spin" /> : <Calculator size={14} />} Estimate
+                {loading ? <UsluLoader size="xs" /> : <Calculator size={14} />} Estimate
               </button>
             </div>
           </div>
@@ -384,7 +384,7 @@ function BackfillPanel({ company, platform, onCompleted }) {
               <div className="mt-3 grid grid-cols-1 md:grid-cols-[1fr_auto] gap-2">
                 <input value={confirm} onChange={e => setConfirm(e.target.value)} className="input-field" placeholder="Type CONFIRM to start replying" />
                 <button onClick={handleRun} disabled={confirm !== 'CONFIRM' || running || !estimate.selected} className={clsx('btn-danger justify-center', (confirm !== 'CONFIRM' || running || !estimate.selected) && 'opacity-50 cursor-not-allowed')}>
-                  {running ? <Loader size={14} className="animate-spin" /> : <Send size={14} />} Start Replies
+                  {running ? <UsluLoader size="xs" /> : <Send size={14} />} Start Replies
                 </button>
               </div>
             </div>
@@ -645,7 +645,7 @@ export default function InboxTab({ company, platform, isAdmin = true }) {
             </div>
             {isAdmin && (
               <button onClick={syncLiveMessages} disabled={syncing} className="mt-3 inline-flex h-9 w-full items-center justify-center gap-2 rounded-lg border border-slate-200 font-bold text-slate-700 hover:bg-slate-50 disabled:opacity-50">
-                {syncing ? <Loader size={13} className="animate-spin" /> : <RefreshCw size={13} />} Sync now
+                {syncing ? <UsluLoader size="xs" /> : <RefreshCw size={13} />} Sync now
               </button>
             )}
           </div>
@@ -685,7 +685,7 @@ export default function InboxTab({ company, platform, isAdmin = true }) {
               {isAdmin && <BackfillPanel company={company} platform={platform} onCompleted={reloadInbox} />}
               {isAdmin && (
                 <button onClick={() => handleTestDM(platform || 'instagram')} disabled={syncing} className="mt-3 inline-flex h-10 items-center gap-2 rounded-lg bg-blue-600 px-4 text-sm font-bold text-white hover:bg-blue-700 disabled:opacity-50">
-                  {syncing ? <Loader size={14} className="animate-spin" /> : <Plus size={14} />} Test DM
+                  {syncing ? <UsluLoader size="xs" /> : <Plus size={14} />} Test DM
                 </button>
               )}
             </div>
@@ -694,7 +694,7 @@ export default function InboxTab({ company, platform, isAdmin = true }) {
           <div className="h-[calc(100vh-215px)] overflow-y-auto">
             {loading ? (
               <div className="flex h-full items-center justify-center">
-                <Loader size={28} className="animate-spin text-blue-600" />
+                <UsluLoader size="lg" />
               </div>
             ) : visibleMessages.length === 0 ? (
               <div className="flex h-full flex-col items-center justify-center px-8 text-center">

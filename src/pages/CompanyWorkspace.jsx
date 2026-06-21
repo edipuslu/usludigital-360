@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { Bell, Settings, CheckCircle2, Mail, Save, Trash2, AlertCircle, GitBranch, MapPin, Users, History, Monitor, KeyRound } from 'lucide-react'
 import Sidebar from '../components/layout/Sidebar'
-import { PlatformIcon } from '../components/ui/UIKit'
+import { PlatformIcon, UsluLoader } from '../components/ui/UIKit'
 import { useAuth } from '../context/AuthContext'
 import { normalizeCompany } from './AdminDashboard'
 import { getCompanies, updateBackendCompany } from '../lib/backendApi'
@@ -340,6 +340,7 @@ export default function CompanyWorkspace() {
     return (
       <div className="min-h-screen flex items-center justify-center bg-slate-50">
         <div className="text-center">
+          <UsluLoader size="lg" className="mb-4" />
           <div className="text-slate-900 font-bold text-xl mb-2">Loading workspace...</div>
           <div className="text-slate-500 text-sm">Checking the shared backend data.</div>
         </div>

@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Eye, EyeOff, Zap, ArrowRight, CheckCircle2, Shield, Brain, BarChart3 } from 'lucide-react'
 import { useAuth } from '../context/AuthContext'
+import { UsluLoader } from '../components/ui/UIKit'
 
 const Feature = ({ icon: Icon, title, desc }) => (
   <div className="flex items-start gap-3">
@@ -127,7 +128,7 @@ export default function LoginPage() {
             >
               {loading ? (
                 <>
-                  <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                  <UsluLoader size="xs" />
                   Signing in...
                 </>
               ) : (

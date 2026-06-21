@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
-import { X, ExternalLink, ChevronRight, Copy, CheckCircle2, AlertCircle, Link2, Info, LogIn, Loader } from 'lucide-react'
-import { PlatformIcon } from '../ui/UIKit'
+import { X, ExternalLink, ChevronRight, Copy, CheckCircle2, AlertCircle, Link2, Info, LogIn } from 'lucide-react'
+import { PlatformIcon, UsluLoader } from '../ui/UIKit'
 import { backendUrl, deleteConnection, getConnections, registerConnection, saveBackendAiConfig } from '../../lib/backendApi'
 import clsx from 'clsx'
 
@@ -576,7 +576,7 @@ function ConnectionGuideModal({ platform, guide, onClose, onSave, existingCreden
             className={clsx('btn-primary', (!allFilled || saving) && 'opacity-50 cursor-not-allowed')}
           >
             {saving ? (
-              <><div className="w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin" />Verifying…</>
+              <><UsluLoader size="xs" />Verifying...</>
             ) : (
               <><CheckCircle2 size={14} />Save & Verify Connection</>
             )}
@@ -652,7 +652,7 @@ function PlatformCard({ platform, guide, data, backendConnections = [], onConnec
                   className="h-9 inline-flex items-center gap-1.5 rounded-lg px-3 text-xs font-bold text-white cursor-pointer disabled:opacity-60 transition-colors"
                   style={{ background: guide.color }}
                 >
-                  {oauthLoading ? <Loader size={13} className="animate-spin" /> : <LogIn size={13} />}
+                  {oauthLoading ? <UsluLoader size="xs" /> : <LogIn size={13} />}
                   Login
                 </button>
               )}
@@ -690,7 +690,7 @@ function PlatformCard({ platform, guide, data, backendConnections = [], onConnec
                 style={{ background: guide.color }}
               >
                 <div className="flex items-center gap-2 text-left">
-                  {oauthLoading ? <Loader size={16} className="animate-spin" /> : <LogIn size={16} />}
+                  {oauthLoading ? <UsluLoader size="xs" /> : <LogIn size={16} />}
                   <div>
                     <div className="font-semibold text-sm">Login with {guide.name}</div>
                     <div className="text-white/80 text-xs mt-0.5">Choose the exact account or page to connect.</div>

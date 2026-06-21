@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Upload, FileText, Trash2, CheckCircle2, RefreshCw, Brain, Shield, Globe, MessageSquare, Plus, Eye, EyeOff, ExternalLink, AlertCircle, Zap, Key, Sparkles, Send } from 'lucide-react'
-import { StatusBadge, Toggle } from '../ui/UIKit'
+import { StatusBadge, Toggle, UsluLoader } from '../ui/UIKit'
 import { getBackendAiConfig, saveBackendAiConfig, testBackendAiReply } from '../../lib/backendApi'
 import clsx from 'clsx'
 
@@ -251,7 +251,7 @@ function OpenAIKeySection({ apiKey, hasSavedKey, onKeyChange }) {
             className={clsx('btn-primary flex-1 justify-center', (!inputKey.trim() || status === 'testing') && 'opacity-50 cursor-not-allowed')}
           >
             {status === 'testing' ? (
-              <><div className="w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin" />Verifying Key…</>
+              <><UsluLoader size="xs" />Verifying Key...</>
             ) : (
               <><CheckCircle2 size={14} />Verify & Save Key</>
             )}
@@ -643,7 +643,7 @@ export default function AITrainingTab({ company, onUpdate, onNotify, isAdmin = t
                 disabled={!testInput.trim() || testing || !hasSavedApiKey}
                 className="btn-primary disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                {testing ? <><div className="w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin" />Generating…</> : <><Brain size={14} />Generate AI Reply</>}
+                {testing ? <><UsluLoader size="xs" />Generating...</> : <><Brain size={14} />Generate AI Reply</>}
               </button>
               {testError && (
                 <div className="bg-red-50 border border-red-200 rounded-xl p-3 flex items-start gap-2">

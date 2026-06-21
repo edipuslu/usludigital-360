@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { FileText, Download, Send, TrendingUp, MessageSquare, Star, ChevronRight, Calendar, BarChart3, CheckCircle2, Trash2 } from 'lucide-react'
-import { SectionHeader, EmptyState, StatusBadge } from '../ui/UIKit'
+import { SectionHeader, EmptyState, StatusBadge, UsluLoader } from '../ui/UIKit'
 import clsx from 'clsx'
 import html2pdf from 'html2pdf.js'
 
@@ -244,7 +244,7 @@ function ReportCard({ report, isAdmin, company, onNotify, onDelete }) {
             {isAdmin && (
               <button onClick={handleSendClick} disabled={sending || sent} className={clsx('btn-secondary', sent && 'text-emerald-600 border-emerald-200 bg-emerald-50')}>
                 {sending ? (
-                  <><div className="w-3.5 h-3.5 border-2 border-slate-300 border-t-slate-600 rounded-full animate-spin" />Sending…</>
+                  <><UsluLoader size="xs" />Sending...</>
                 ) : sent ? (
                   <><CheckCircle2 size={14} className="text-emerald-600" />Sent</>
                 ) : (
@@ -316,7 +316,7 @@ function ReportCard({ report, isAdmin, company, onNotify, onDelete }) {
                 className="flex-1 btn-primary flex items-center justify-center gap-2"
               >
                 {sending ? (
-                  <><div className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin" />Sending...</>
+                  <><UsluLoader size="xs" />Sending...</>
                 ) : (
                   <><Send size={14} />Send Report</>
                 )}

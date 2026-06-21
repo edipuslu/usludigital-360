@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
-import { BarChart3, ExternalLink, FileText, Loader, MessageCircle, RefreshCw, UserPlus, Users } from 'lucide-react'
+import { BarChart3, ExternalLink, FileText, MessageCircle, RefreshCw, UserPlus, Users } from 'lucide-react'
 import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
-import { SectionHeader, PlatformIcon } from '../ui/UIKit'
+import { SectionHeader, PlatformIcon, UsluLoader } from '../ui/UIKit'
 import { fetchGrowthMetrics } from '../../lib/backendApi'
 
 const PLATFORM_ORDER = ['instagram', 'facebook', 'youtube', 'whatsapp']
@@ -480,7 +480,7 @@ export default function GrowthTab({ company, platform }) {
   if (loading) {
     return (
       <div className="flex items-center justify-center py-16">
-        <Loader size={32} className="animate-spin text-blue-600" />
+        <UsluLoader size="lg" />
       </div>
     )
   }
@@ -519,7 +519,7 @@ export default function GrowthTab({ company, platform }) {
           <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4 mb-8">
             <SectionHeader title={activeTitle} description={activeDescription} />
             <button onClick={refreshGrowth} disabled={refreshing} className="btn-secondary self-start">
-              <RefreshCw size={14} className={refreshing ? 'animate-spin' : ''} />
+              {refreshing ? <UsluLoader size="xs" /> : <RefreshCw size={14} />}
               Refresh
             </button>
           </div>

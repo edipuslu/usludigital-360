@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { Save, Plus, X, Zap, MessageSquare, Link2, Volume2, ShieldOff, Clock } from 'lucide-react'
-import { PlatformIcon, Toggle, SectionHeader } from '../ui/UIKit'
+import { PlatformIcon, Toggle, SectionHeader, UsluLoader } from '../ui/UIKit'
 import { saveBackendAiConfig } from '../../lib/backendApi'
 import clsx from 'clsx'
 
@@ -186,7 +186,7 @@ export default function AutomationTab({ company, onUpdate, onNotify }) {
         description="Control how AI behaves across each platform — reply types, tone and restrictions"
         action={
           <button onClick={handleSave} className="btn-primary">
-            {saved ? <><div className="w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin" />Saving…</> : <><Save size={14} />Save Changes</>}
+            {saved ? <><UsluLoader size="xs" />Saving...</> : <><Save size={14} />Save Changes</>}
           </button>
         }
       />

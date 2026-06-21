@@ -1,6 +1,34 @@
 import { ChevronUp, ChevronDown, TrendingUp } from 'lucide-react'
 import clsx from 'clsx'
 
+export const UsluLoader = ({ size = 'md', label, className }) => {
+  const sizes = {
+    xs: 'h-4 w-4',
+    sm: 'h-5 w-5',
+    md: 'h-12 w-12',
+    lg: 'h-20 w-20',
+    xl: 'h-24 w-24',
+  }
+
+  return (
+    <div className={clsx('inline-flex items-center justify-center gap-3', className)}>
+      <svg
+        className={clsx('uslu-loader flex-shrink-0', sizes[size] || sizes.md)}
+        viewBox="0 0 240 240"
+        aria-hidden={label ? undefined : 'true'}
+        role={label ? 'img' : undefined}
+      >
+        {label && <title>{label}</title>}
+        <circle className="uslu-loader__ring uslu-loader__ring--a" cx="120" cy="120" r="105" fill="none" strokeWidth="20" strokeDasharray="0 660" strokeDashoffset="-330" strokeLinecap="round" />
+        <circle className="uslu-loader__ring uslu-loader__ring--b" cx="120" cy="120" r="35" fill="none" strokeWidth="20" strokeDasharray="0 220" strokeDashoffset="-110" strokeLinecap="round" />
+        <circle className="uslu-loader__ring uslu-loader__ring--c" cx="85" cy="120" r="70" fill="none" strokeWidth="20" strokeDasharray="0 440" strokeLinecap="round" />
+        <circle className="uslu-loader__ring uslu-loader__ring--d" cx="155" cy="120" r="70" fill="none" strokeWidth="20" strokeDasharray="0 440" strokeLinecap="round" />
+      </svg>
+      {label && <span className="text-sm font-bold text-slate-700">{label}</span>}
+    </div>
+  )
+}
+
 export const StatusDot = ({ status, size = 'sm' }) => {
   const colors = { active: 'bg-emerald-500', paused: 'bg-amber-400', error: 'bg-red-500', offline: 'bg-slate-300', training: 'bg-blue-500' }
   const sizes = { sm: 'w-2 h-2', md: 'w-2.5 h-2.5', lg: 'w-3 h-3' }

@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { Building2, Plus, Trash2, LogOut, X, AlertTriangle, ArrowUpRight, GitBranch, MapPin, Search, RefreshCw, ShieldCheck } from 'lucide-react'
 import { useAuth } from '../context/AuthContext'
 import { deleteBackendCompany, getCompanies, saveBackendCompany, updateBackendCompany } from '../lib/backendApi'
+import { UsluLoader } from '../components/ui/UIKit'
 import clsx from 'clsx'
 
 const emptyDaily = Array.from({ length: 30 }, (_, i) => ({ day: i + 1, date: `Jun ${i + 1}`, clicks: 0, replies: 0 }))
@@ -421,7 +422,7 @@ export default function AdminDashboard() {
           </div>
           <div className="flex items-center gap-2">
             <button onClick={() => loadFromBackend(true)} disabled={loading} className="inline-flex h-11 items-center gap-2 rounded-lg border border-slate-200 bg-white px-4 text-sm font-bold text-slate-700 hover:bg-slate-50 disabled:opacity-50">
-              <RefreshCw size={15} className={loading ? 'animate-spin' : ''} /> Refresh
+              {loading ? <UsluLoader size="xs" /> : <RefreshCw size={15} />} Refresh
             </button>
             <button onClick={() => setShowCreate(true)} className="btn-primary h-11"><Plus size={14} /> New Company</button>
             <button onClick={signOut} className="inline-flex h-11 items-center gap-2 rounded-lg border border-slate-200 bg-white px-4 text-sm font-bold text-slate-600 hover:bg-red-50 hover:text-red-600">
@@ -485,7 +486,7 @@ export default function AdminDashboard() {
 
             {loading ? (
               <div className="p-12 text-center">
-                <RefreshCw size={28} className="mx-auto mb-3 animate-spin text-blue-600" />
+                <UsluLoader size="lg" className="mb-3" />
                 <div className="text-lg font-bold text-slate-900">Loading companies...</div>
                 <p className="mt-1 text-sm text-slate-500">Checking Supabase through the backend.</p>
               </div>
