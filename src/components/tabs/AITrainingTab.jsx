@@ -310,9 +310,8 @@ export default function AITrainingTab({ company, onUpdate, onNotify, isAdmin = t
   const [testResponse, setTestResponse] = useState('')
   const [testing, setTesting] = useState(false)
   const [testError, setTestError] = useState('')
-  const [apiKey, setApiKey] = useState(() => localStorage.getItem('ud360_openai_key') || '')
-  const [hasSavedApiKey, setHasSavedApiKey] = useState(() => Boolean(localStorage.getItem('ud360_openai_key') || company.hasOpenaiKey))
-  const [setupOpen, setSetupOpen] = useState(() => Boolean(company.aiTraining.description || company.aiTraining.websiteUrl || company.aiTraining.documents?.length || company.hasOpenaiKey || localStorage.getItem('ud360_openai_key')))
+  const [hasSavedApiKey, setHasSavedApiKey] = useState(() => Boolean(company.hasOpenaiKey))
+  const [setupOpen, setSetupOpen] = useState(() => Boolean(company.aiTraining.description || company.aiTraining.websiteUrl || company.aiTraining.documents?.length || company.hasOpenaiKey))
   const [focusSection, setFocusSection] = useState('knowledge')
 
   useEffect(() => {
@@ -324,7 +323,7 @@ export default function AITrainingTab({ company, onUpdate, onNotify, isAdmin = t
       })
       .catch(() => {
         if (!alive) return
-        setHasSavedApiKey(Boolean(localStorage.getItem('ud360_openai_key') || company.hasOpenaiKey))
+        setHasSavedApiKey(Boolean(company.hasOpenaiKey))
       })
     return () => {
       alive = false
@@ -381,8 +380,8 @@ export default function AITrainingTab({ company, onUpdate, onNotify, isAdmin = t
 
   const handleTest = async () => {
     if (!testInput.trim()) return
-    if (!apiKey && !hasSavedApiKey) {
-      setTestError('Please add and verify your OpenAI API key first.')
+    if (!hasSavedApiKey) {
+      setTestError('Add the shared OpenAI API key in Settings > API Keys first.')
       return
     }
     setTesting(true)
@@ -390,20 +389,6 @@ export default function AITrainingTab({ company, onUpdate, onNotify, isAdmin = t
     setTestResponse('')
 
     try {
-      if (apiKey) {
-        await saveBackendAiConfig({
-          ...company,
-          aiTraining: {
-            ...company.aiTraining,
-            documents: docs,
-            websiteUrl,
-            guardrails,
-            fallbackMessage: fallback,
-            description,
-            tone: selectedTone,
-          },
-        }, apiKey)
-      }
       const data = await testBackendAiReply(company.id, testInput)
       setTestResponse(data.reply)
     } catch (err) {
@@ -527,38 +512,37 @@ export default function AITrainingTab({ company, onUpdate, onNotify, isAdmin = t
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Left — OpenAI key + documents */}
+        {/* Left — provider status + documents */}
         <div className="lg:col-span-2 space-y-5">
           {isAdmin ? (
-            <OpenAIKeySection apiKey={apiKey} hasSavedKey={hasSavedApiKey} onKeyChange={async key => {
-              setApiKey(key)
-              setHasSavedApiKey(Boolean(key))
-              const automation = key ? {
-                ...company.automation,
-                instagram: { ...(company.automation?.instagram || {}), dmReply: true, commentReply: true },
-                facebook: { ...(company.automation?.facebook || {}), dmReply: true, commentReply: true },
-                whatsapp: { ...(company.automation?.whatsapp || {}), dmReply: true },
-              } : company.automation
-              try {
-                await saveBackendAiConfig({
-                  ...company,
-                  automation,
-                  aiTraining: {
-                    ...company.aiTraining,
-                    documents: docs,
-                    websiteUrl,
-                    guardrails,
-                    fallbackMessage: fallback,
-                    description,
-                    tone: selectedTone,
-                  },
-                }, key)
-                onUpdate?.(current => ({ ...current, automation, hasOpenaiKey: Boolean(key) }))
-                onNotify?.(key ? 'OpenAI key saved for all companies. Comment and DM auto-replies are enabled.' : 'OpenAI key removed from all companies.', 'success')
-              } catch (err) {
-                onNotify?.(`OpenAI key changed locally, but backend sync failed: ${err.message}`, 'warning')
-              }
-            }} />
+            <div className="rounded-lg border border-slate-200 bg-white p-5">
+              <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+                <div className="flex items-center gap-4">
+                  <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-slate-950 text-white">
+                    <Key size={20} />
+                  </div>
+                  <div>
+                    <h3 className="text-base font-extrabold text-slate-950">Shared AI Provider</h3>
+                    <p className="text-sm font-medium text-slate-500">The OpenAI key is managed once in Settings and applies to every company.</p>
+                  </div>
+                </div>
+                <span className={clsx('inline-flex w-fit rounded-full px-3 py-1 text-xs font-extrabold', hasSavedApiKey ? 'bg-emerald-50 text-emerald-700' : 'bg-orange-50 text-orange-700')}>
+                  {hasSavedApiKey ? 'Ready for testing' : 'Needs key'}
+                </span>
+              </div>
+              <div className="mt-5 grid grid-cols-1 gap-3 sm:grid-cols-3">
+                {[
+                  ['Scope', 'All companies'],
+                  ['Replies', 'Comments and DMs'],
+                  ['Manage', 'Settings > API Keys'],
+                ].map(([label, value]) => (
+                  <div key={label} className="rounded-lg border border-slate-100 bg-slate-50 p-4">
+                    <div className="text-xs font-extrabold uppercase tracking-wide text-slate-400">{label}</div>
+                    <div className="mt-1 text-sm font-bold text-slate-800">{value}</div>
+                  </div>
+                ))}
+              </div>
+            </div>
           ) : (
             <div className="card p-5">
               <div className="flex items-center gap-2 mb-2">
@@ -627,7 +611,7 @@ export default function AITrainingTab({ company, onUpdate, onNotify, isAdmin = t
               <Brain size={15} className="text-slate-400" /> Test AI Responses
             </h3>
             <p className="text-slate-400 text-sm mb-4">
-              {hasSavedApiKey ? 'Powered by the cheapest available OpenAI model — type any question a customer might ask' : 'Add your OpenAI API key above to test real AI responses'}
+              {hasSavedApiKey ? 'Powered by the cheapest available OpenAI model — type any question a customer might ask' : 'Add your shared OpenAI API key in Settings > API Keys to test real AI responses'}
             </p>
             <div className="space-y-3">
               <textarea

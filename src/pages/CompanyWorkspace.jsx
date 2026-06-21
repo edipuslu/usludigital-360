@@ -1,11 +1,11 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import { Bell, Settings, CheckCircle2, Mail, Save, Trash2, AlertCircle, GitBranch, MapPin, Users, History, Monitor, KeyRound } from 'lucide-react'
+import { Bell, Settings, CheckCircle2, Mail, Save, Trash2, AlertCircle, GitBranch, MapPin, Users, History, Monitor, KeyRound, Eye, EyeOff } from 'lucide-react'
 import Sidebar from '../components/layout/Sidebar'
 import { PlatformIcon, UsluLoader } from '../components/ui/UIKit'
 import { useAuth } from '../context/AuthContext'
 import { normalizeCompany } from './AdminDashboard'
-import { getCompanies, updateBackendCompany } from '../lib/backendApi'
+import { getBackendAiConfig, getCompanies, saveBackendAiConfig, updateBackendCompany } from '../lib/backendApi'
 import OverviewTab from '../components/tabs/OverviewTab'
 import PlatformsTab from '../components/tabs/PlatformsTab'
 import InboxTab from '../components/tabs/InboxTab'
@@ -157,6 +157,146 @@ function PlaceholderSetting({ title, description, icon: Icon }) {
   )
 }
 
+function ApiKeysSetting({ company, onNotify }) {
+  const [key, setKey] = useState('')
+  const [hasSavedKey, setHasSavedKey] = useState(Boolean(company?.hasOpenaiKey))
+  const [showKey, setShowKey] = useState(false)
+  const [saving, setSaving] = useState(false)
+  const [status, setStatus] = useState('')
+  const [deleteText, setDeleteText] = useState('')
+
+  useEffect(() => {
+    let alive = true
+    getBackendAiConfig(company.id)
+      .then(config => {
+        if (!alive) return
+        setHasSavedKey(Boolean(config.hasOpenaiKey))
+      })
+      .catch(() => {
+        if (!alive) return
+        setHasSavedKey(Boolean(company?.hasOpenaiKey))
+      })
+    return () => {
+      alive = false
+    }
+  }, [company?.id, company?.hasOpenaiKey])
+
+  const saveKey = async () => {
+    const trimmedKey = key.trim()
+    if (!trimmedKey) {
+      setStatus('Paste the OpenAI API key before saving.')
+      return
+    }
+    setSaving(true)
+    setStatus('')
+    try {
+      await saveBackendAiConfig(company, trimmedKey)
+      setHasSavedKey(true)
+      setKey('')
+      onNotify?.('Shared OpenAI API key saved for all companies.', 'success')
+      setStatus('Saved. This key is now used by every company workspace.')
+    } catch (err) {
+      setStatus(err.message || 'Could not save the API key.')
+      onNotify?.(`OpenAI key save failed: ${err.message}`, 'warning')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const removeKey = async () => {
+    if (deleteText !== 'DELETE') {
+      setStatus('Type DELETE exactly before removing the shared key.')
+      return
+    }
+    setSaving(true)
+    setStatus('')
+    try {
+      await saveBackendAiConfig(company, '')
+      setHasSavedKey(false)
+      setDeleteText('')
+      onNotify?.('Shared OpenAI API key removed.', 'success')
+      setStatus('Removed. AI replies will stay off until a key is saved again.')
+    } catch (err) {
+      setStatus(err.message || 'Could not remove the API key.')
+      onNotify?.(`OpenAI key removal failed: ${err.message}`, 'warning')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  return (
+    <div className="animate-slide-in">
+      <div className="mb-8">
+        <h2 className="text-3xl font-extrabold tracking-tight text-slate-950">API Keys</h2>
+        <p className="mt-1 text-sm font-medium text-slate-500">One shared AI provider key is used across every company you manage.</p>
+      </div>
+
+      <div className="rounded-lg border border-slate-200 bg-white">
+        <div className="flex flex-col gap-4 border-b border-slate-200 p-6 lg:flex-row lg:items-center lg:justify-between">
+          <div className="flex items-center gap-4">
+            <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-slate-950 text-white">
+              <KeyRound size={22} />
+            </div>
+            <div>
+              <h3 className="text-lg font-extrabold text-slate-950">OpenAI</h3>
+              <p className="text-sm font-medium text-slate-500">Used for AI comment replies, DM replies, and reply testing.</p>
+            </div>
+          </div>
+          <span className={clsx('inline-flex w-fit rounded-full px-3 py-1 text-xs font-extrabold', hasSavedKey ? 'bg-emerald-50 text-emerald-700' : 'bg-orange-50 text-orange-700')}>
+            {hasSavedKey ? 'Connected' : 'Missing key'}
+          </span>
+        </div>
+
+        <div className="grid grid-cols-1 gap-6 p-6 lg:grid-cols-[1fr_280px]">
+          <div>
+            <label className="mb-1.5 block text-sm font-semibold text-slate-700">Shared OpenAI API Key</label>
+            <div className="flex gap-2">
+              <input
+                value={key}
+                onChange={e => setKey(e.target.value)}
+                type={showKey ? 'text' : 'password'}
+                className="input-field"
+                placeholder={hasSavedKey ? 'A key is already saved. Paste a new key to replace it.' : 'sk-...'}
+                autoComplete="off"
+              />
+              <button type="button" onClick={() => setShowKey(value => !value)} className="btn-secondary px-3" title={showKey ? 'Hide key' : 'Show key'}>
+                {showKey ? <EyeOff size={16} /> : <Eye size={16} />}
+              </button>
+            </div>
+            <p className="mt-2 text-xs font-medium text-slate-500">
+              Save it once here. New and existing companies will use the same provider key automatically.
+            </p>
+          </div>
+
+          <div className="flex items-end">
+            <button type="button" onClick={saveKey} disabled={saving || !key.trim()} className="btn-primary w-full justify-center disabled:cursor-not-allowed disabled:opacity-50">
+              {saving ? <><UsluLoader size="xs" /> Saving</> : <><Save size={14} /> Save Key</>}
+            </button>
+          </div>
+        </div>
+
+        <div className="border-t border-slate-200 bg-slate-50 p-6">
+          <div className="grid grid-cols-1 gap-4 lg:grid-cols-[1fr_280px] lg:items-end">
+            <div>
+              <label className="mb-1.5 block text-sm font-semibold text-slate-700">Remove shared key</label>
+              <input
+                value={deleteText}
+                onChange={e => setDeleteText(e.target.value)}
+                className="input-field"
+                placeholder="Type DELETE to remove"
+              />
+            </div>
+            <button type="button" onClick={removeKey} disabled={saving || deleteText !== 'DELETE'} className="inline-flex h-11 items-center justify-center gap-2 rounded-lg border border-red-200 bg-white px-4 text-sm font-bold text-red-600 transition hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-50">
+              <Trash2 size={14} /> Remove Key
+            </button>
+          </div>
+          {status && <p className="mt-3 text-sm font-semibold text-slate-600">{status}</p>}
+        </div>
+      </div>
+    </div>
+  )
+}
+
 function SettingsPanel({ company, settings, onSave, onUpdate, onNotify, isAdmin }) {
   const [form, setForm] = useState(settings)
   const [saved, setSaved] = useState(false)
@@ -257,13 +397,16 @@ function SettingsPanel({ company, settings, onSave, onUpdate, onNotify, isAdmin 
       )
     }
 
+    if (selected === 'api-keys') {
+      return <ApiKeysSetting company={company} onNotify={onNotify} />
+    }
+
     const placeholders = {
       team: ['Team Members', 'Invite and manage people who can access this company workspace.', Users],
       logs: ['Logs', 'Connection changes, automation actions, and AI reply activity will appear here.', History],
       display: ['Display', 'Control simple interface preferences for this workspace.', Monitor],
       'inbox-behavior': ['Inbox Behavior', 'Manage how conversations are opened, closed, filtered, and assigned.', Mail],
       'auto-assignment': ['Auto-Assignment', 'Set rules for assigning incoming messages to the right person or branch.', Users],
-      'api-keys': ['API Keys', 'Store provider keys that only the admin can manage for this workspace.', KeyRound],
     }
     const [title, description, Icon] = placeholders[selected] || placeholders.general || placeholders.display
     return <PlaceholderSetting title={title} description={description} icon={Icon} />

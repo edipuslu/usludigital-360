@@ -264,6 +264,7 @@ async function loadStore() {
         const defaults = companyDefaults(row)
         const config = companyConfigs[row.id] || {}
         const tableBranches = branchesByCompany[row.id] || []
+        const configBranches = row.branches || config.branches || defaults.branches
         return [row.id, {
           ...defaults,
           openaiKey: config.openaiKey || defaults.openaiKey || '',
@@ -279,13 +280,14 @@ async function loadStore() {
             schedule: { ...defaults.automation.schedule, ...(config.automation?.schedule || {}) },
           },
           settings: { ...defaults.settings, ...(config.settings || {}) },
-          branches: tableBranches.length ? tableBranches : row.branches || config.branches || defaults.branches,
+          branches: tableBranches.length ? mergeBranchConfig(tableBranches, configBranches) : configBranches,
           updatedAt: config.updatedAt || defaults.updatedAt,
         }]
       }))
       : Object.fromEntries(Object.entries(storedData?.companies || {}).map(([id, company]) => {
         const defaults = companyDefaults({ id, name: company?.name || 'Company' })
         const tableBranches = branchesByCompany[id] || []
+        const configBranches = company?.branches || defaults.branches
         return [id, {
           ...defaults,
           ...company,
@@ -297,7 +299,7 @@ async function loadStore() {
             schedule: { ...defaults.automation.schedule, ...(company?.automation?.schedule || {}) },
           },
           settings: { ...defaults.settings, ...(company?.settings || {}) },
-          branches: tableBranches.length ? tableBranches : company?.branches || defaults.branches,
+          branches: tableBranches.length ? mergeBranchConfig(tableBranches, configBranches) : configBranches,
         }]
       }))
     const connections = {}
@@ -601,6 +603,18 @@ function normalizeBranchRow(row) {
   }
 }
 
+function mergeBranchConfig(tableBranches = [], configBranches = []) {
+  if (!Array.isArray(tableBranches) || !tableBranches.length) return configBranches
+  const configById = Object.fromEntries((configBranches || []).filter(branch => branch?.id).map(branch => [branch.id, branch]))
+  return tableBranches.map(branch => ({
+    ...(configById[branch.id] || {}),
+    ...branch,
+    location: branch.location || configById[branch.id]?.location || '',
+    platforms: branch.platforms || configById[branch.id]?.platforms || {},
+    whatsappLink: branch.whatsappLink || configById[branch.id]?.whatsappLink || '',
+  }))
+}
+
 async function loadBranchesFromSupabase(base, headers) {
   const response = await fetch(`${base}/rest/v1/branches?select=*&order=created_at.desc`, { headers })
   const rows = await response.json().catch(() => [])
@@ -639,7 +653,6 @@ async function saveBranchesToSupabase(base, headers, companies = [], options = {
         id: branch.id,
         company_id: company.id,
         name: branch.name || 'Branch',
-        location: branch.location || '',
         status: branch.status || 'active',
         created_at: branch.createdAt || new Date().toISOString(),
         updated_at: new Date().toISOString(),
