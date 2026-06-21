@@ -43,6 +43,8 @@ const TAB_TO_SECTION = {
   growth: 'social-media-analytics',
 }
 
+const UUID_SECTION_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+
 function tabFromSection(section) {
   return SECTION_TO_TAB[section || 'home'] || 'overview'
 }
@@ -346,6 +348,11 @@ export default function CompanyWorkspace() {
 
   useEffect(() => {
     if (!section) {
+      navigate('/company/home', { replace: true })
+      return
+    }
+    if (UUID_SECTION_PATTERN.test(section)) {
+      window.sessionStorage.setItem('ud360_active_company_id', section)
       navigate('/company/home', { replace: true })
       return
     }
