@@ -1,12 +1,11 @@
 import { useState, useEffect } from 'react'
 import { FileText, Download, Send, TrendingUp, MessageSquare, Star, ChevronRight, Calendar, BarChart3, CheckCircle2, Trash2, Zap, AlertCircle } from 'lucide-react'
 import { EmptyState, StatusBadge, UsluLoader } from '../ui/UIKit'
-import { sendBackendReport } from '../../lib/backendApi'
+import { getReportEmailStatus, sendBackendReport } from '../../lib/backendApi'
 import clsx from 'clsx'
 import html2pdf from 'html2pdf.js'
 
 const MONTHLY_REPORT_LIMIT = 3
-const REPORT_SENDER_LABEL = 'Configured sender'
 
 const getCurrentMonth = () => new Date().toLocaleDateString('en-US', { month: 'long', year: 'numeric' })
 
@@ -28,12 +27,17 @@ function ReportCard({ report, isAdmin, company, onNotify, onDelete }) {
   const [sent, setSent] = useState(false)
   const [deleting, setDeleting] = useState(false)
   const [showEmailDialog, setShowEmailDialog] = useState(false)
+  const [emailStatus, setEmailStatus] = useState({ loading: false, configured: false, provider: 'none', sender: '' })
   const [emailForm, setEmailForm] = useState({
     toEmails: company.clientEmail || ''
   })
 
   const handleSendClick = () => {
     setShowEmailDialog(true)
+    setEmailStatus(prev => ({ ...prev, loading: true }))
+    getReportEmailStatus()
+      .then(status => setEmailStatus({ loading: false, ...status }))
+      .catch(error => setEmailStatus({ loading: false, configured: false, provider: 'none', sender: '', error: error.message }))
   }
 
   const handleConfirmSend = async () => {
@@ -49,6 +53,10 @@ function ReportCard({ report, isAdmin, company, onNotify, onDelete }) {
     }
     if (invalidRecipient) {
       onNotify?.(`Invalid recipient email: ${invalidRecipient}`, 'error')
+      return
+    }
+    if (!emailStatus.configured) {
+      onNotify?.('Report email provider is not configured yet.', 'error')
       return
     }
     setSending(true)
@@ -282,10 +290,16 @@ function ReportCard({ report, isAdmin, company, onNotify, onDelete }) {
               <p className="text-slate-500 text-sm mt-1">Send this report from the verified backend sender to up to 3 recipients.</p>
             </div>
 
-            <div className="rounded-lg border border-slate-200 bg-slate-50 p-3">
+            <div className={clsx('rounded-lg border p-3', emailStatus.configured ? 'border-emerald-200 bg-emerald-50' : 'border-amber-200 bg-amber-50')}>
               <div className="text-xs font-extrabold uppercase tracking-wide text-slate-400">Sender</div>
-              <div className="mt-1 text-sm font-bold text-slate-900">{REPORT_SENDER_LABEL}</div>
-              <p className="mt-1 text-xs text-slate-500">The sender is controlled by secure Vercel environment variables, not by this form.</p>
+              <div className="mt-1 text-sm font-bold text-slate-900">
+                {emailStatus.loading ? 'Checking sender...' : emailStatus.configured ? emailStatus.sender : 'Not configured'}
+              </div>
+              <p className="mt-1 text-xs text-slate-600">
+                {emailStatus.configured
+                  ? `Provider: ${String(emailStatus.provider || '').toUpperCase()}. The sender is controlled by secure Vercel environment variables.`
+                  : 'Add RESEND_API_KEY and REPORT_FROM_EMAIL in Vercel before sending.'}
+              </p>
             </div>
 
             <div>
@@ -315,7 +329,7 @@ function ReportCard({ report, isAdmin, company, onNotify, onDelete }) {
               </button>
               <button
                 onClick={handleConfirmSend}
-                disabled={sending}
+                disabled={sending || emailStatus.loading || !emailStatus.configured}
                 className="flex-1 btn-primary flex items-center justify-center gap-2"
               >
                 {sending ? (

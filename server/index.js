@@ -38,6 +38,7 @@ const SMTP_HOST = process.env.SMTP_HOST || ''
 const SMTP_PORT = Number(process.env.SMTP_PORT || 587)
 const SMTP_USER = process.env.SMTP_USER || ''
 const SMTP_PASS = process.env.SMTP_PASS || ''
+const RESEND_API_KEY = process.env.RESEND_API_KEY || ''
 const GRAPH_BASE_URL = 'https://graph.facebook.com/v20.0'
 const FACEBOOK_OAUTH_URL = 'https://www.facebook.com/v20.0/dialog/oauth'
 const META_SCOPES = [
@@ -320,17 +321,72 @@ function createReportTransporter() {
   return null
 }
 
-async function sendReportEmail({ company, report, recipients }) {
-  const transporter = createReportTransporter()
-  const fromEmail = REPORT_FROM_EMAIL || SMTP_USER || GMAIL_USER
-  if (!transporter || !fromEmail) {
-    throw new Error('Professional email sending is not configured. Add SMTP settings or Gmail App Password in Vercel Environment Variables.')
+function getReportEmailStatus() {
+  const sender = REPORT_FROM_EMAIL || SMTP_USER || GMAIL_USER
+  if (RESEND_API_KEY && REPORT_FROM_EMAIL) {
+    return { configured: true, provider: 'resend', sender }
+  }
+  if (SMTP_HOST && SMTP_USER && SMTP_PASS && sender) {
+    return { configured: true, provider: 'smtp', sender }
+  }
+  if (GMAIL_USER && GMAIL_APP_PASSWORD) {
+    return { configured: true, provider: 'gmail', sender: sender || GMAIL_USER }
+  }
+  return { configured: false, provider: 'none', sender: sender || '' }
+}
+
+async function sendReportWithResend({ company, report, recipients, pdf, filename }) {
+  const fromEmail = REPORT_FROM_EMAIL
+  if (!RESEND_API_KEY || !fromEmail) {
+    throw new Error('Resend is not configured. Add RESEND_API_KEY and REPORT_FROM_EMAIL in Vercel Environment Variables.')
   }
 
+  const response = await fetch('https://api.resend.com/emails', {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${RESEND_API_KEY}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      from: `${REPORT_FROM_NAME} <${fromEmail}>`,
+      to: recipients,
+      subject: `${company.name || 'Company'} ${report.month || 'Monthly'} Report`,
+      html: reportEmailHtml({ company, report }),
+      text: `${company.name || 'Company'} ${report.month || 'Monthly'} Report\n\nAI Replies: ${report.totalReplies || 0}\nWhatsApp Clicks: ${report.waClicks || 0}\n\n${report.summary || ''}`,
+      attachments: [
+        {
+          filename,
+          content: pdf.toString('base64'),
+        },
+      ],
+    }),
+  })
+  const data = await response.json().catch(() => ({}))
+  if (!response.ok) {
+    throw new Error(data?.message || data?.error?.message || `Resend email failed with HTTP ${response.status}`)
+  }
+  return { messageId: data.id || '', provider: 'resend' }
+}
+
+async function sendReportEmail({ company, report, recipients }) {
   const pdf = await createReportPdfBuffer({ company, report })
   const filename = `uslu360digital-${String(report.month || 'monthly-report').toLowerCase().replace(/[^a-z0-9]+/g, '-')}.pdf`
+  const status = getReportEmailStatus()
+  if (!status.configured) {
+    throw new Error('Professional email sending is not configured. Add RESEND_API_KEY + REPORT_FROM_EMAIL, or SMTP settings, in Vercel Environment Variables.')
+  }
 
-  return transporter.sendMail({
+  if (status.provider === 'resend') {
+    return sendReportWithResend({ company, report, recipients, pdf, filename })
+  }
+
+  const transporter = createReportTransporter()
+  const fromEmail = status.sender
+  if (!transporter || !fromEmail) {
+    throw new Error('Professional email sending is not configured. Add RESEND_API_KEY + REPORT_FROM_EMAIL, or SMTP settings, in Vercel Environment Variables.')
+  }
+
+  const info = await transporter.sendMail({
     from: `"${REPORT_FROM_NAME}" <${fromEmail}>`,
     to: recipients,
     subject: `${company.name || 'Company'} ${report.month || 'Monthly'} Report`,
@@ -344,6 +400,7 @@ async function sendReportEmail({ company, report, recipients }) {
       },
     ],
   })
+  return { messageId: info.messageId || '', provider: status.provider }
 }
 
 async function readFormBody(req) {
@@ -2572,6 +2629,14 @@ export async function appHandler(req, res) {
       return json(res, 200, { reply: result.reply, model: result.model || OPENAI_MODEL })
     }
 
+    if (req.method === 'GET' && url.pathname === '/api/report-email/status') {
+      const status = getReportEmailStatus()
+      return json(res, 200, {
+        ...status,
+        senderLabel: status.sender || REPORT_FROM_NAME,
+      })
+    }
+
     const sendReportParams = routeParams(url.pathname, '/api/companies/:companyId/send-report')
     if (req.method === 'POST' && sendReportParams) {
       const body = await readBody(req)
@@ -2597,6 +2662,7 @@ export async function appHandler(req, res) {
         ok: true,
         recipients,
         fromEmail: REPORT_FROM_EMAIL || SMTP_USER || GMAIL_USER,
+        provider: info.provider || getReportEmailStatus().provider,
         messageId: info.messageId || '',
       })
     }

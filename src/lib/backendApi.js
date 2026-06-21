@@ -132,6 +132,10 @@ export function sendBackendReport(companyId, payload) {
   })
 }
 
+export function getReportEmailStatus() {
+  return request('/api/report-email/status')
+}
+
 // Fetch inbox (comments and DMs). Live Meta sync is opt-in because it can be slow.
 export function fetchInbox(companyId, type = 'all', options = {}) {
   const sync = options.sync ? '&sync=1' : ''
