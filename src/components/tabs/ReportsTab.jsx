@@ -6,7 +6,7 @@ import clsx from 'clsx'
 import html2pdf from 'html2pdf.js'
 
 const MONTHLY_REPORT_LIMIT = 3
-const DEFAULT_REPORT_FROM_EMAIL = 'edipusluprsnl@gmail.com'
+const REPORT_SENDER_LABEL = 'Configured sender'
 
 const getCurrentMonth = () => new Date().toLocaleDateString('en-US', { month: 'long', year: 'numeric' })
 
@@ -29,7 +29,6 @@ function ReportCard({ report, isAdmin, company, onNotify, onDelete }) {
   const [deleting, setDeleting] = useState(false)
   const [showEmailDialog, setShowEmailDialog] = useState(false)
   const [emailForm, setEmailForm] = useState({
-    fromEmail: DEFAULT_REPORT_FROM_EMAIL,
     toEmails: company.clientEmail || ''
   })
 
@@ -52,15 +51,9 @@ function ReportCard({ report, isAdmin, company, onNotify, onDelete }) {
       onNotify?.(`Invalid recipient email: ${invalidRecipient}`, 'error')
       return
     }
-    if (!emailForm.fromEmail || !emailForm.fromEmail.includes('@')) {
-      onNotify?.('Please enter a valid sender email address.', 'error')
-      return
-    }
-
     setSending(true)
     try {
       await sendBackendReport(company.id, {
-        fromEmail: emailForm.fromEmail,
         toEmails: recipients,
         reportId: report.id,
         month: report.month,
@@ -286,19 +279,13 @@ function ReportCard({ report, isAdmin, company, onNotify, onDelete }) {
           <div className="bg-white rounded-xl shadow-2xl max-w-md w-full p-6 space-y-5">
             <div>
               <h3 className="text-slate-900 font-bold text-lg">Send Report by Email</h3>
-              <p className="text-slate-500 text-sm mt-1">Send this report from your configured Gmail account to up to 3 recipients.</p>
+              <p className="text-slate-500 text-sm mt-1">Send this report from the verified backend sender to up to 3 recipients.</p>
             </div>
 
-            <div>
-              <label className="block text-sm font-semibold text-slate-700 mb-2">From Gmail</label>
-              <input
-                type="email"
-                value={emailForm.fromEmail}
-                onChange={e => setEmailForm(prev => ({ ...prev, fromEmail: e.target.value }))}
-                placeholder={DEFAULT_REPORT_FROM_EMAIL}
-                className="input-field w-full"
-              />
-              <p className="text-xs text-slate-400 mt-1">Must match the Gmail account configured in Vercel.</p>
+            <div className="rounded-lg border border-slate-200 bg-slate-50 p-3">
+              <div className="text-xs font-extrabold uppercase tracking-wide text-slate-400">Sender</div>
+              <div className="mt-1 text-sm font-bold text-slate-900">{REPORT_SENDER_LABEL}</div>
+              <p className="mt-1 text-xs text-slate-500">The sender is controlled by secure Vercel environment variables, not by this form.</p>
             </div>
 
             <div>
@@ -315,7 +302,7 @@ function ReportCard({ report, isAdmin, company, onNotify, onDelete }) {
 
             <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
               <p className="text-xs text-blue-900">
-                <strong>Preview:</strong> {report.month} report will be sent from <strong>{emailForm.fromEmail || DEFAULT_REPORT_FROM_EMAIL}</strong> to <strong>{parseRecipientEmails(emailForm.toEmails).join(', ') || 'no recipients yet'}</strong>.
+                <strong>Preview:</strong> {report.month} report will be sent from the verified sender to <strong>{parseRecipientEmails(emailForm.toEmails).join(', ') || 'no recipients yet'}</strong> with a PDF attachment.
               </p>
             </div>
 

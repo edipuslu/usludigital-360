@@ -5,6 +5,7 @@ import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { createHash, createHmac } from 'node:crypto'
 import nodemailer from 'nodemailer'
+import PDFDocument from 'pdfkit'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const DATA_DIR = process.env.VERCEL ? '/tmp/usludigital-360-data' : path.join(__dirname, 'data')
@@ -29,8 +30,14 @@ const SUPABASE_URL = process.env.SUPABASE_URL || ''
 const SUPABASE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_ANON_KEY || ''
 const SUPABASE_STORE_TABLE = process.env.SUPABASE_STORE_TABLE || 'ud360_store'
 const SUPABASE_STORE_ID = process.env.SUPABASE_STORE_ID || 'default'
-const GMAIL_USER = process.env.GMAIL_USER || process.env.REPORT_FROM_EMAIL || ''
+const REPORT_FROM_EMAIL = process.env.REPORT_FROM_EMAIL || process.env.GMAIL_USER || ''
+const REPORT_FROM_NAME = process.env.REPORT_FROM_NAME || 'Uslu360Digital Reports'
+const GMAIL_USER = process.env.GMAIL_USER || ''
 const GMAIL_APP_PASSWORD = process.env.GMAIL_APP_PASSWORD || process.env.GMAIL_PASS || ''
+const SMTP_HOST = process.env.SMTP_HOST || ''
+const SMTP_PORT = Number(process.env.SMTP_PORT || 587)
+const SMTP_USER = process.env.SMTP_USER || ''
+const SMTP_PASS = process.env.SMTP_PASS || ''
 const GRAPH_BASE_URL = 'https://graph.facebook.com/v20.0'
 const FACEBOOK_OAUTH_URL = 'https://www.facebook.com/v20.0/dialog/oauth'
 const META_SCOPES = [
@@ -247,30 +254,95 @@ function reportEmailHtml({ company, report }) {
   `
 }
 
-async function sendReportEmail({ company, report, recipients, fromEmail }) {
-  if (!GMAIL_USER || !GMAIL_APP_PASSWORD) {
-    throw new Error('Gmail sending is not configured. Add GMAIL_USER and GMAIL_APP_PASSWORD in Vercel Environment Variables.')
-  }
+function createReportPdfBuffer({ company, report }) {
+  return new Promise((resolve, reject) => {
+    const doc = new PDFDocument({ size: 'A4', margin: 48 })
+    const chunks = []
+    const month = report.month || new Date().toLocaleDateString('en-US', { month: 'long', year: 'numeric' })
+    const replies = Number(report.totalReplies || 0).toLocaleString()
+    const clicks = Number(report.waClicks || 0).toLocaleString()
 
-  const sender = fromEmail || GMAIL_USER
-  if (sender.toLowerCase() !== GMAIL_USER.toLowerCase()) {
-    throw new Error(`Sender must match configured Gmail account: ${GMAIL_USER}`)
-  }
+    doc.on('data', chunk => chunks.push(chunk))
+    doc.on('end', () => resolve(Buffer.concat(chunks)))
+    doc.on('error', reject)
 
-  const transporter = nodemailer.createTransport({
-    service: 'gmail',
-    auth: {
-      user: GMAIL_USER,
-      pass: GMAIL_APP_PASSWORD,
-    },
+    doc.rect(0, 0, doc.page.width, 142).fill('#030918')
+    doc.fillColor('#ffffff').fontSize(24).font('Helvetica-Bold').text('Uslu360Digital', 48, 42)
+    doc.fillColor('#94a3b8').fontSize(9).font('Helvetica-Bold').text('MONTHLY PERFORMANCE REPORT', 48, 74, { characterSpacing: 1 })
+    doc.fillColor('#ffffff').fontSize(34).font('Helvetica-Bold').text(month, 48, 100, { width: 500 })
+
+    doc.fillColor('#0f172a')
+    doc.fontSize(11).font('Helvetica-Bold').text(company.name || 'Company', 48, 174)
+    doc.fontSize(10).font('Helvetica').fillColor('#64748b').text(report.summary || 'Monthly report generated from the current workspace metrics.', 48, 194, {
+      width: 500,
+      lineGap: 4,
+    })
+
+    const metricY = 260
+    doc.roundedRect(48, metricY, 230, 112, 14).strokeColor('#e2e8f0').lineWidth(1).stroke()
+    doc.roundedRect(306, metricY, 230, 112, 14).strokeColor('#e2e8f0').lineWidth(1).stroke()
+    doc.fillColor('#64748b').fontSize(9).font('Helvetica-Bold').text('AI REPLIES SENT', 68, metricY + 22)
+    doc.fillColor('#255ff4').fontSize(34).font('Helvetica-Bold').text(replies, 68, metricY + 44)
+    doc.fillColor('#64748b').fontSize(9).font('Helvetica-Bold').text('WHATSAPP CLICKS', 326, metricY + 22)
+    doc.fillColor('#f42582').fontSize(34).font('Helvetica-Bold').text(clicks, 326, metricY + 44)
+
+    doc.roundedRect(48, 410, 488, 96, 14).fillAndStroke('#f8fafc', '#e2e8f0')
+    doc.fillColor('#0f172a').fontSize(13).font('Helvetica-Bold').text('Best Performing Content', 68, 432)
+    doc.fillColor('#255ff4').fontSize(11).font('Helvetica-Bold').text(report.bestPost || 'No post selected yet', 68, 458, { width: 450 })
+
+    doc.moveTo(48, 740).lineTo(536, 740).strokeColor('#e2e8f0').stroke()
+    doc.fillColor('#64748b').fontSize(8).font('Helvetica').text('Uslu360Digital | Confidential client report', 48, 756)
+    doc.text(report.id || '', 400, 756, { width: 136, align: 'right' })
+    doc.end()
   })
+}
+
+function createReportTransporter() {
+  if (SMTP_HOST && SMTP_USER && SMTP_PASS) {
+    return nodemailer.createTransport({
+      host: SMTP_HOST,
+      port: SMTP_PORT,
+      secure: SMTP_PORT === 465,
+      auth: { user: SMTP_USER, pass: SMTP_PASS },
+    })
+  }
+
+  if (GMAIL_USER && GMAIL_APP_PASSWORD) {
+    return nodemailer.createTransport({
+      service: 'gmail',
+      auth: {
+        user: GMAIL_USER,
+        pass: GMAIL_APP_PASSWORD,
+      },
+    })
+  }
+
+  return null
+}
+
+async function sendReportEmail({ company, report, recipients }) {
+  const transporter = createReportTransporter()
+  const fromEmail = REPORT_FROM_EMAIL || SMTP_USER || GMAIL_USER
+  if (!transporter || !fromEmail) {
+    throw new Error('Professional email sending is not configured. Add SMTP settings or Gmail App Password in Vercel Environment Variables.')
+  }
+
+  const pdf = await createReportPdfBuffer({ company, report })
+  const filename = `uslu360digital-${String(report.month || 'monthly-report').toLowerCase().replace(/[^a-z0-9]+/g, '-')}.pdf`
 
   return transporter.sendMail({
-    from: `"Uslu360Digital Reports" <${GMAIL_USER}>`,
+    from: `"${REPORT_FROM_NAME}" <${fromEmail}>`,
     to: recipients,
     subject: `${company.name || 'Company'} ${report.month || 'Monthly'} Report`,
     html: reportEmailHtml({ company, report }),
     text: `${company.name || 'Company'} ${report.month || 'Monthly'} Report\n\nAI Replies: ${report.totalReplies || 0}\nWhatsApp Clicks: ${report.waClicks || 0}\n\n${report.summary || ''}`,
+    attachments: [
+      {
+        filename,
+        content: pdf,
+        contentType: 'application/pdf',
+      },
+    ],
   })
 }
 
@@ -2511,11 +2583,6 @@ export async function appHandler(req, res) {
       if (recipients.length > 3) return json(res, 400, { error: 'You can send a report to maximum 3 email addresses.' })
       if (invalid.length) return json(res, 400, { error: `Invalid recipient email: ${invalid[0]}` })
 
-      const fromEmail = String(body.fromEmail || GMAIL_USER || '').trim().toLowerCase()
-      if (!fromEmail || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(fromEmail)) {
-        return json(res, 400, { error: 'Add a valid sender email.' })
-      }
-
       const report = {
         id: body.reportId || `manual-${Date.now()}`,
         month: body.month,
@@ -2525,11 +2592,11 @@ export async function appHandler(req, res) {
         waClicks: body.waClicks,
       }
 
-      const info = await sendReportEmail({ company, report, recipients, fromEmail })
+      const info = await sendReportEmail({ company, report, recipients })
       return json(res, 200, {
         ok: true,
         recipients,
-        fromEmail,
+        fromEmail: REPORT_FROM_EMAIL || SMTP_USER || GMAIL_USER,
         messageId: info.messageId || '',
       })
     }
