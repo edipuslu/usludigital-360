@@ -164,7 +164,7 @@ function OpenAIKeySection({ apiKey, hasSavedKey, onKeyChange }) {
   }
 
   const clearKey = () => {
-    if (removeText !== 'Remove') return
+    if (removeText !== 'DELETE') return
     setInputKey('')
     setStatus('empty')
     setRemoveMode(false)
@@ -264,21 +264,21 @@ function OpenAIKeySection({ apiKey, hasSavedKey, onKeyChange }) {
         {removeMode && (
           <div className="rounded-xl border border-red-200 bg-red-50 p-3">
             <div className="text-red-800 text-xs font-semibold mb-2">
-              This removes the OpenAI key from every company. Type <span className="font-bold">Remove</span> to confirm.
+              This removes the OpenAI key from every company. Type <span className="font-bold">DELETE</span> to confirm.
             </div>
             <div className="flex flex-col sm:flex-row gap-2">
               <input
                 value={removeText}
                 onChange={e => setRemoveText(e.target.value)}
                 className="input-field bg-white"
-                placeholder="Remove"
+                placeholder="DELETE"
               />
               <button
                 onClick={clearKey}
-                disabled={removeText !== 'Remove'}
-                className={clsx('btn-danger justify-center', removeText !== 'Remove' && 'opacity-50 cursor-not-allowed')}
+                disabled={removeText !== 'DELETE'}
+                className={clsx('btn-danger justify-center', removeText !== 'DELETE' && 'opacity-50 cursor-not-allowed')}
               >
-                Confirm Remove
+                Confirm Delete
               </button>
               <button
                 onClick={() => { setRemoveMode(false); setRemoveText('') }}
