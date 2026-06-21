@@ -44,7 +44,10 @@ export default function LoginPage() {
       setError(result.error)
       return
     }
-    navigate(result.user.role === 'admin' ? '/admin' : `/company/${result.user.companyId}`)
+    if (result.user.companyId) {
+      window.sessionStorage.setItem('ud360_active_company_id', result.user.companyId)
+    }
+    navigate(result.user.role === 'admin' ? '/admin' : '/company/home')
   }
 
   const fillDemo = (email, password) => setForm({ email, password })

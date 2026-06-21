@@ -380,7 +380,8 @@ export default function AdminDashboard() {
       setError(err.message || 'Company was saved on this device, but backend save failed.')
     }
     setShowCreate(false)
-    navigate(`/company/${company.id}`)
+    window.sessionStorage.setItem('ud360_active_company_id', company.id)
+    navigate('/company/home')
   }
 
   const remove = async () => {
@@ -526,7 +527,10 @@ export default function AdminDashboard() {
                         <div className="mt-1 text-sm font-extrabold capitalize text-slate-900">{company.aiTraining.status.replace('_', ' ')}</div>
                       </div>
                       <div className="flex flex-wrap items-center gap-2 lg:justify-end">
-                        <button onClick={() => navigate(`/company/${company.id}`)} className="btn-primary justify-center">
+                        <button onClick={() => {
+                          window.sessionStorage.setItem('ud360_active_company_id', company.id)
+                          navigate('/company/home')
+                        }} className="btn-primary justify-center">
                           Open <ArrowUpRight size={14} />
                         </button>
                         <button onClick={() => setBranchCompany(company)} className="btn-secondary justify-center">

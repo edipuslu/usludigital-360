@@ -16,6 +16,41 @@ import ReportsTab from '../components/tabs/ReportsTab'
 import GrowthTab from '../components/tabs/GrowthTab'
 import clsx from 'clsx'
 
+const SECTION_TO_TAB = {
+  home: 'overview',
+  overview: 'overview',
+  inbox: 'inbox',
+  'inbox-instagram': 'inbox-instagram',
+  'inbox-facebook': 'inbox-facebook',
+  'inbox-youtube': 'inbox-youtube',
+  'inbox-whatsapp': 'inbox-whatsapp',
+  growth: 'growth',
+  'social-media-analytics': 'growth',
+  'growth-instagram': 'growth-instagram',
+  'growth-facebook': 'growth-facebook',
+  'growth-youtube': 'growth-youtube',
+  'growth-whatsapp': 'growth-whatsapp',
+  'ai-training': 'ai-training',
+  automation: 'automation',
+  analytics: 'analytics',
+  reports: 'reports',
+  notifications: 'notifications',
+  settings: 'settings',
+}
+
+const TAB_TO_SECTION = {
+  overview: 'home',
+  growth: 'social-media-analytics',
+}
+
+function tabFromSection(section) {
+  return SECTION_TO_TAB[section || 'home'] || 'overview'
+}
+
+function sectionFromTab(tab) {
+  return TAB_TO_SECTION[tab] || tab || 'home'
+}
+
 function NotificationsPanel({ notifications, onMarkAllRead, onRemove }) {
   return (
     <div className="space-y-6 animate-slide-in">
@@ -276,14 +311,15 @@ function SettingsPanel({ company, settings, onSave, onUpdate, onNotify, isAdmin 
 }
 
 export default function CompanyWorkspace() {
-  const { companyId } = useParams()
+  const { section } = useParams()
   const navigate = useNavigate()
   const { user, isAdmin } = useAuth()
-  const [activeTab, setActiveTab] = useState('overview')
   const [workspaces, setWorkspaces] = useState([])
   const [loading, setLoading] = useState(true)
   const [syncError, setSyncError] = useState('')
   const [activeBranchId, setActiveBranchId] = useState('all')
+  const activeTab = tabFromSection(section)
+  const selectedCompanyId = user?.companyId || window.sessionStorage.getItem('ud360_active_company_id')
 
   useEffect(() => {
     let alive = true
@@ -304,9 +340,28 @@ export default function CompanyWorkspace() {
     }
   }, [])
 
-  const company = useMemo(() => workspaces.find(c => c.id === companyId) || workspaces[0], [companyId, workspaces])
+  const company = useMemo(() => workspaces.find(c => c.id === selectedCompanyId) || workspaces[0], [selectedCompanyId, workspaces])
   const branches = company?.branches || []
   const activeBranch = branches.find(branch => branch.id === activeBranchId)
+
+  useEffect(() => {
+    if (!section) {
+      navigate('/company/home', { replace: true })
+      return
+    }
+    if (loading) return
+    if (!section || !SECTION_TO_TAB[section]) {
+      const legacyCompany = workspaces.find(c => c.id === section)
+      if (legacyCompany) {
+        window.sessionStorage.setItem('ud360_active_company_id', legacyCompany.id)
+      }
+      navigate('/company/home', { replace: true })
+    }
+  }, [section, workspaces, loading, navigate])
+
+  const navigateToTab = tab => {
+    navigate(`/company/${sectionFromTab(tab)}`)
+  }
 
   useEffect(() => {
     if (activeBranchId !== 'all' && company && !branches.some(branch => branch.id === activeBranchId)) {
@@ -364,13 +419,13 @@ export default function CompanyWorkspace() {
     )
   }
 
-  if (!isAdmin && user?.companyId !== companyId) {
+  if (!isAdmin && user?.companyId && company?.id !== user.companyId) {
     navigate('/login')
     return null
   }
 
   const tabContent = {
-    overview: <OverviewTab company={company} onNavigate={setActiveTab} isAdmin={isAdmin} />,
+    overview: <OverviewTab company={company} onNavigate={navigateToTab} isAdmin={isAdmin} />,
     inbox: <InboxTab company={company} onNotify={addNotification} isAdmin={isAdmin} />,
     'inbox-instagram': <InboxTab company={company} platform="instagram" onNotify={addNotification} isAdmin={isAdmin} />,
     'inbox-facebook': <InboxTab company={company} platform="facebook" onNotify={addNotification} isAdmin={isAdmin} />,
@@ -412,7 +467,7 @@ export default function CompanyWorkspace() {
       <Sidebar
         companyId={company.id}
         currentSection={activeTab}
-        onNavigate={setActiveTab}
+        onNavigate={navigateToTab}
         notificationCount={(company.notifications || []).filter(n => !n.read).length}
         branches={branches}
         activeBranchId={activeBranchId}

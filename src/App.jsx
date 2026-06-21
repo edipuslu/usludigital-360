@@ -8,7 +8,7 @@ function ProtectedRoute({ children, requireAdmin = false }) {
   const { user, isAdmin } = useAuth()
   if (!user) return <Navigate to="/login" replace />
   if (requireAdmin && !isAdmin) {
-    return <Navigate to={`/company/${user.companyId}`} replace />
+    return <Navigate to="/company/home" replace />
   }
   return children
 }
@@ -17,7 +17,7 @@ function RootRedirect() {
   const { user, isAdmin } = useAuth()
   if (!user) return <Navigate to="/login" replace />
   if (isAdmin) return <Navigate to="/admin" replace />
-  return <Navigate to={`/company/${user.companyId}`} replace />
+  return <Navigate to="/company/home" replace />
 }
 
 function AppRoutes() {
@@ -34,7 +34,7 @@ function AppRoutes() {
         }
       />
       <Route
-        path="/company/:companyId"
+        path="/company/:section?"
         element={
           <ProtectedRoute>
             <CompanyWorkspace />
