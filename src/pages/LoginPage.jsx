@@ -104,6 +104,19 @@ const EyeBall = ({ size = 48, pupilSize = 16, maxDistance = 10, isBlinking = fal
   )
 }
 
+const Smile = ({ width = 46, height = 18, color = '#020617', happy = true, className = '', style = {} }) => (
+  <div className={className} style={{ width, height, ...style }}>
+    <svg width="100%" height="100%" viewBox="0 0 60 28" fill="none" aria-hidden="true">
+      <path
+        d={happy ? 'M12 8C20 23 40 23 48 8' : 'M16 16C24 9 36 9 44 16'}
+        stroke={color}
+        strokeWidth="6"
+        strokeLinecap="round"
+      />
+    </svg>
+  </div>
+)
+
 const AnimatedLoginCharacters = ({ isTyping, showPassword, passwordValue }) => {
   const [mouse, setMouse] = useState({ x: 0, y: 0 })
   const [isPinkBlinking, setIsPinkBlinking] = useState(false)
@@ -192,9 +205,10 @@ const AnimatedLoginCharacters = ({ isTyping, showPassword, passwordValue }) => {
 
   return (
     <div className="relative w-[550px] h-[430px] max-w-full scale-[0.92] xl:scale-100 origin-bottom">
+      <div className="absolute bottom-[-18px] left-3 h-7 w-[470px] rounded-full bg-black/25 blur-lg" />
       <div
         ref={pinkRef}
-        className="absolute bottom-0 transition-all duration-700 ease-in-out"
+        className="absolute bottom-0 shadow-2xl shadow-black/20 transition-all duration-700 ease-in-out"
         style={{
           left: 70,
           width: 180,
@@ -220,11 +234,22 @@ const AnimatedLoginCharacters = ({ isTyping, showPassword, passwordValue }) => {
           <EyeBall size={18} pupilSize={7} maxDistance={5} isBlinking={isPinkBlinking} forceLookX={passwordMode ? (isPinkPeeking ? 4 : -4) : isLookingAtEachOther ? 3 : undefined} forceLookY={passwordMode ? (isPinkPeeking ? 5 : -4) : isLookingAtEachOther ? 4 : undefined} />
           <EyeBall size={18} pupilSize={7} maxDistance={5} isBlinking={isPinkBlinking} forceLookX={passwordMode ? (isPinkPeeking ? 4 : -4) : isLookingAtEachOther ? 3 : undefined} forceLookY={passwordMode ? (isPinkPeeking ? 5 : -4) : isLookingAtEachOther ? 4 : undefined} />
         </div>
+        <Smile
+          className="absolute transition-all duration-700 ease-in-out"
+          width={44}
+          height={18}
+          happy={!passwordMode || isPinkPeeking}
+          style={{
+            left: passwordMode ? 39 : isLookingAtEachOther ? 72 : 65 + pinkPos.faceX,
+            top: passwordMode ? 72 : isLookingAtEachOther ? 102 : 78 + pinkPos.faceY,
+            opacity: passwordMode && !isPinkPeeking ? 0.45 : 1,
+          }}
+        />
       </div>
 
       <div
         ref={redRef}
-        className="absolute bottom-0 transition-all duration-700 ease-in-out"
+        className="absolute bottom-0 shadow-2xl shadow-black/20 transition-all duration-700 ease-in-out"
         style={{
           left: 240,
           width: 120,
@@ -252,11 +277,20 @@ const AnimatedLoginCharacters = ({ isTyping, showPassword, passwordValue }) => {
           <EyeBall size={16} pupilSize={6} maxDistance={4} isBlinking={isRedBlinking} forceLookX={passwordMode ? -4 : isLookingAtEachOther ? 0 : undefined} forceLookY={passwordMode ? -4 : isLookingAtEachOther ? -4 : undefined} />
           <EyeBall size={16} pupilSize={6} maxDistance={4} isBlinking={isRedBlinking} forceLookX={passwordMode ? -4 : isLookingAtEachOther ? 0 : undefined} forceLookY={passwordMode ? -4 : isLookingAtEachOther ? -4 : undefined} />
         </div>
+        <Smile
+          className="absolute transition-all duration-700 ease-in-out"
+          width={34}
+          height={15}
+          style={{
+            left: passwordMode ? 24 : isLookingAtEachOther ? 46 : 42 + redPos.faceX,
+            top: passwordMode ? 58 : isLookingAtEachOther ? 40 : 60 + redPos.faceY,
+          }}
+        />
       </div>
 
       <div
         ref={orangeRef}
-        className="absolute bottom-0 transition-all duration-700 ease-in-out"
+        className="absolute bottom-0 shadow-2xl shadow-black/20 transition-all duration-700 ease-in-out"
         style={{
           left: 0,
           width: 240,
@@ -278,11 +312,20 @@ const AnimatedLoginCharacters = ({ isTyping, showPassword, passwordValue }) => {
           <Pupil forceLookX={passwordMode ? -5 : undefined} forceLookY={passwordMode ? -4 : undefined} />
           <Pupil forceLookX={passwordMode ? -5 : undefined} forceLookY={passwordMode ? -4 : undefined} />
         </div>
+        <Smile
+          className="absolute transition-all duration-200 ease-out"
+          width={54}
+          height={20}
+          style={{
+            left: passwordMode ? 78 : 101 + orangePos.faceX,
+            top: passwordMode ? 118 : 122 + orangePos.faceY,
+          }}
+        />
       </div>
 
       <div
         ref={blueRef}
-        className="absolute bottom-0 transition-all duration-700 ease-in-out"
+        className="absolute bottom-0 shadow-2xl shadow-black/20 transition-all duration-700 ease-in-out"
         style={{
           left: 310,
           width: 140,
@@ -304,11 +347,13 @@ const AnimatedLoginCharacters = ({ isTyping, showPassword, passwordValue }) => {
           <Pupil forceLookX={passwordMode ? -5 : undefined} forceLookY={passwordMode ? -4 : undefined} />
           <Pupil forceLookX={passwordMode ? -5 : undefined} forceLookY={passwordMode ? -4 : undefined} />
         </div>
-        <div
-          className="absolute w-20 h-1 bg-slate-950 rounded-full transition-all duration-200 ease-out"
+        <Smile
+          className="absolute transition-all duration-200 ease-out"
+          width={58}
+          height={22}
           style={{
-            left: passwordMode ? 10 : 40 + bluePos.faceX,
-            top: passwordMode ? 88 : 88 + bluePos.faceY,
+            left: passwordMode ? 28 : 43 + bluePos.faceX,
+            top: passwordMode ? 90 : 92 + bluePos.faceY,
           }}
         />
       </div>
