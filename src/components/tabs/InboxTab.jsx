@@ -1,11 +1,17 @@
-import { useEffect, useMemo, useState } from 'react'
-import { MessageCircle, Send, Search, Filter, Heart, MessageSquare, Calendar, User, ExternalLink, AlertTriangle, Calculator, RefreshCw, Plus, Settings, Archive, Clock } from 'lucide-react'
+import { useEffect, useMemo, useRef, useState } from 'react'
+import { MessageCircle, Send, Search, Heart, MessageSquare, Calendar, User, ExternalLink, AlertTriangle, Calculator, RefreshCw, Plus, Settings, Archive, Clock, SlidersHorizontal, ChevronDown } from 'lucide-react'
 import { PlatformIcon, UsluLoader } from '../ui/UIKit'
 import { estimateBackfillReplies, fetchInbox, replyToInboxItem, runBackfillReplies, createTestDM } from '../../lib/backendApi'
 import clsx from 'clsx'
 
 const PLATFORMS = ['instagram', 'facebook', 'youtube', 'whatsapp']
 const PLATFORM_LABELS = { instagram: 'Instagram', facebook: 'Facebook', youtube: 'YouTube', whatsapp: 'WhatsApp' }
+const CHARACTER_COLORS = {
+  red: '#f42f25',
+  orange: '#f49725',
+  blue: '#255ff4',
+  pink: '#f42582',
+}
 
 function formatInboxDate(value) {
   if (!value) return 'Unknown date'
@@ -37,6 +43,106 @@ function formatSyncWarning(warning) {
     return 'Instagram DMs work in Development Mode only for Meta App Roles/Test Users who accepted the invite. Public customer DMs need Meta approval before they can sync or reply.'
   }
   return warning
+}
+
+function MiniEye({ x = 0, y = 0, size = 10 }) {
+  return (
+    <span className="flex items-center justify-center rounded-full bg-white" style={{ width: size + 8, height: size + 8 }}>
+      <span
+        className="block rounded-full bg-slate-950 transition-transform duration-100"
+        style={{ width: size, height: size, transform: `translate(${x}px, ${y}px)` }}
+      />
+    </span>
+  )
+}
+
+function AnimatedInboxCharacters({ compact = false }) {
+  const wrapRef = useRef(null)
+  const [look, setLook] = useState({ x: 0, y: 0 })
+
+  useEffect(() => {
+    const handleMove = event => {
+      if (!wrapRef.current) return
+      const rect = wrapRef.current.getBoundingClientRect()
+      const centerX = rect.left + rect.width / 2
+      const centerY = rect.top + rect.height / 2
+      setLook({
+        x: Math.max(-4, Math.min(4, (event.clientX - centerX) / 60)),
+        y: Math.max(-3, Math.min(3, (event.clientY - centerY) / 70)),
+      })
+    }
+    window.addEventListener('mousemove', handleMove)
+    return () => window.removeEventListener('mousemove', handleMove)
+  }, [])
+
+  return (
+    <div
+      ref={wrapRef}
+      className={clsx('relative mx-auto', compact ? 'h-28 w-44' : 'h-44 w-72')}
+      aria-hidden="true"
+    >
+      <div
+        className="absolute bottom-0 left-8 rounded-t-lg transition-transform duration-300"
+        style={{
+          width: compact ? 48 : 76,
+          height: compact ? 104 : 164,
+          background: CHARACTER_COLORS.blue,
+          transform: `skewX(${-look.x}deg)`,
+        }}
+      >
+        <div className="absolute left-3 top-5 flex gap-2">
+          <MiniEye x={look.x} y={look.y} size={compact ? 5 : 7} />
+          <MiniEye x={look.x} y={look.y} size={compact ? 5 : 7} />
+        </div>
+      </div>
+      <div
+        className="absolute bottom-0 rounded-t-full transition-transform duration-300"
+        style={{
+          left: compact ? 0 : 4,
+          width: compact ? 82 : 130,
+          height: compact ? 66 : 104,
+          background: CHARACTER_COLORS.orange,
+          transform: `skewX(${look.x}deg)`,
+        }}
+      >
+        <div className="absolute left-8 top-8 flex gap-3">
+          <span className="h-2.5 w-2.5 rounded-full bg-slate-950" />
+          <span className="h-2.5 w-2.5 rounded-full bg-slate-950" />
+        </div>
+      </div>
+      <div
+        className="absolute bottom-0 rounded-t-lg transition-transform duration-300"
+        style={{
+          left: compact ? 82 : 134,
+          width: compact ? 48 : 78,
+          height: compact ? 86 : 136,
+          background: CHARACTER_COLORS.red,
+          transform: `skewX(${look.x * 0.8}deg)`,
+        }}
+      >
+        <div className="absolute left-3 top-5 flex gap-2">
+          <MiniEye x={-look.x} y={look.y} size={compact ? 5 : 7} />
+          <MiniEye x={-look.x} y={look.y} size={compact ? 5 : 7} />
+        </div>
+      </div>
+      <div
+        className="absolute bottom-0 rounded-t-full transition-transform duration-300"
+        style={{
+          right: compact ? 6 : 14,
+          width: compact ? 66 : 104,
+          height: compact ? 74 : 116,
+          background: CHARACTER_COLORS.pink,
+          transform: `skewX(${-look.x * 0.7}deg)`,
+        }}
+      >
+        <div className="absolute left-6 top-7 flex gap-3">
+          <span className="h-2.5 w-2.5 rounded-full bg-slate-950" />
+          <span className="h-2.5 w-2.5 rounded-full bg-slate-950" />
+        </div>
+        <div className="absolute left-7 top-14 h-1 w-10 rounded-full bg-slate-950" />
+      </div>
+    </div>
+  )
 }
 
 function MessageCard({ msg, onReply, isReply = false, isAdmin = true }) {
@@ -81,7 +187,7 @@ function MessageCard({ msg, onReply, isReply = false, isAdmin = true }) {
           </div>
         </div>
         {msg.likes > 0 && (
-          <div className="flex items-center gap-1 text-red-500 text-xs font-medium flex-shrink-0">
+          <div className="flex items-center gap-1 text-xs font-medium flex-shrink-0" style={{ color: CHARACTER_COLORS.red }}>
             <Heart size={12} fill="currentColor" /> {msg.likes}
           </div>
         )}
@@ -653,32 +759,84 @@ export default function InboxTab({ company, branchId = '', platform, isAdmin = t
         </aside>
 
         <section className="border-r border-slate-200">
-          <div className="flex flex-wrap items-center gap-2 border-b border-slate-200 px-5 py-4">
-            <input type="checkbox" checked={allVisibleSelected} onChange={toggleSelectAll} className="mr-2 h-5 w-5 rounded border-slate-300" />
-            <select value={statusFilter} onChange={e => setStatusFilter(e.target.value)} className="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm font-semibold text-slate-700">
-              <option value="open">Open Chats</option>
-              <option value="all">All Chats</option>
-              <option value="replied">AI Replied</option>
-              <option value="failed">Failed</option>
-            </select>
-            <button
-              type="button"
-              onClick={() => setOnlyUnread(value => !value)}
-              className={clsx('h-10 rounded-lg border px-4 text-sm font-semibold', onlyUnread ? 'border-blue-200 bg-blue-50 text-blue-700' : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50')}
-            >
-              Unread
-            </button>
-            <select value={sortOrder} onChange={e => setSortOrder(e.target.value)} className="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm font-semibold text-slate-700">
-              <option value="newest">Sort: Newest</option>
-              <option value="oldest">Sort: Oldest</option>
-            </select>
-            <select value={channelFilter} onChange={e => setChannelFilter(e.target.value)} disabled={Boolean(platform)} className="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm font-semibold text-slate-700 disabled:opacity-60">
-              <option value="all">All Channels</option>
-              {PLATFORMS.map(item => <option key={item} value={item}>{PLATFORM_LABELS[item]}</option>)}
-            </select>
-            <button type="button" onClick={() => setShowFilters(value => !value)} className="inline-flex h-10 items-center gap-2 rounded-lg border border-slate-200 bg-white px-4 text-sm font-semibold text-slate-700 hover:bg-slate-50">
-              <Filter size={15} /> Filter
-            </button>
+          <div className="border-b border-slate-200 px-5 py-4">
+            <div className="mb-3 flex items-center justify-between gap-3">
+              <label className="inline-flex min-h-11 cursor-pointer items-center gap-3 rounded-lg px-1 text-sm font-bold text-slate-700">
+                <input type="checkbox" checked={allVisibleSelected} onChange={toggleSelectAll} className="h-5 w-5 rounded border-slate-300 accent-[#255ff4]" />
+                Select
+              </label>
+              <button
+                type="button"
+                onClick={() => setShowFilters(value => !value)}
+                className={clsx(
+                  'inline-flex h-11 items-center gap-2 rounded-lg border px-4 text-sm font-bold transition-colors',
+                  showFilters ? 'border-[#255ff4]/30 bg-[#255ff4]/10 text-[#255ff4]' : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50'
+                )}
+              >
+                <SlidersHorizontal size={16} /> Advanced
+              </button>
+            </div>
+
+            <div className="space-y-4">
+              <div className="grid grid-cols-4 rounded-lg border border-slate-200 bg-slate-50 p-1">
+                {[
+                  ['open', 'Open'],
+                  ['all', 'All'],
+                  ['replied', 'Replied'],
+                  ['failed', 'Failed'],
+                ].map(([value, label]) => (
+                  <button
+                    key={value}
+                    type="button"
+                    onClick={() => setStatusFilter(value)}
+                    className={clsx(
+                      'h-10 rounded-md text-sm font-bold transition-colors',
+                      statusFilter === value ? 'bg-white text-slate-950 shadow-sm' : 'text-slate-500 hover:text-slate-900'
+                    )}
+                  >
+                    {label}
+                  </button>
+                ))}
+              </div>
+
+              <div className="grid grid-cols-1 gap-3">
+                <label className="block">
+                  <span className="mb-1 block text-xs font-bold uppercase tracking-wide text-slate-400">Channel</span>
+                  <div className="relative">
+                    <select value={channelFilter} onChange={e => setChannelFilter(e.target.value)} disabled={Boolean(platform)} className="h-11 w-full appearance-none rounded-lg border border-slate-200 bg-white px-3 pr-9 text-sm font-semibold text-slate-800 outline-none focus:border-[#255ff4] focus:ring-2 focus:ring-[#255ff4]/10 disabled:opacity-60">
+                      <option value="all">All Channels</option>
+                      {PLATFORMS.map(item => <option key={item} value={item}>{PLATFORM_LABELS[item]}</option>)}
+                    </select>
+                    <ChevronDown size={16} className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                  </div>
+                </label>
+
+                <label className="block">
+                  <span className="mb-1 block text-xs font-bold uppercase tracking-wide text-slate-400">Order</span>
+                  <div className="relative">
+                    <select value={sortOrder} onChange={e => setSortOrder(e.target.value)} className="h-11 w-full appearance-none rounded-lg border border-slate-200 bg-white px-3 pr-9 text-sm font-semibold text-slate-800 outline-none focus:border-[#255ff4] focus:ring-2 focus:ring-[#255ff4]/10">
+                      <option value="newest">Newest first</option>
+                      <option value="oldest">Oldest first</option>
+                    </select>
+                    <ChevronDown size={16} className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                  </div>
+                </label>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => setOnlyUnread(value => !value)}
+                className={clsx(
+                  'flex h-11 w-full items-center justify-between rounded-lg border px-4 text-sm font-bold transition-colors',
+                  onlyUnread ? 'border-[#255ff4]/30 bg-[#255ff4]/10 text-[#255ff4]' : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50'
+                )}
+              >
+                Unread only
+                <span className={clsx('h-5 w-9 rounded-full p-0.5 transition-colors', onlyUnread ? 'bg-[#255ff4]' : 'bg-slate-200')}>
+                  <span className={clsx('block h-4 w-4 rounded-full bg-white transition-transform', onlyUnread && 'translate-x-4')} />
+                </span>
+              </button>
+            </div>
           </div>
 
           {showFilters && (
@@ -695,10 +853,14 @@ export default function InboxTab({ company, branchId = '', platform, isAdmin = t
           <div className="h-[calc(100vh-215px)] overflow-y-auto">
             {loading ? (
               <div className="flex h-full items-center justify-center">
-                <UsluLoader size="lg" />
+                <div className="text-center">
+                  <AnimatedInboxCharacters compact />
+                  <div className="mt-4 text-sm font-bold text-slate-900">Loading conversations</div>
+                </div>
               </div>
             ) : visibleMessages.length === 0 ? (
               <div className="flex h-full flex-col items-center justify-center px-8 text-center">
+                <AnimatedInboxCharacters compact />
                 <div className="text-lg font-bold text-slate-900">No opened conversations</div>
                 <button type="button" onClick={() => setStatusFilter('all')} className="mt-8 text-sm font-bold text-blue-600 hover:text-blue-700">
                   Go To Closed Conversations
@@ -726,6 +888,7 @@ export default function InboxTab({ company, branchId = '', platform, isAdmin = t
             </div>
           ) : (
             <div className="flex h-full min-h-[620px] flex-col items-center justify-center px-8 text-center">
+              <AnimatedInboxCharacters />
               <h2 className="max-w-md text-xl font-bold text-slate-900">
                 {messages.length === 0 ? 'Send a message to your bot to try Inbox' : 'Select a conversation to view details'}
               </h2>
