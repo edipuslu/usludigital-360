@@ -1,6 +1,6 @@
 import { ArrowRight, Bot, CheckCircle2, ExternalLink, Globe, Inbox, MessageCircle, TrendingUp, Zap } from 'lucide-react'
 
-const PLATFORM_KEYS = ['instagram', 'facebook', 'youtube', 'whatsapp']
+const PLATFORM_KEYS = ['instagram', 'facebook', 'whatsapp', 'tiktok', 'youtube']
 
 const adminQuickActions = [
   {
@@ -40,7 +40,7 @@ const clientQuickActions = [
 ]
 
 const adminNextSteps = [
-  { label: 'Connect Instagram or Facebook', test: company => PLATFORM_KEYS.some(key => company.platforms?.[key]?.connected), target: 'platforms' },
+  { label: 'Connect Instagram or Facebook', test: company => PLATFORM_KEYS.some(key => company.platforms?.[key]?.connected), target: 'settings' },
   { label: 'Train the AI with business details', test: company => company.aiTraining?.status === 'active' || company.aiTraining?.documents?.length > 0 || company.aiTraining?.websiteUrl, target: 'ai-training' },
   { label: 'Review inbox replies', test: company => Number(company.metrics?.thisMonth?.totalReplies || 0) > 0, target: 'inbox' },
 ]
@@ -131,7 +131,7 @@ export default function OverviewTab({ company, onNavigate, isAdmin = false }) {
   const displayName = company.clientName || company.name || 'there'
   const quickActions = isAdmin ? adminQuickActions : clientQuickActions
   const nextSteps = isAdmin ? adminNextSteps : clientNextSteps
-  const setupTarget = isAdmin ? 'platforms' : 'inbox'
+  const setupTarget = isAdmin ? 'settings' : 'inbox'
 
   return (
     <div className="animate-slide-in">
@@ -196,9 +196,9 @@ export default function OverviewTab({ company, onNavigate, isAdmin = false }) {
                 <div className="mt-4 text-2xl font-extrabold text-slate-950">{company.metrics?.thisMonth?.totalReplies || 0}</div>
                 <div className="mt-1 text-sm font-medium text-slate-500">AI replies this month</div>
               </button>
-              <button type="button" onClick={() => onNavigate?.(isAdmin ? 'platforms' : 'growth')} className="rounded-lg bg-white p-5 text-left cursor-pointer transition-colors hover:bg-slate-50">
+              <button type="button" onClick={() => onNavigate?.(isAdmin ? 'settings' : 'growth')} className="rounded-lg bg-white p-5 text-left cursor-pointer transition-colors hover:bg-slate-50">
                 <Globe size={20} className="text-slate-500" />
-                <div className="mt-4 text-2xl font-extrabold text-slate-950">{connected}/4</div>
+                <div className="mt-4 text-2xl font-extrabold text-slate-950">{connected}/5</div>
                 <div className="mt-1 text-sm font-medium text-slate-500">Channels connected</div>
               </button>
               <button type="button" onClick={() => onNavigate?.('growth')} className="rounded-lg bg-white p-5 text-left cursor-pointer transition-colors hover:bg-slate-50">

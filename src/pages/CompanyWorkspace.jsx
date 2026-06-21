@@ -1,8 +1,8 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import { Bell, Settings, CheckCircle2, Mail, Clock, Save, Trash2, AlertCircle, GitBranch, MapPin } from 'lucide-react'
+import { Bell, Settings, CheckCircle2, Mail, Save, Trash2, AlertCircle, GitBranch, MapPin, Users, History, Monitor, KeyRound } from 'lucide-react'
 import Sidebar from '../components/layout/Sidebar'
-import { StatusBadge } from '../components/ui/UIKit'
+import { PlatformIcon } from '../components/ui/UIKit'
 import { useAuth } from '../context/AuthContext'
 import { loadCompanies, saveCompanies } from './AdminDashboard'
 import { getCompanies, updateBackendCompany } from '../lib/backendApi'
@@ -15,37 +15,6 @@ import AnalyticsTab from '../components/tabs/AnalyticsTab'
 import ReportsTab from '../components/tabs/ReportsTab'
 import GrowthTab from '../components/tabs/GrowthTab'
 import clsx from 'clsx'
-
-const TABS = [
-  { key: 'overview', label: 'Home', roles: ['admin', 'client'] },
-  { key: 'platforms', label: 'Platforms', roles: ['admin'] },
-  { key: 'inbox', label: 'Inbox', roles: ['admin', 'client'] },
-  { key: 'ai-training', label: 'AI Training', roles: ['admin'] },
-  { key: 'automation', label: 'Automation', roles: ['admin'] },
-  { key: 'analytics', label: 'Analytics', roles: ['admin', 'client'] },
-  { key: 'reports', label: 'Reports', roles: ['admin', 'client'] },
-]
-
-const SECTION_LABELS = {
-  overview: 'Home',
-  platforms: 'Platforms',
-  inbox: 'Inbox',
-  'inbox-instagram': 'Instagram Inbox',
-  'inbox-facebook': 'Facebook Inbox',
-  'inbox-youtube': 'YouTube Inbox',
-  'inbox-whatsapp': 'WhatsApp Inbox',
-  growth: 'Social Media Analytics',
-  'growth-instagram': 'Instagram Analytics',
-  'growth-facebook': 'Facebook Analytics',
-  'growth-youtube': 'YouTube Analytics',
-  'growth-whatsapp': 'WhatsApp Analytics',
-  'ai-training': 'AI Training',
-  automation: 'Automation',
-  analytics: 'Analytics',
-  reports: 'Reports',
-  notifications: 'Notifications',
-  settings: 'Settings',
-}
 
 function NotificationsPanel({ notifications, onMarkAllRead, onRemove }) {
   return (
@@ -94,9 +63,60 @@ function NotificationsPanel({ notifications, onMarkAllRead, onRemove }) {
   )
 }
 
-function SettingsPanel({ settings, onSave }) {
+const SETTINGS_MAIN = [
+  { key: 'general', label: 'General', icon: Settings },
+  { key: 'notifications', label: 'Notifications', icon: Bell },
+  { key: 'team', label: 'Team Members', icon: Users },
+  { key: 'logs', label: 'Logs', icon: History },
+  { key: 'display', label: 'Display', icon: Monitor },
+]
+
+const SETTINGS_INBOX = [
+  { key: 'inbox-behavior', label: 'Inbox Behavior' },
+  { key: 'auto-assignment', label: 'Auto-Assignment' },
+]
+
+const SETTINGS_CHANNELS = [
+  { key: 'instagram', label: 'Instagram' },
+  { key: 'facebook', label: 'Facebook' },
+  { key: 'whatsapp', label: 'WhatsApp' },
+  { key: 'tiktok', label: 'TikTok' },
+  { key: 'youtube', label: 'YouTube' },
+]
+
+function SettingsNavItem({ item, active, onClick, channel }) {
+  const Icon = item.icon
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={clsx(
+        'flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-sm font-semibold transition-colors',
+        active ? 'bg-slate-200 text-slate-950' : 'text-slate-500 hover:bg-slate-100 hover:text-slate-900'
+      )}
+    >
+      {channel ? <PlatformIcon platform={item.key} size={17} connected={true} /> : Icon ? <Icon size={16} className="text-slate-400" /> : null}
+      <span className="truncate">{item.label}</span>
+    </button>
+  )
+}
+
+function PlaceholderSetting({ title, description, icon: Icon }) {
+  return (
+    <div className="rounded-lg border border-slate-200 bg-white p-8">
+      <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-slate-100 text-slate-500">
+        <Icon size={22} />
+      </div>
+      <h2 className="mt-6 text-3xl font-extrabold tracking-tight text-slate-950">{title}</h2>
+      <p className="mt-3 max-w-2xl text-sm leading-relaxed text-slate-500">{description}</p>
+    </div>
+  )
+}
+
+function SettingsPanel({ company, settings, onSave, onUpdate, onNotify, isAdmin }) {
   const [form, setForm] = useState(settings)
   const [saved, setSaved] = useState(false)
+  const [selected, setSelected] = useState('general')
 
   const update = (key, value) => setForm(prev => ({ ...prev, [key]: value }))
   const save = async () => {
@@ -106,66 +126,150 @@ function SettingsPanel({ settings, onSave }) {
     setSaved(false)
   }
 
-  return (
-    <div className="space-y-6 animate-slide-in">
-      <div className="flex items-start justify-between">
-        <div>
-          <h2 className="text-slate-900 font-bold text-lg">Settings</h2>
-          <p className="text-slate-500 text-sm mt-0.5">Control workspace identity, alerts, and report delivery.</p>
-        </div>
-        <button onClick={save} className="btn-primary">
-          {saved ? <><CheckCircle2 size={14} /> Saved</> : <><Save size={14} /> Save Settings</>}
-        </button>
-      </div>
+  const renderSelected = () => {
+    if (SETTINGS_CHANNELS.some(item => item.key === selected)) {
+      return (
+        <PlatformsTab
+          company={company}
+          onUpdate={onUpdate}
+          onNotify={onNotify}
+          selectedPlatform={selected}
+          compact
+        />
+      )
+    }
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <div className="card p-5 space-y-4">
-          <h3 className="text-slate-900 font-bold text-base flex items-center gap-2"><Settings size={15} className="text-slate-400" /> Workspace</h3>
-          <div>
-            <label className="block text-sm font-semibold text-slate-700 mb-1.5">Workspace Name</label>
-            <input value={form.workspaceName || ''} onChange={e => update('workspaceName', e.target.value)} className="input-field" placeholder="Workspace name" />
-          </div>
-          <div>
-            <label className="block text-sm font-semibold text-slate-700 mb-1.5">Timezone</label>
-            <select value={form.timezone || 'Africa/Casablanca'} onChange={e => update('timezone', e.target.value)} className="input-field">
-              <option value="Africa/Casablanca">Africa/Casablanca</option>
-              <option value="Europe/Istanbul">Europe/Istanbul</option>
-              <option value="Europe/London">Europe/London</option>
-              <option value="America/New_York">America/New_York</option>
-            </select>
-          </div>
-        </div>
-
-        <div className="card p-5 space-y-4">
-          <h3 className="text-slate-900 font-bold text-base flex items-center gap-2"><Mail size={15} className="text-slate-400" /> Notifications</h3>
-          <div>
-            <label className="block text-sm font-semibold text-slate-700 mb-1.5">Notification Email</label>
-            <input value={form.notificationEmail || ''} onChange={e => update('notificationEmail', e.target.value)} className="input-field" placeholder="alerts@domain.com" />
-          </div>
-          {[
-            ['adminAlerts', 'Admin alerts', 'AI failures, unknown answers, and connection drops'],
-            ['clientAlerts', 'Client alerts', 'Monthly reports and unusual message spikes'],
-            ['monthlyReportEmail', 'Monthly report email', 'Send the report automatically when it is ready'],
-            ['spikeAlerts', 'Spike alerts', 'Notify when message volume rises unusually fast'],
-          ].map(([key, label, desc]) => (
-            <button key={key} onClick={() => update(key, !form[key])} className="w-full flex items-center justify-between gap-4 text-left">
-              <div>
-                <div className="text-slate-800 text-sm font-semibold">{label}</div>
-                <div className="text-slate-500 text-xs mt-0.5">{desc}</div>
-              </div>
-              <div className={clsx('relative w-11 h-6 rounded-full transition-colors flex-shrink-0', form[key] ? 'bg-blue-600' : 'bg-slate-200')}>
-                <div className={clsx('absolute top-1 w-4 h-4 bg-white rounded-full shadow-sm transition-all', form[key] ? 'left-6' : 'left-1')} />
-              </div>
+    if (selected === 'general') {
+      return (
+        <div className="animate-slide-in">
+          <div className="mb-8 flex items-start justify-between gap-4">
+            <div>
+              <h2 className="text-3xl font-extrabold tracking-tight text-slate-950">General</h2>
+              <p className="mt-1 text-sm font-medium text-slate-500">Workspace identity and default operating timezone.</p>
+            </div>
+            <button onClick={save} className="btn-primary">
+              {saved ? <><CheckCircle2 size={14} /> Saved</> : <><Save size={14} /> Save</>}
             </button>
-          ))}
+          </div>
+          <div className="rounded-lg border border-slate-200 bg-white p-6">
+            <div className="grid grid-cols-1 gap-5 lg:grid-cols-2">
+              <div>
+                <label className="mb-1.5 block text-sm font-semibold text-slate-700">Workspace Name</label>
+                <input value={form.workspaceName || ''} onChange={e => update('workspaceName', e.target.value)} className="input-field" placeholder="Workspace name" />
+              </div>
+              <div>
+                <label className="mb-1.5 block text-sm font-semibold text-slate-700">Timezone</label>
+                <select value={form.timezone || 'Africa/Casablanca'} onChange={e => update('timezone', e.target.value)} className="input-field">
+                  <option value="Africa/Casablanca">Africa/Casablanca</option>
+                  <option value="Europe/Istanbul">Europe/Istanbul</option>
+                  <option value="Europe/London">Europe/London</option>
+                  <option value="America/New_York">America/New_York</option>
+                </select>
+              </div>
+            </div>
+          </div>
         </div>
+      )
+    }
+
+    if (selected === 'notifications') {
+      return (
+        <div className="animate-slide-in">
+          <div className="mb-8 flex items-start justify-between gap-4">
+            <div>
+              <h2 className="text-3xl font-extrabold tracking-tight text-slate-950">Notifications</h2>
+              <p className="mt-1 text-sm font-medium text-slate-500">Choose which workspace alerts should be sent or shown.</p>
+            </div>
+            <button onClick={save} className="btn-primary">
+              {saved ? <><CheckCircle2 size={14} /> Saved</> : <><Save size={14} /> Save</>}
+            </button>
+          </div>
+          <div className="rounded-lg border border-slate-200 bg-white p-6">
+            <div className="mb-5">
+              <label className="mb-1.5 block text-sm font-semibold text-slate-700">Notification Email</label>
+              <input value={form.notificationEmail || ''} onChange={e => update('notificationEmail', e.target.value)} className="input-field max-w-xl" placeholder="alerts@domain.com" />
+            </div>
+            <div className="divide-y divide-slate-200">
+              {[
+                ['adminAlerts', 'Admin alerts', 'AI failures, unknown answers, and connection drops'],
+                ['clientAlerts', 'Client alerts', 'Monthly reports and unusual message spikes'],
+                ['monthlyReportEmail', 'Monthly report email', 'Send the report automatically when it is ready'],
+                ['spikeAlerts', 'Spike alerts', 'Notify when message volume rises unusually fast'],
+              ].map(([key, label, desc]) => (
+                <button key={key} onClick={() => update(key, !form[key])} className="flex w-full items-center justify-between gap-4 py-4 text-left">
+                  <div>
+                    <div className="text-sm font-semibold text-slate-800">{label}</div>
+                    <div className="mt-0.5 text-xs text-slate-500">{desc}</div>
+                  </div>
+                  <div className={clsx('relative h-6 w-11 flex-shrink-0 rounded-full transition-colors', form[key] ? 'bg-blue-600' : 'bg-slate-200')}>
+                    <div className={clsx('absolute top-1 h-4 w-4 rounded-full bg-white shadow-sm transition-all', form[key] ? 'left-6' : 'left-1')} />
+                  </div>
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+      )
+    }
+
+    const placeholders = {
+      team: ['Team Members', 'Invite and manage people who can access this company workspace.', Users],
+      logs: ['Logs', 'Connection changes, automation actions, and AI reply activity will appear here.', History],
+      display: ['Display', 'Control simple interface preferences for this workspace.', Monitor],
+      'inbox-behavior': ['Inbox Behavior', 'Manage how conversations are opened, closed, filtered, and assigned.', Mail],
+      'auto-assignment': ['Auto-Assignment', 'Set rules for assigning incoming messages to the right person or branch.', Users],
+      'api-keys': ['API Keys', 'Store provider keys that only the admin can manage for this workspace.', KeyRound],
+    }
+    const [title, description, Icon] = placeholders[selected] || placeholders.general || placeholders.display
+    return <PlaceholderSetting title={title} description={description} icon={Icon} />
+  }
+
+  return (
+    <div className="animate-slide-in">
+      <div className="-mx-8 -mt-8 border-b border-slate-200 bg-slate-50 px-8 py-7">
+        <h1 className="text-3xl font-extrabold tracking-tight text-slate-950">Settings</h1>
       </div>
 
-      <div className="card p-5 bg-slate-900 text-white">
-        <div className="flex items-center gap-2 mb-2"><Clock size={15} className="text-blue-300" /><span className="font-bold text-sm">What settings do now</span></div>
-        <p className="text-slate-300 text-sm leading-relaxed">
-          Saved settings update this workspace immediately and control which alerts appear in Notifications. When the backend is connected, these same values are ready to send to the API.
-        </p>
+      <div className="grid grid-cols-1 gap-8 py-8 lg:grid-cols-[240px_1fr]">
+        <aside className="space-y-8">
+          <div>
+            <div className="mb-3 px-3 text-base font-extrabold text-slate-950">Main</div>
+            <div className="space-y-1">
+              {SETTINGS_MAIN.map(item => (
+                <SettingsNavItem key={item.key} item={item} active={selected === item.key} onClick={() => setSelected(item.key)} />
+              ))}
+            </div>
+          </div>
+
+          <div>
+            <div className="mb-3 px-3 text-base font-extrabold text-slate-950">Inbox</div>
+            <div className="space-y-1">
+              {SETTINGS_INBOX.map(item => (
+                <SettingsNavItem key={item.key} item={item} active={selected === item.key} onClick={() => setSelected(item.key)} />
+              ))}
+            </div>
+          </div>
+
+          {isAdmin && (
+            <div>
+              <div className="mb-3 px-3 text-base font-extrabold text-slate-950">Admin</div>
+              <SettingsNavItem item={{ key: 'api-keys', label: 'API Keys', icon: KeyRound }} active={selected === 'api-keys'} onClick={() => setSelected('api-keys')} />
+            </div>
+          )}
+
+          <div>
+            <div className="mb-3 px-3 text-base font-extrabold text-slate-950">Channels</div>
+            <div className="space-y-1">
+              {SETTINGS_CHANNELS.map(item => (
+                <SettingsNavItem key={item.key} item={item} channel active={selected === item.key} onClick={() => setSelected(item.key)} />
+              ))}
+            </div>
+          </div>
+        </aside>
+
+        <section className="min-w-0">
+          {renderSelected()}
+        </section>
       </div>
     </div>
   )
@@ -267,22 +371,8 @@ export default function CompanyWorkspace() {
     return null
   }
 
-  const platformMap = {
-    'inbox-instagram': 'instagram',
-    'inbox-facebook': 'facebook',
-    'inbox-youtube': 'youtube',
-    'inbox-whatsapp': 'whatsapp',
-    'growth-instagram': 'instagram',
-    'growth-facebook': 'facebook',
-    'growth-youtube': 'youtube',
-    'growth-whatsapp': 'whatsapp',
-  }
-  const userRole = isAdmin ? 'admin' : 'client'
-  const visibleTabs = TABS.filter(tab => tab.roles.includes(userRole))
-
   const tabContent = {
     overview: <OverviewTab company={company} onNavigate={setActiveTab} isAdmin={isAdmin} />,
-    platforms: <PlatformsTab company={company} onUpdate={updateCompany} onNotify={addNotification} />,
     inbox: <InboxTab company={company} onNotify={addNotification} isAdmin={isAdmin} />,
     'inbox-instagram': <InboxTab company={company} platform="instagram" onNotify={addNotification} isAdmin={isAdmin} />,
     'inbox-facebook': <InboxTab company={company} platform="facebook" onNotify={addNotification} isAdmin={isAdmin} />,
@@ -306,7 +396,11 @@ export default function CompanyWorkspace() {
     ),
     settings: (
       <SettingsPanel
+        company={company}
         settings={company.settings || {}}
+        onUpdate={updateCompany}
+        onNotify={addNotification}
+        isAdmin={isAdmin}
         onSave={settings => {
           updateCompany(c => ({ ...c, name: settings.workspaceName || c.name, settings }))
           addNotification('Settings saved successfully.', 'success')

@@ -15,6 +15,7 @@ const disconnectedPlatforms = {
   facebook: { connected: false, handle: null, followers: null, lastSync: null, error: null },
   youtube: { connected: false, handle: null, followers: null, lastSync: null, error: null },
   whatsapp: { connected: false, handle: null, followers: null, lastSync: null, error: null },
+  tiktok: { connected: false, handle: null, followers: null, lastSync: null, error: null },
 }
 
 const emptyMetrics = {
@@ -66,6 +67,7 @@ export const COMPANIES = [
       facebook: { ...disconnectedPlatforms.facebook },
       youtube: { ...disconnectedPlatforms.youtube },
       whatsapp: { ...disconnectedPlatforms.whatsapp },
+      tiktok: { ...disconnectedPlatforms.tiktok },
     },
     goal: 'push_to_whatsapp',
     whatsappLink: '',
@@ -76,6 +78,7 @@ export const COMPANIES = [
       facebook: { dmReply: true, commentReply: true, tone: 'professional', blacklist: [] },
       youtube: { dmReply: false, commentReply: false, tone: 'professional', blacklist: [] },
       whatsapp: { dmReply: true, commentReply: false, tone: 'professional', blacklist: [] },
+      tiktok: { dmReply: false, commentReply: false, tone: 'professional', blacklist: [] },
     },
     metrics: emptyMetrics,
     reports: [],

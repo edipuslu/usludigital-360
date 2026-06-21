@@ -170,6 +170,35 @@ const PLATFORM_GUIDES = {
       },
     ],
   },
+  tiktok: {
+    name: 'TikTok',
+    color: '#111827',
+    bg: '#F1F5F9',
+    subtitle: 'TikTok Business account connection',
+    fields: [
+      { key: 'handle', label: 'TikTok Username', placeholder: '@yourbrand', type: 'text' },
+      { key: 'accessToken', label: 'TikTok Access Token', placeholder: 'Paste TikTok token when available', type: 'password' },
+    ],
+    steps: [
+      {
+        num: 1,
+        title: 'Open TikTok for Developers',
+        description: 'Create or open the TikTok app that belongs to this company.',
+        link: { label: 'Open TikTok Developers', url: 'https://developers.tiktok.com' },
+      },
+      {
+        num: 2,
+        title: 'Choose the Correct Account',
+        description: 'Use the TikTok Business account for this company only, not a personal account.',
+      },
+      {
+        num: 3,
+        title: 'Save the Account Details',
+        description: 'Add the TikTok username and token here so this workspace keeps the channel separated from Instagram, Facebook, YouTube, and WhatsApp.',
+        note: 'TikTok live comment/DM automation depends on TikTok API access. This page keeps the channel ready as a separate connection.',
+      },
+    ],
+  },
   whatsapp: {
     name: 'WhatsApp Business',
     color: '#25D366',
@@ -365,6 +394,18 @@ async function verifyPlatformCredentials(platform, creds) {
     return { id: channelId, name: data.items[0]?.snippet?.title || channelId }
   }
 
+  if (platform === 'tiktok') {
+    const handle = (creds.handle || '').trim()
+    const accessToken = (creds.accessToken || '').trim()
+    if (!/^@?[A-Za-z0-9._]{2,24}$/.test(handle)) {
+      throw new Error('TikTok username should look like @yourbrand.')
+    }
+    if (accessToken.length < 12) {
+      throw new Error('TikTok access token is too short.')
+    }
+    return { id: handle.replace(/^@/, ''), name: handle.startsWith('@') ? handle : `@${handle}` }
+  }
+
   throw new Error('Unsupported platform.')
 }
 
@@ -546,7 +587,7 @@ function ConnectionGuideModal({ platform, guide, onClose, onSave, existingCreden
   )
 }
 
-function PlatformCard({ platform, guide, data, backendConnections = [], onConnect, onOAuthLogin, onDisconnect }) {
+function PlatformCard({ platform, guide, data, backendConnections = [], onConnect, onOAuthLogin, onDisconnect, compact = false }) {
   const [showGuide, setShowGuide] = useState(false)
   const [oauthLoading, setOauthLoading] = useState(false)
 
@@ -569,11 +610,12 @@ function PlatformCard({ platform, guide, data, backendConnections = [], onConnec
     facebook: 'hover:border-blue-200',
     youtube: 'hover:border-red-200',
     whatsapp: 'hover:border-green-200',
+    tiktok: 'hover:border-slate-300',
   }[platform]
 
   return (
     <>
-      <div className={clsx('card p-6 transition-all duration-200', borderColor, isConnected && 'border-emerald-200 bg-emerald-50/20')}>
+      <div className={clsx('rounded-lg border border-slate-200 bg-white p-6 transition-colors duration-200', borderColor, isConnected && 'border-emerald-200 bg-emerald-50/20')}>
         {/* Header */}
         <div className="flex items-start justify-between gap-3 mb-5">
           <div className="flex items-center gap-3">
@@ -676,6 +718,41 @@ function PlatformCard({ platform, guide, data, backendConnections = [], onConnec
             )}
           </div>
         )}
+
+        {compact && (
+          <div className="mt-6 divide-y divide-slate-200 border-t border-slate-200">
+            <div className="grid grid-cols-1 gap-4 py-5 lg:grid-cols-[220px_1fr]">
+              <div className="text-sm font-bold text-slate-900">Default reply</div>
+              <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+                <div className="flex flex-wrap gap-2">
+                  <button type="button" className="h-10 rounded-lg border border-slate-200 px-4 text-sm font-semibold text-slate-700 hover:bg-slate-50">Create New Reply</button>
+                  <button type="button" className="h-10 rounded-lg border border-slate-200 px-4 text-sm font-semibold text-slate-700 hover:bg-slate-50">Select Existing</button>
+                </div>
+                <p className="max-w-xl text-sm leading-relaxed text-slate-500">
+                  Used when the AI cannot recognize a message or when automation is paused.
+                </p>
+              </div>
+            </div>
+            <div className="grid grid-cols-1 gap-4 py-5 lg:grid-cols-[220px_1fr]">
+              <div className="text-sm font-bold text-slate-900">Main menu</div>
+              <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+                <button type="button" className="h-10 rounded-lg border border-slate-200 px-12 text-sm font-semibold text-slate-700 hover:bg-slate-50">Edit</button>
+                <p className="max-w-xl text-sm leading-relaxed text-slate-500">
+                  Configure quick actions customers can use inside this channel.
+                </p>
+              </div>
+            </div>
+            <div className="grid grid-cols-1 gap-4 py-5 lg:grid-cols-[220px_1fr]">
+              <div>
+                <div className="text-sm font-bold text-slate-900">AI reply status</div>
+                <span className="mt-1 inline-flex rounded bg-emerald-600 px-1.5 py-0.5 text-[10px] font-bold text-white">BETA</span>
+              </div>
+              <p className="max-w-xl text-sm leading-relaxed text-slate-500">
+                When this channel is connected and automation is enabled, new eligible comments and messages can be saved to Inbox and replied to by AI.
+              </p>
+            </div>
+          </div>
+        )}
       </div>
 
       {showGuide && (
@@ -707,7 +784,7 @@ function RequirementCard({ icon: Icon, title, children }) {
   )
 }
 
-export default function PlatformsTab({ company, onUpdate, onNotify }) {
+export default function PlatformsTab({ company, onUpdate, onNotify, selectedPlatform = null, compact = false }) {
   const [backendConnections, setBackendConnections] = useState({})
 
   useEffect(() => {
@@ -747,9 +824,9 @@ export default function PlatformsTab({ company, onUpdate, onNotify }) {
       status: 'active',
       whatsappLink: credentials.whatsappLink || current.whatsappLink,
       platforms: {
-        ...current.platforms,
-        [platform]: {
-          ...current.platforms[platform],
+          ...current.platforms,
+          [platform]: {
+          ...(current.platforms?.[platform] || {}),
           ...platformData,
         },
       },
@@ -763,7 +840,7 @@ export default function PlatformsTab({ company, onUpdate, onNotify }) {
         whatsappLink: credentials.whatsappLink || company.whatsappLink,
         platforms: {
           ...company.platforms,
-          [platform]: { ...company.platforms[platform], ...platformData },
+          [platform]: { ...(company.platforms?.[platform] || {}), ...platformData },
         },
       })
       onNotify?.(`${guide.name} verified and registered with the webhook backend.`, 'success')
@@ -777,9 +854,9 @@ export default function PlatformsTab({ company, onUpdate, onNotify }) {
     onUpdate(current => ({
       ...current,
       platforms: {
-        ...current.platforms,
-        [platform]: {
-          ...current.platforms[platform],
+          ...current.platforms,
+          [platform]: {
+          ...(current.platforms?.[platform] || {}),
           connected: false,
           error: null,
           credentials: null,
@@ -795,6 +872,37 @@ export default function PlatformsTab({ company, onUpdate, onNotify }) {
     } catch (err) {
       onNotify?.(`${guide.name} removed locally, but backend disconnect failed: ${err.message}`, 'warning')
     }
+  }
+
+  const visibleEntries = selectedPlatform
+    ? Object.entries(PLATFORM_GUIDES).filter(([key]) => key === selectedPlatform)
+    : Object.entries(PLATFORM_GUIDES)
+
+  if (compact && selectedPlatform) {
+    const guide = PLATFORM_GUIDES[selectedPlatform]
+    return (
+      <div className="animate-slide-in">
+        <div className="mb-8 flex items-center gap-4">
+          <div className="flex h-12 w-12 items-center justify-center rounded-full" style={{ background: guide.bg }}>
+            <PlatformIcon platform={selectedPlatform} size={24} connected={true} />
+          </div>
+          <div>
+            <h2 className="text-3xl font-extrabold tracking-tight text-slate-950">{guide.name}</h2>
+            <p className="mt-1 text-sm font-medium text-slate-500">{guide.subtitle}</p>
+          </div>
+        </div>
+        <PlatformCard
+          platform={selectedPlatform}
+          guide={guide}
+          data={company.platforms?.[selectedPlatform]}
+          backendConnections={backendConnections[selectedPlatform] || []}
+          onConnect={connectPlatform}
+          onOAuthLogin={loginWithOAuth}
+          onDisconnect={disconnectPlatform}
+          compact
+        />
+      </div>
+    )
   }
 
   return (
@@ -841,7 +949,7 @@ export default function PlatformsTab({ company, onUpdate, onNotify }) {
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
-        {Object.entries(PLATFORM_GUIDES).map(([key, guide]) => (
+        {visibleEntries.map(([key, guide]) => (
           <PlatformCard
             key={key}
             platform={key}

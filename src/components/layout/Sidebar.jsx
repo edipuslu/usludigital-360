@@ -1,6 +1,6 @@
 import {
   LayoutDashboard, BarChart3, Brain, FileText,
-  Bell, Settings, LogOut, Zap, Globe, ArrowLeft, Inbox, TrendingUp,
+  Bell, Settings, LogOut, Zap, ArrowLeft, Inbox, TrendingUp,
   GitBranch, MapPin,
 } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
@@ -9,7 +9,6 @@ import clsx from 'clsx'
 
 const MAIN_NAV = [
   { icon: LayoutDashboard, label: 'Home', key: 'overview', roles: ['admin', 'client'] },
-  { icon: Globe, label: 'Platforms', key: 'platforms', roles: ['admin'] },
   { icon: Inbox, label: 'Inbox', key: 'inbox', roles: ['admin', 'client'] },
   { icon: TrendingUp, label: 'Social Media Analytics', key: 'growth', roles: ['admin', 'client'] },
   { icon: Brain, label: 'AI Training', key: 'ai-training', roles: ['admin'] },

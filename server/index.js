@@ -63,6 +63,7 @@ function automationDefaults() {
     facebook: { dmReply: true, commentReply: true, tone: 'professional', blacklist: [] },
     youtube: { dmReply: false, commentReply: false, tone: 'professional', blacklist: [] },
     whatsapp: { dmReply: true, commentReply: false, tone: 'professional', blacklist: [] },
+    tiktok: { dmReply: false, commentReply: false, tone: 'professional', blacklist: [] },
   }
 }
 
@@ -85,6 +86,7 @@ function companyDefaults(row = {}) {
       facebook: { connected: false, handle: null, followers: null, lastSync: null, error: null },
       youtube: { connected: false, handle: null, followers: null, lastSync: null, error: null },
       whatsapp: { connected: false, handle: null, followers: null, lastSync: null, error: null },
+      tiktok: { connected: false, handle: null, followers: null, lastSync: null, error: null },
     },
     goal: 'push_to_whatsapp',
     whatsappLink: '',
@@ -113,6 +115,7 @@ function companyDefaults(row = {}) {
         { platform: 'Facebook', replies: 0, waClicks: 0, color: '#1877F2' },
         { platform: 'YouTube', replies: 0, waClicks: 0, color: '#FF0000' },
         { platform: 'WhatsApp', replies: 0, waClicks: 0, color: '#25D366' },
+        { platform: 'TikTok', replies: 0, waClicks: 0, color: '#111827' },
       ],
       daily: emptyDaily,
       heatmap: emptyHeatmap,
