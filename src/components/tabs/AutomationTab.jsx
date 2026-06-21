@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Save, Plus, X, Zap, MessageSquare, Link2, Volume2, ShieldOff, Clock, CheckCircle2 } from 'lucide-react'
+import { Save, Plus, X, Zap, MessageSquare, Link2, Volume2, ShieldOff, CheckCircle2 } from 'lucide-react'
 import { PlatformIcon, Toggle, UsluLoader } from '../ui/UIKit'
 import { saveBackendAiConfig } from '../../lib/backendApi'
 import clsx from 'clsx'
@@ -146,18 +146,6 @@ function PlatformAutomation({ platform, settings, onChange }) {
   )
 }
 
-function toLocalInputValue(value) {
-  if (!value) return ''
-  const date = new Date(value)
-  if (Number.isNaN(date.getTime())) return ''
-  const offsetDate = new Date(date.getTime() - date.getTimezoneOffset() * 60000)
-  return offsetDate.toISOString().slice(0, 16)
-}
-
-function fromLocalInputValue(value) {
-  return value ? new Date(value).toISOString() : ''
-}
-
 export default function AutomationTab({ company, onUpdate, onNotify }) {
   const [activeP, setActiveP] = useState('instagram')
   const initialAutomation = {
@@ -216,7 +204,6 @@ export default function AutomationTab({ company, onUpdate, onNotify }) {
 
       <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
         {[
-          ['Schedule', settings.schedule?.enabled !== false ? 'Active' : 'Paused', Clock],
           ['Goal', GOALS.find(g => g.value === goal)?.label || 'Custom', Zap],
           ['Channels', `${PLATFORMS.filter(p => settings[p]?.dmReply || settings[p]?.commentReply).length}/${PLATFORMS.length} enabled`, CheckCircle2],
         ].map(([label, value, Icon]) => (
@@ -232,51 +219,6 @@ export default function AutomationTab({ company, onUpdate, onNotify }) {
             </div>
           </div>
         ))}
-      </div>
-
-      {/* Activation schedule */}
-      <div className="overflow-hidden rounded-xl border border-slate-200 bg-white">
-        <div className="flex items-center justify-between gap-3 border-b border-slate-200 px-6 py-5">
-          <div>
-            <div className="flex items-center gap-2">
-              <Clock size={16} className="text-blue-600" />
-              <h3 className="text-lg font-extrabold text-slate-950">AI Activation Time</h3>
-            </div>
-            <p className="mt-1 text-sm text-slate-500">Times are controlled in Morocco time. Leave stop time empty to keep AI running nonstop.</p>
-          </div>
-          <Toggle
-            checked={settings.schedule?.enabled !== false}
-            onChange={v => setSettings(prev => ({ ...prev, schedule: { ...(prev.schedule || DEFAULT_SCHEDULE), enabled: v } }))}
-            label="Active"
-            description=""
-          />
-        </div>
-        <div className="grid grid-cols-1 gap-4 p-6 md:grid-cols-2">
-          <div>
-            <label className="block text-sm font-semibold text-slate-700 mb-1.5">Start replying from</label>
-            <input
-              type="datetime-local"
-              value={toLocalInputValue(settings.schedule?.startAt)}
-              onChange={e => setSettings(prev => ({ ...prev, schedule: { ...(prev.schedule || DEFAULT_SCHEDULE), startAt: fromLocalInputValue(e.target.value), timezone: 'Africa/Casablanca' } }))}
-              className="input-field"
-            />
-          </div>
-          <div>
-            <label className="block text-sm font-semibold text-slate-700 mb-1.5">Stop replying at</label>
-            <input
-              type="datetime-local"
-              value={toLocalInputValue(settings.schedule?.endAt)}
-              onChange={e => setSettings(prev => ({ ...prev, schedule: { ...(prev.schedule || DEFAULT_SCHEDULE), endAt: fromLocalInputValue(e.target.value), timezone: 'Africa/Casablanca' } }))}
-              className="input-field"
-            />
-            <button
-              onClick={() => setSettings(prev => ({ ...prev, schedule: { ...(prev.schedule || DEFAULT_SCHEDULE), endAt: '' } }))}
-              className="mt-2 text-xs font-semibold text-blue-600 hover:text-blue-700"
-            >
-              Run nonstop
-            </button>
-          </div>
-        </div>
       </div>
 
       {/* Business Goal */}
