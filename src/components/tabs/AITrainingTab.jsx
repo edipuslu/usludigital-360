@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
-import { Upload, FileText, Trash2, CheckCircle2, RefreshCw, Brain, Shield, Globe, MessageSquare, Plus, Eye, EyeOff, ExternalLink, AlertCircle, Zap, Key } from 'lucide-react'
-import { StatusBadge, SectionHeader, Toggle } from '../ui/UIKit'
+import { Upload, FileText, Trash2, CheckCircle2, RefreshCw, Brain, Shield, Globe, MessageSquare, Plus, Eye, EyeOff, ExternalLink, AlertCircle, Zap, Key, Sparkles, Send } from 'lucide-react'
+import { StatusBadge, Toggle } from '../ui/UIKit'
 import { getBackendAiConfig, saveBackendAiConfig, testBackendAiReply } from '../../lib/backendApi'
 import clsx from 'clsx'
 
@@ -15,6 +15,53 @@ const FILE_TYPES = {
   pdf: { label: 'PDF', bg: 'bg-red-50', text: 'text-red-600', border: 'border-red-200' },
   sheet: { label: 'XLS', bg: 'bg-emerald-50', text: 'text-emerald-600', border: 'border-emerald-200' },
   doc: { label: 'DOC', bg: 'bg-blue-50', text: 'text-blue-600', border: 'border-blue-200' },
+}
+
+function AiPreviewCard({ type, title, description, onClick }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className="group text-left cursor-pointer focus:outline-none focus:ring-2 focus:ring-blue-200 rounded-lg"
+    >
+      <div className="h-[220px] overflow-hidden rounded-lg bg-slate-950 p-6 transition-transform group-hover:-translate-y-0.5">
+        {type === 'replies' && (
+          <div className="flex h-full flex-col justify-center gap-4">
+            <div className="max-w-[210px] rounded-2xl bg-slate-800 px-4 py-3 text-sm font-medium text-white">How long is the course?</div>
+            <div className="ml-auto max-w-[235px] rounded-2xl bg-violet-600 px-4 py-3 text-sm font-semibold leading-relaxed text-white">
+              8 weeks. Video lessons, worksheets, and lifetime access.
+            </div>
+          </div>
+        )}
+        {type === 'comments' && (
+          <div className="flex h-full flex-col justify-center gap-4">
+            <div className="-rotate-3 rounded-lg bg-white px-4 py-3 text-sm font-semibold text-slate-800 shadow-sm">
+              Your feedback helps us improve every week.
+            </div>
+            <div className="rotate-2 rounded-lg bg-slate-100 px-4 py-3 text-sm font-medium text-slate-500">
+              Thanks for sharing this. We appreciate you.
+            </div>
+            <div className="mt-auto flex gap-4 border-t border-white/20 pt-4 text-white">
+              <MessageSquare size={24} />
+              <Send size={24} />
+            </div>
+          </div>
+        )}
+        {type === 'goals' && (
+          <div className="flex h-full flex-col justify-center rounded-[28px] border border-slate-800 bg-black px-6">
+            <div className="text-xs font-bold text-slate-400">Jessica Peel · 2h</div>
+            <div className="mt-1 text-sm text-white">Love this.</div>
+            <div className="mt-5 rounded-2xl bg-violet-600 p-5 text-white">
+              <div className="text-sm font-semibold leading-relaxed">Happy to hear you loved it. Want the registration link?</div>
+              <div className="mt-4 rounded-lg bg-white/20 px-4 py-3 text-center text-sm font-bold">Register now</div>
+            </div>
+          </div>
+        )}
+      </div>
+      <h3 className="mt-5 text-base font-extrabold text-slate-950">{title}</h3>
+      <p className="mt-2 text-sm leading-relaxed text-slate-600">{description}</p>
+    </button>
+  )
 }
 
 function DocumentRow({ doc, onRemove }) {
@@ -265,6 +312,8 @@ export default function AITrainingTab({ company, onUpdate, onNotify, isAdmin = t
   const [testError, setTestError] = useState('')
   const [apiKey, setApiKey] = useState(() => localStorage.getItem('ud360_openai_key') || '')
   const [hasSavedApiKey, setHasSavedApiKey] = useState(() => Boolean(localStorage.getItem('ud360_openai_key') || company.hasOpenaiKey))
+  const [setupOpen, setSetupOpen] = useState(() => Boolean(company.aiTraining.description || company.aiTraining.websiteUrl || company.aiTraining.documents?.length || company.hasOpenaiKey || localStorage.getItem('ud360_openai_key')))
+  const [focusSection, setFocusSection] = useState('knowledge')
 
   useEffect(() => {
     let alive = true
@@ -364,22 +413,118 @@ export default function AITrainingTab({ company, onUpdate, onNotify, isAdmin = t
     }
   }
 
+  const openSetup = section => {
+    setFocusSection(section)
+    setSetupOpen(true)
+  }
+
+  if (!setupOpen) {
+    return (
+      <div className="animate-slide-in">
+        <div className="-mx-8 -mt-8 flex items-center justify-between border-b border-slate-200 bg-slate-50 px-8 py-6">
+          <div className="flex items-center gap-3">
+            <h1 className="text-3xl font-extrabold tracking-tight text-slate-950">Usludigital AI</h1>
+            <span className="text-lg font-semibold text-slate-400">BETA for Instagram</span>
+          </div>
+          {isAdmin && (
+            <button
+              type="button"
+              onClick={() => openSetup('test')}
+              className="inline-flex h-11 items-center gap-2 rounded-lg bg-slate-950 px-5 text-sm font-bold text-white hover:bg-slate-800"
+            >
+              <Sparkles size={16} /> Test AI
+            </button>
+          )}
+        </div>
+
+        <section className="mx-auto max-w-5xl px-2 py-16 text-center">
+          <p className="text-sm font-semibold text-slate-500">Welcome to Usludigital AI</p>
+          <h2 className="mt-6 text-4xl font-extrabold tracking-tight text-slate-950">Meet your new social media assistant</h2>
+
+          <div className="mt-10 grid grid-cols-1 gap-8 text-left md:grid-cols-3">
+            <AiPreviewCard
+              type="replies"
+              title="AI Replies"
+              description="Share your business knowledge, then AI uses it to reply around the clock."
+              onClick={() => openSetup('knowledge')}
+            />
+            <AiPreviewCard
+              type="comments"
+              title="AI Comments"
+              description="Set your brand tone, then AI replies to comments in the style you choose."
+              onClick={() => openSetup('behavior')}
+            />
+            <AiPreviewCard
+              type="goals"
+              title="AI Goals"
+              description="Guide replies toward leads, clicks, bookings, or whichever result matters most."
+              onClick={() => openSetup('goals')}
+            />
+          </div>
+
+          <button
+            type="button"
+            onClick={() => openSetup('knowledge')}
+            className="mt-10 inline-flex h-12 items-center justify-center rounded-lg bg-blue-600 px-7 text-base font-bold text-white hover:bg-blue-700"
+          >
+            Set Up Usludigital AI
+          </button>
+
+          <p className="mx-auto mt-28 max-w-2xl text-sm font-medium text-slate-500">
+            AI is not human and may need review. Replies use the business context, tone, guardrails, and fallback message you configure here.
+          </p>
+        </section>
+      </div>
+    )
+  }
+
   return (
     <div className="space-y-6 animate-slide-in">
-      <SectionHeader
-        title="AI Training Center"
-        description={isAdmin ? "Add your OpenAI key and upload business context so the AI replies accurately in your brand's voice" : "View the AI training status and business context configured by the admin."}
-        action={
-          <div className="flex items-center gap-2">
+      <div className="-mx-8 -mt-8 flex flex-col gap-5 border-b border-slate-200 bg-slate-50 px-8 py-6 lg:flex-row lg:items-center lg:justify-between">
+        <div>
+          <div className="flex flex-wrap items-center gap-3">
+            <h1 className="text-3xl font-extrabold tracking-tight text-slate-950">Usludigital AI</h1>
+            <span className="text-lg font-semibold text-slate-400">BETA for Instagram</span>
             <StatusBadge status={isAdmin ? (hasSavedApiKey ? 'active' : 'needs_update') : company.aiTraining.status} />
-            {isAdmin && docs.length > 0 && (
-              <button onClick={() => saveTraining('active')} className="btn-primary">
-                <RefreshCw size={14} /> Retrain AI
-              </button>
-            )}
           </div>
-        }
-      />
+          <div className="mt-4 flex flex-wrap gap-2">
+            {[
+              ['knowledge', 'Knowledge'],
+              ['behavior', 'Behavior'],
+              ['goals', 'Goals'],
+              ...(isAdmin ? [['test', 'Test AI']] : []),
+            ].map(([key, label]) => (
+              <button
+                key={key}
+                type="button"
+                onClick={() => setFocusSection(key)}
+                className={clsx(
+                  'h-10 rounded-lg px-4 text-sm font-bold transition-colors',
+                  focusSection === key ? 'bg-slate-950 text-white' : 'bg-white text-slate-600 hover:bg-slate-100'
+                )}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+        </div>
+        <div className="flex flex-wrap items-center gap-2">
+          {isAdmin && docs.length > 0 && (
+            <button onClick={() => saveTraining('active')} className="btn-primary">
+              <RefreshCw size={14} /> Retrain AI
+            </button>
+          )}
+          {isAdmin && (
+            <button
+              type="button"
+              onClick={() => setFocusSection('test')}
+              className="inline-flex h-11 items-center gap-2 rounded-lg bg-slate-950 px-5 text-sm font-bold text-white hover:bg-slate-800"
+            >
+              <Sparkles size={16} /> Test AI
+            </button>
+          )}
+        </div>
+      </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Left — OpenAI key + documents */}
@@ -427,7 +572,7 @@ export default function AITrainingTab({ company, onUpdate, onNotify, isAdmin = t
           )}
 
           {/* Documents */}
-          <div className="card p-5">
+          <div className={clsx('card p-5', focusSection === 'knowledge' && 'ring-2 ring-blue-200')}>
             <div className="flex items-center justify-between mb-4">
               <h3 className="text-slate-900 font-bold text-base flex items-center gap-2">
                 <FileText size={15} className="text-slate-400" /> Training Documents
@@ -449,7 +594,7 @@ export default function AITrainingTab({ company, onUpdate, onNotify, isAdmin = t
           </div>
 
           {/* Website + Description */}
-          <div className="card p-5">
+          <div className={clsx('card p-5', focusSection === 'knowledge' && 'ring-2 ring-blue-200')}>
             <h3 className="text-slate-900 font-bold text-base flex items-center gap-2 mb-4">
               <Globe size={15} className="text-slate-400" /> Business Context
             </h3>
@@ -477,7 +622,7 @@ export default function AITrainingTab({ company, onUpdate, onNotify, isAdmin = t
           </div>
 
           {/* AI Test Console */}
-          {isAdmin && <div className="card p-5">
+          {isAdmin && <div className={clsx('card p-5', focusSection === 'test' && 'ring-2 ring-blue-200')}>
             <h3 className="text-slate-900 font-bold text-base flex items-center gap-2 mb-1">
               <Brain size={15} className="text-slate-400" /> Test AI Responses
             </h3>
@@ -512,7 +657,7 @@ export default function AITrainingTab({ company, onUpdate, onNotify, isAdmin = t
                     <div className="w-6 h-6 rounded-full bg-blue-600 flex items-center justify-center">
                       <Brain size={12} className="text-white" />
                     </div>
-                    <span className="text-slate-700 text-xs font-semibold">AI Reply (GPT-4o mini)</span>
+                    <span className="text-slate-700 text-xs font-semibold">AI Reply</span>
                     <span className="text-slate-400 text-xs ml-auto">Live response</span>
                   </div>
                   <p className="text-slate-700 text-sm leading-relaxed">{testResponse}</p>
@@ -524,7 +669,7 @@ export default function AITrainingTab({ company, onUpdate, onNotify, isAdmin = t
 
         {/* Right — settings */}
         <div className="space-y-5">
-          <div className="card p-5">
+          <div className={clsx('card p-5', focusSection === 'behavior' && 'ring-2 ring-blue-200')}>
             <h3 className="text-slate-900 font-bold text-base flex items-center gap-2 mb-4">
               <Shield size={15} className="text-slate-400" /> AI Guardrails
             </h3>
@@ -549,7 +694,7 @@ export default function AITrainingTab({ company, onUpdate, onNotify, isAdmin = t
             </div>
           </div>
 
-          <div className="card p-5">
+          <div className={clsx('card p-5', focusSection === 'behavior' && 'ring-2 ring-blue-200')}>
             <h3 className="text-slate-900 font-bold text-base flex items-center gap-2 mb-4">
               <MessageSquare size={15} className="text-slate-400" /> Default Reply Tone
             </h3>
@@ -577,7 +722,7 @@ export default function AITrainingTab({ company, onUpdate, onNotify, isAdmin = t
             </div>
           </div>
 
-          <div className="card p-5 bg-gradient-to-br from-blue-50 to-indigo-50 border-blue-100">
+          <div className={clsx('card p-5 bg-gradient-to-br from-blue-50 to-indigo-50 border-blue-100', focusSection === 'goals' && 'ring-2 ring-blue-200')}>
             <div className="flex items-center gap-2 mb-3">
               <CheckCircle2 size={16} className="text-blue-600" />
               <span className="text-blue-900 font-bold text-sm">Setup Checklist</span>
