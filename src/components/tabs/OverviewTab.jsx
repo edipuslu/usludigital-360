@@ -1,4 +1,4 @@
-import { ArrowRight, Bot, CheckCircle2, ExternalLink, Globe, Inbox, MessageCircle, TrendingUp, Zap } from 'lucide-react'
+import { ArrowRight, Bot, CheckCircle2, ExternalLink, GitBranch, Globe, Inbox, MapPin, MessageCircle, TrendingUp, Zap } from 'lucide-react'
 
 const PLATFORM_KEYS = ['instagram', 'facebook', 'whatsapp', 'tiktok', 'youtube']
 
@@ -128,7 +128,9 @@ function NextMoves({ company, onNavigate, steps }) {
 
 export default function OverviewTab({ company, onNavigate, isAdmin = false }) {
   const connected = connectedCount(company)
-  const displayName = company.clientName || company.name || 'there'
+  const companyName = company.clientName || company.name || 'there'
+  const activeBranchName = company.branchName || ''
+  const displayName = activeBranchName || companyName
   const quickActions = isAdmin ? adminQuickActions : clientQuickActions
   const nextSteps = isAdmin ? adminNextSteps : clientNextSteps
   const setupTarget = isAdmin ? 'settings' : 'inbox'
@@ -136,7 +138,29 @@ export default function OverviewTab({ company, onNavigate, isAdmin = false }) {
   return (
     <div className="animate-slide-in">
       <div className="-mx-8 -mt-8 border-b border-slate-200 bg-slate-50 px-8 py-7">
-        <h1 className="text-3xl font-extrabold tracking-tight text-slate-950">Home</h1>
+        <div className="flex flex-wrap items-center gap-3">
+          <h1 className="text-3xl font-extrabold tracking-tight text-slate-950">Home</h1>
+          {activeBranchName && (
+            <span className="inline-flex items-center gap-1.5 rounded-full border border-blue-200 bg-blue-50 px-3 py-1 text-sm font-bold text-blue-700">
+              <GitBranch size={14} />
+              {activeBranchName}
+            </span>
+          )}
+        </div>
+        {activeBranchName && (
+          <div className="mt-2 flex flex-wrap items-center gap-2 text-sm font-medium text-slate-500">
+            <span>{companyName}</span>
+            {company.branchLocation && (
+              <>
+                <span className="text-slate-300">/</span>
+                <span className="inline-flex items-center gap-1">
+                  <MapPin size={13} className="text-slate-400" />
+                  {company.branchLocation}
+                </span>
+              </>
+            )}
+          </div>
+        )}
       </div>
 
       <div className="mx-auto max-w-7xl px-2 py-12">
@@ -164,6 +188,7 @@ export default function OverviewTab({ company, onNavigate, isAdmin = false }) {
         <section className="mt-12">
           <h2 className="text-5xl font-extrabold tracking-tight text-slate-950 md:text-6xl">Hello, {displayName}!</h2>
           <div className="mt-4 flex flex-wrap items-center gap-5 text-base font-medium text-slate-800">
+            {activeBranchName && <span className="text-slate-500">Branch of {companyName}</span>}
             <span>{connected} connected channel{connected === 1 ? '' : 's'}</span>
             <button type="button" onClick={() => onNavigate?.('growth')} className="text-blue-600 hover:text-blue-700">
               See Insights

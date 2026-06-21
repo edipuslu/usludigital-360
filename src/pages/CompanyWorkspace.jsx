@@ -500,7 +500,7 @@ export default function CompanyWorkspace() {
   }
 
   const tabContent = {
-    overview: <OverviewTab company={company} onNavigate={navigateToTab} isAdmin={isAdmin} />,
+    overview: <OverviewTab company={scopedCompany} onNavigate={navigateToTab} isAdmin={isAdmin} />,
     inbox: <InboxTab company={scopedCompany} branchId={activeBranch?.id || ''} onNotify={addNotification} isAdmin={isAdmin} />,
     'inbox-instagram': <InboxTab company={scopedCompany} branchId={activeBranch?.id || ''} platform="instagram" onNotify={addNotification} isAdmin={isAdmin} />,
     'inbox-facebook': <InboxTab company={scopedCompany} branchId={activeBranch?.id || ''} platform="facebook" onNotify={addNotification} isAdmin={isAdmin} />,
