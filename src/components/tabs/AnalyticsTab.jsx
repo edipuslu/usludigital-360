@@ -7,8 +7,8 @@ import {
 } from 'recharts'
 import clsx from 'clsx'
 
-const CHART_COLORS = ['#2563EB', '#10B981', '#F59E0B', '#8B5CF6', '#EF4444', '#06B6D4']
-const PLATFORM_COLORS = { instagram: '#E1306C', facebook: '#1877F2', youtube: '#FF0000', whatsapp: '#25D366' }
+const CHART_COLORS = ['#255ff4', '#10B981', '#f49725', '#8B5CF6', '#f42f25', '#06B6D4']
+const PLATFORM_COLORS = { instagram: '#f42582', facebook: '#255ff4', youtube: '#f42f25', whatsapp: '#25D366' }
 
 const CustomTooltip = ({ active, payload, label }) => {
   if (!active || !payload?.length) return null
@@ -57,7 +57,7 @@ function HeatmapChart({ data }) {
                   style={{
                     backgroundColor: intensity === 0
                       ? '#F1F5F9'
-                      : `rgba(37, 99, 235, ${0.1 + intensity * 0.9})`,
+                      : `rgba(37, 95, 244, ${0.1 + intensity * 0.9})`,
                   }}
                 />
               )
@@ -67,7 +67,7 @@ function HeatmapChart({ data }) {
         <div className="flex items-center justify-end gap-2 mt-3">
           <span className="text-xs text-slate-400">Less</span>
           {[0.05, 0.25, 0.5, 0.75, 1].map(i => (
-            <div key={i} className="w-4 h-4 rounded-sm" style={{ backgroundColor: `rgba(37,99,235,${i})` }} />
+            <div key={i} className="w-4 h-4 rounded-sm" style={{ backgroundColor: `rgba(37,95,244,${i})` }} />
           ))}
           <span className="text-xs text-slate-400">More</span>
         </div>
@@ -78,7 +78,7 @@ function HeatmapChart({ data }) {
 
 function FunnelChart({ data }) {
   const max = data[0]?.value || 1
-  const colors = ['#2563EB', '#3B82F6', '#60A5FA', '#93C5FD']
+  const colors = ['#255ff4', '#255ff4', '#255ff4', '#93C5FD']
   return (
     <div className="space-y-2">
       {data.map((stage, i) => {

@@ -7,7 +7,7 @@ import clsx from 'clsx'
 const PLATFORM_GUIDES = {
   instagram: {
     name: 'Instagram',
-    color: '#E1306C',
+    color: '#f42582',
     bg: '#FDE8F1',
     subtitle: 'Instagram Graph API via Meta for Developers',
     fields: [
@@ -72,7 +72,7 @@ const PLATFORM_GUIDES = {
   },
   facebook: {
     name: 'Facebook',
-    color: '#1877F2',
+    color: '#255ff4',
     bg: '#E8F1FD',
     subtitle: 'Facebook Page API via Meta for Developers',
     fields: [
@@ -123,7 +123,7 @@ const PLATFORM_GUIDES = {
   },
   youtube: {
     name: 'YouTube',
-    color: '#FF0000',
+    color: '#f42f25',
     bg: '#FFE8E8',
     subtitle: 'YouTube Data API v3 via Google Cloud Console',
     fields: [

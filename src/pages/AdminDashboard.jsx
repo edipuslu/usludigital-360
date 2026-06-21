@@ -24,7 +24,7 @@ export function createCompany({ name, industry }) {
     status: 'needs_update',
     createdAt: new Date().toISOString(),
     initials: name.split(/\s+/).map(w => w[0]).join('').slice(0, 2).toUpperCase() || 'CO',
-    accentColor: '#2563EB',
+    accentColor: '#255ff4',
     platforms: {
       instagram: { connected: false, handle: null, followers: null, lastSync: null, error: null },
       facebook: { connected: false, handle: null, followers: null, lastSync: null, error: null },
@@ -62,9 +62,9 @@ export function createCompany({ name, industry }) {
         change: { replies: 0, waClicks: 0, responseRate: 0, avgReplyTime: 0 },
       },
       byPlatform: [
-        { platform: 'Instagram', replies: 0, waClicks: 0, color: '#E1306C' },
-        { platform: 'Facebook', replies: 0, waClicks: 0, color: '#1877F2' },
-        { platform: 'YouTube', replies: 0, waClicks: 0, color: '#FF0000' },
+        { platform: 'Instagram', replies: 0, waClicks: 0, color: '#f42582' },
+        { platform: 'Facebook', replies: 0, waClicks: 0, color: '#255ff4' },
+        { platform: 'YouTube', replies: 0, waClicks: 0, color: '#f42f25' },
         { platform: 'WhatsApp', replies: 0, waClicks: 0, color: '#25D366' },
       ],
       daily: emptyDaily,

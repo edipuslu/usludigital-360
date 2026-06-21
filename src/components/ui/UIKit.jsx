@@ -90,12 +90,12 @@ export const StatCard = ({ label, value, icon: Icon, iconColor = 'blue', change,
 
 export const PlatformIcon = ({ platform, size = 20, connected = true, hasError = false }) => {
   const configs = {
-    instagram: { color: '#E1306C', bg: '#FDE8F1' },
-    facebook: { color: '#1877F2', bg: '#E8F1FD' },
-    youtube: { color: '#FF0000', bg: '#FFE8E8' },
+    instagram: { color: '#f42582', bg: '#FDE8F1' },
+    facebook: { color: '#255ff4', bg: '#E8F1FD' },
+    youtube: { color: '#f42f25', bg: '#FFE8E8' },
     whatsapp: { color: '#25D366', bg: '#E8FBF0' },
     tiktok: { color: '#111827', bg: '#F1F5F9' },
-    messenger: { color: '#0084FF', bg: '#E8F1FD' },
+    messenger: { color: '#255ff4', bg: '#E8F1FD' },
   }
   const cfg = configs[platform] || { color: '#94A3B8', bg: '#F1F5F9' }
 

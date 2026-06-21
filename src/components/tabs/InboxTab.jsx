@@ -226,9 +226,9 @@ function ConversationListItem({ msg, active, selected, onClick, onToggleSelect }
 function OverviewPanel({ messages, onRefresh, company }) {
   const [testing, setTesting] = useState(false)
   const PLATFORM_CONFIG = {
-    instagram: { label: 'Instagram', color: '#E1306C', bg: '#FDE8F1' },
-    facebook: { label: 'Facebook', color: '#1877F2', bg: '#E8F1FD' },
-    youtube: { label: 'YouTube', color: '#FF0000', bg: '#FFE8E8' },
+    instagram: { label: 'Instagram', color: '#f42582', bg: '#FDE8F1' },
+    facebook: { label: 'Facebook', color: '#255ff4', bg: '#E8F1FD' },
+    youtube: { label: 'YouTube', color: '#f42f25', bg: '#FFE8E8' },
     whatsapp: { label: 'WhatsApp', color: '#25D366', bg: '#E8FBF0' },
   }
 

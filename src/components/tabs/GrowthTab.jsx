@@ -16,21 +16,21 @@ const ANALYTICS_NAV = [
 const PLATFORMS_CONFIG = {
   instagram: {
     label: 'Instagram',
-    color: '#E1306C',
+    color: '#f42582',
     bg: '#FDE8F1',
     description: 'Followers, following, posts, comments, and monthly analytics for the selected Instagram Business account.',
     empty: 'No Instagram analytics data yet.',
   },
   facebook: {
     label: 'Facebook',
-    color: '#1877F2',
+    color: '#255ff4',
     bg: '#E8F1FD',
     description: 'Followers, page likes, page posts, comments, and monthly analytics for the selected Facebook Page.',
     empty: 'No Facebook analytics data yet.',
   },
   youtube: {
     label: 'YouTube',
-    color: '#FF0000',
+    color: '#f42f25',
     bg: '#FFE8E8',
     description: 'Subscribers, videos, comments, and channel analytics.',
     empty: 'No YouTube analytics data yet.',
@@ -188,7 +188,7 @@ function AnalyticsGraph({ platform, data }) {
                 contentStyle={{ borderRadius: 8, border: '1px solid #E2E8F0', boxShadow: '0 10px 30px rgba(15,23,42,0.08)' }}
               />
               <Bar dataKey="posts" name="Posts" fill={config.color} radius={[4, 4, 0, 0]} />
-              <Bar dataKey="comments" name="Comments" fill="#2563EB" radius={[4, 4, 0, 0]} />
+              <Bar dataKey="comments" name="Comments" fill="#255ff4" radius={[4, 4, 0, 0]} />
               <Bar dataKey="likes" name="Likes" fill="#10B981" radius={[4, 4, 0, 0]} />
             </BarChart>
           </ResponsiveContainer>

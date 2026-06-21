@@ -220,7 +220,7 @@ function ReportCard({ report, isAdmin, company, onNotify, onDelete }) {
           <div className="bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-100 rounded-xl p-4">
             <div className="flex items-start gap-3">
               <div className="w-8 h-8 bg-amber-100 border border-amber-200 rounded-lg flex items-center justify-center flex-shrink-0">
-                <Star size={14} className="text-amber-600" fill="#FCD34D" />
+                <Star size={14} className="text-amber-600" fill="#f49725" />
               </div>
               <div className="flex-1">
                 <div className="text-slate-900 font-bold text-sm mb-1">Best Performing Post</div>
