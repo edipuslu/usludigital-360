@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { MessageCircle, Send, Search, Heart, MessageSquare, Calendar, User, ExternalLink, AlertTriangle, Calculator, RefreshCw, Plus, Settings, Archive, Clock, SlidersHorizontal, ChevronDown } from 'lucide-react'
+import { MessageCircle, Send, Search, Heart, MessageSquare, Calendar, User, ExternalLink, AlertTriangle, Calculator, RefreshCw, Plus, Settings, Archive, Clock } from 'lucide-react'
 import { PlatformIcon, UsluLoader } from '../ui/UIKit'
 import { estimateBackfillReplies, fetchInbox, replyToInboxItem, runBackfillReplies, createTestDM } from '../../lib/backendApi'
 import clsx from 'clsx'
@@ -185,7 +185,7 @@ function EmptyInboxArt() {
   )
 }
 
-function ConversationListItem({ msg, active, selected, onClick, onToggleSelect }) {
+function ConversationListItem({ msg, active, onClick }) {
   return (
     <button
       type="button"
@@ -195,16 +195,6 @@ function ConversationListItem({ msg, active, selected, onClick, onToggleSelect }
         active && 'bg-slate-100'
       )}
     >
-      <input
-        type="checkbox"
-        checked={selected}
-        onChange={e => {
-          e.stopPropagation()
-          onToggleSelect?.()
-        }}
-        onClick={e => e.stopPropagation()}
-        className="mt-1 h-4 w-4 rounded border-slate-300"
-      />
       <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full bg-slate-200">
         <User size={17} className="text-slate-500" />
       </div>
@@ -419,12 +409,9 @@ export default function InboxTab({ company, branchId = '', platform, isAdmin = t
   const [lastUpdated, setLastUpdated] = useState(null)
   const [search, setSearch] = useState('')
   const [statusFilter, setStatusFilter] = useState('open')
-  const [onlyUnread, setOnlyUnread] = useState(false)
   const [sortOrder, setSortOrder] = useState('newest')
   const [channelFilter, setChannelFilter] = useState(platform || 'all')
   const [labelFilter, setLabelFilter] = useState('all')
-  const [showFilters, setShowFilters] = useState(false)
-  const [selectedIds, setSelectedIds] = useState([])
   const [selectedMessageId, setSelectedMessageId] = useState(null)
   const branchScope = branchId && branchId !== 'all' ? branchId : ''
 
@@ -520,7 +507,6 @@ export default function InboxTab({ company, branchId = '', platform, isAdmin = t
         if (statusFilter === 'failed') return message.status === 'reply_failed'
         return message.status !== 'closed'
       })
-      .filter(message => !onlyUnread || !message.aiReplied)
       .filter(message => labelFilter !== 'favorites' || message.likes > 0)
       .filter(message => labelFilter !== 'reminders' || message.status === 'reply_failed')
       .filter(message => !term || `${message.authorName} ${message.content} ${message.aiReply}`.toLowerCase().includes(term))
@@ -529,15 +515,13 @@ export default function InboxTab({ company, branchId = '', platform, isAdmin = t
         const bTime = new Date(b.date).getTime() || 0
         return sortOrder === 'newest' ? bTime - aTime : aTime - bTime
       })
-  }, [messages, platform, channelFilter, statusFilter, onlyUnread, labelFilter, search, sortOrder])
+  }, [messages, platform, channelFilter, statusFilter, labelFilter, search, sortOrder])
 
   const commentCount = visibleMessages.filter(m => !m.isDM).length
   const dmCount = visibleMessages.filter(m => m.isDM).length
   const failedCount = messages.filter(m => m.status === 'reply_failed').length
   const favoritesCount = messages.filter(m => m.likes > 0).length
   const selectedMessage = visibleMessages.find(message => message.id === selectedMessageId) || null
-  const allVisibleSelected = visibleMessages.length > 0 && visibleMessages.every(message => selectedIds.includes(message.id))
-
   useEffect(() => {
     if (!visibleMessages.length) {
       setSelectedMessageId(null)
@@ -547,18 +531,6 @@ export default function InboxTab({ company, branchId = '', platform, isAdmin = t
       setSelectedMessageId(visibleMessages[0].id)
     }
   }, [visibleMessages, selectedMessageId])
-
-  const toggleSelectAll = () => {
-    if (allVisibleSelected) {
-      setSelectedIds(ids => ids.filter(id => !visibleMessages.some(message => message.id === id)))
-      return
-    }
-    setSelectedIds(ids => Array.from(new Set([...ids, ...visibleMessages.map(message => message.id)])))
-  }
-
-  const toggleSelected = id => {
-    setSelectedIds(ids => ids.includes(id) ? ids.filter(existing => existing !== id) : [...ids, id])
-  }
 
   const handleTestDM = async platformKey => {
     setSyncing(true)
@@ -660,23 +632,6 @@ export default function InboxTab({ company, branchId = '', platform, isAdmin = t
 
         <section className="border-r border-slate-200">
           <div className="border-b border-slate-200 px-5 py-4">
-            <div className="mb-3 flex items-center justify-between gap-3">
-              <label className="inline-flex min-h-11 cursor-pointer items-center gap-3 rounded-lg px-1 text-sm font-bold text-slate-700">
-                <input type="checkbox" checked={allVisibleSelected} onChange={toggleSelectAll} className="h-5 w-5 rounded border-slate-300 accent-[#255ff4]" />
-                Select
-              </label>
-              <button
-                type="button"
-                onClick={() => setShowFilters(value => !value)}
-                className={clsx(
-                  'inline-flex h-11 items-center gap-2 rounded-lg border px-4 text-sm font-bold transition-colors',
-                  showFilters ? 'border-[#255ff4]/30 bg-[#255ff4]/10 text-[#255ff4]' : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50'
-                )}
-              >
-                <SlidersHorizontal size={16} /> More tools
-              </button>
-            </div>
-
             <div className="grid grid-cols-4 rounded-lg border border-slate-200 bg-slate-50 p-1">
               {[
                 ['open', 'Open'],
@@ -697,55 +652,18 @@ export default function InboxTab({ company, branchId = '', platform, isAdmin = t
                 </button>
               ))}
             </div>
-          </div>
 
-          {showFilters && (
-            <div className="space-y-4 border-b border-slate-200 bg-slate-50 p-4">
-              <div className="grid grid-cols-1 gap-3">
-                <label className="block">
-                  <span className="mb-1 block text-xs font-bold uppercase tracking-wide text-slate-400">Channel</span>
-                  <div className="relative">
-                    <select value={channelFilter} onChange={e => setChannelFilter(e.target.value)} disabled={Boolean(platform)} className="h-11 w-full appearance-none rounded-lg border border-slate-200 bg-white px-3 pr-9 text-sm font-semibold text-slate-800 outline-none focus:border-[#255ff4] focus:ring-2 focus:ring-[#255ff4]/10 disabled:opacity-60">
-                      <option value="all">Every channel</option>
-                      {PLATFORMS.map(item => <option key={item} value={item}>{PLATFORM_LABELS[item]}</option>)}
-                    </select>
-                    <ChevronDown size={16} className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-slate-400" />
-                  </div>
-                </label>
-
-                <label className="block">
-                  <span className="mb-1 block text-xs font-bold uppercase tracking-wide text-slate-400">Order</span>
-                  <div className="relative">
-                    <select value={sortOrder} onChange={e => setSortOrder(e.target.value)} className="h-11 w-full appearance-none rounded-lg border border-slate-200 bg-white px-3 pr-9 text-sm font-semibold text-slate-800 outline-none focus:border-[#255ff4] focus:ring-2 focus:ring-[#255ff4]/10">
-                      <option value="newest">Newest first</option>
-                      <option value="oldest">Oldest first</option>
-                    </select>
-                    <ChevronDown size={16} className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-slate-400" />
-                  </div>
-                </label>
-              </div>
-
-              <button
-                type="button"
-                onClick={() => setOnlyUnread(value => !value)}
-                className={clsx(
-                  'flex h-11 w-full items-center justify-between rounded-lg border px-4 text-sm font-bold transition-colors',
-                  onlyUnread ? 'border-[#255ff4]/30 bg-[#255ff4]/10 text-[#255ff4]' : 'border-slate-200 bg-white text-slate-700 hover:bg-white'
-                )}
-              >
-                Unread only
-                <span className={clsx('h-5 w-9 rounded-full p-0.5 transition-colors', onlyUnread ? 'bg-[#255ff4]' : 'bg-slate-200')}>
-                  <span className={clsx('block h-4 w-4 rounded-full bg-white transition-transform', onlyUnread && 'translate-x-4')} />
-                </span>
-              </button>
-              {isAdmin && <BackfillPanel company={company} platform={platform} onCompleted={reloadInbox} />}
-              {isAdmin && (
-                <button onClick={() => handleTestDM(platform || 'instagram')} disabled={syncing} className="inline-flex h-10 items-center gap-2 rounded-lg bg-[#255ff4] px-4 text-sm font-bold text-white hover:bg-[#1d4ed8] disabled:opacity-50">
-                  {syncing ? <UsluLoader size="xs" /> : <Plus size={14} />} Test DM
-                </button>
-              )}
+            <div className="mt-3 grid grid-cols-2 gap-2">
+              <select value={channelFilter} onChange={e => setChannelFilter(e.target.value)} disabled={Boolean(platform)} className="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm font-semibold text-slate-800 outline-none focus:border-[#255ff4] focus:ring-2 focus:ring-[#255ff4]/10 disabled:opacity-60">
+                <option value="all">All channels</option>
+                {PLATFORMS.map(item => <option key={item} value={item}>{PLATFORM_LABELS[item]}</option>)}
+              </select>
+              <select value={sortOrder} onChange={e => setSortOrder(e.target.value)} className="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm font-semibold text-slate-800 outline-none focus:border-[#255ff4] focus:ring-2 focus:ring-[#255ff4]/10">
+                <option value="newest">Newest</option>
+                <option value="oldest">Oldest</option>
+              </select>
             </div>
-          )}
+          </div>
 
           <div className="h-[calc(100vh-215px)] overflow-y-auto">
             {loading ? (
@@ -768,9 +686,7 @@ export default function InboxTab({ company, branchId = '', platform, isAdmin = t
                   key={message.id}
                   msg={message}
                   active={selectedMessageId === message.id}
-                  selected={selectedIds.includes(message.id)}
                   onClick={() => setSelectedMessageId(message.id)}
-                  onToggleSelect={() => toggleSelected(message.id)}
                 />
               ))
             )}
