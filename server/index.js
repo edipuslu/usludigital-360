@@ -177,6 +177,22 @@ function extractWebsiteText(html) {
     .slice(0, 12000)
 }
 
+function extractWebsiteMeta(html) {
+  const source = String(html || '')
+  const parts = []
+  const title = source.match(/<title[^>]*>([\s\S]*?)<\/title>/i)?.[1]
+  if (title) parts.push(`Title: ${title}`)
+  for (const pattern of [
+    /<meta[^>]+name=["']description["'][^>]+content=["']([^"']+)["'][^>]*>/i,
+    /<meta[^>]+property=["']og:description["'][^>]+content=["']([^"']+)["'][^>]*>/i,
+    /<meta[^>]+property=["']og:title["'][^>]+content=["']([^"']+)["'][^>]*>/i,
+  ]) {
+    const match = source.match(pattern)?.[1]
+    if (match) parts.push(match)
+  }
+  return parts.join(' ').replace(/\s+/g, ' ').trim()
+}
+
 function json(res, status, body) {
   res.writeHead(status, {
     'Content-Type': 'application/json',
@@ -2039,10 +2055,11 @@ async function analyzeWebsiteWithAi(company, websiteUrl) {
     throw new Error(`Website could not be analyzed. HTTP ${websiteResponse.status}`)
   }
 
-  const websiteText = extractWebsiteText(await websiteResponse.text())
-  if (!websiteText || websiteText.length < 80) {
-    throw new Error('Website text is too short to analyze.')
-  }
+  const html = await websiteResponse.text()
+  const extractedText = extractWebsiteText(html)
+  const metaText = extractWebsiteMeta(html)
+  const websiteText = [metaText, extractedText].filter(Boolean).join('\n').trim()
+  const hasLimitedWebsiteText = websiteText.length < 80
 
   const response = await fetch('https://api.openai.com/v1/chat/completions', {
     method: 'POST',
@@ -2055,11 +2072,11 @@ async function analyzeWebsiteWithAi(company, websiteUrl) {
       messages: [
         {
           role: 'system',
-          content: 'Analyze this business website for an AI customer-reply system. Return only valid JSON with keys summary, audience, services, suggestedGoal, commentGuidance, dmGuidance. Keep each value concise and practical.',
+          content: 'Analyze this business website for an AI customer-reply system. Return only valid JSON with keys summary, audience, services, suggestedGoal, commentGuidance, dmGuidance. Keep each value concise and practical. If the website text is limited, say that clearly and avoid inventing details.',
         },
         {
           role: 'user',
-          content: `Company: ${company?.name || 'Company'}\nWebsite: ${parsedUrl.toString()}\nWebsite text:\n${websiteText}`,
+          content: `Company: ${company?.name || 'Company'}\nWebsite: ${parsedUrl.toString()}\nReadable text was limited: ${hasLimitedWebsiteText ? 'yes' : 'no'}\nWebsite text:\n${websiteText || 'No readable website text was available from the HTML response.'}`,
         },
       ],
       temperature: 0.35,
