@@ -2061,31 +2061,39 @@ async function analyzeWebsiteWithAi(company, websiteUrl) {
   const websiteText = [metaText, extractedText].filter(Boolean).join('\n').trim()
   const hasLimitedWebsiteText = websiteText.length < 80
 
-  const response = await fetch('https://api.openai.com/v1/chat/completions', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      Authorization: `Bearer ${apiKey}`,
-    },
-    body: JSON.stringify({
-      model: OPENAI_MODEL_FALLBACKS[0] || OPENAI_MODEL,
-      messages: [
-        {
-          role: 'system',
-          content: 'Analyze this business website for an AI customer-reply system. Return only valid JSON with keys summary, audience, services, suggestedGoal, commentGuidance, dmGuidance. Keep each value concise and practical. If the website text is limited, say that clearly and avoid inventing details.',
-        },
-        {
-          role: 'user',
-          content: `Company: ${company?.name || 'Company'}\nWebsite: ${parsedUrl.toString()}\nReadable text was limited: ${hasLimitedWebsiteText ? 'yes' : 'no'}\nWebsite text:\n${websiteText || 'No readable website text was available from the HTML response.'}`,
-        },
-      ],
-      temperature: 0.35,
-      max_tokens: 600,
-    }),
-  })
-  const data = await response.json().catch(() => ({}))
-  if (!response.ok) {
-    throw new Error(data?.error?.message || `OpenAI analysis failed with HTTP ${response.status}`)
+  let data = {}
+  let lastError = ''
+  for (const model of OPENAI_MODEL_FALLBACKS) {
+    const response = await fetch('https://api.openai.com/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${apiKey}`,
+      },
+      body: JSON.stringify({
+        model,
+        messages: [
+          {
+            role: 'system',
+            content: 'Analyze this business website for an AI customer-reply system. Return only valid JSON with keys summary, audience, services, suggestedGoal, commentGuidance, dmGuidance. Keep each value concise and practical. If the website text is limited, say that clearly and avoid inventing details.',
+          },
+          {
+            role: 'user',
+            content: `Company: ${company?.name || 'Company'}\nWebsite: ${parsedUrl.toString()}\nReadable text was limited: ${hasLimitedWebsiteText ? 'yes' : 'no'}\nWebsite text:\n${websiteText || 'No readable website text was available from the HTML response.'}`,
+          },
+        ],
+        temperature: 0.35,
+        max_tokens: 600,
+      }),
+    })
+    data = await response.json().catch(() => ({}))
+    if (response.ok) break
+    lastError = data?.error?.message || `OpenAI analysis failed with HTTP ${response.status}`
+    const canTryNextModel = /does not have access to model|model .* does not exist|invalid model|model_not_found/i.test(lastError)
+    if (!canTryNextModel) throw new Error(lastError)
+  }
+  if (!data?.choices?.[0]?.message?.content) {
+    throw new Error(lastError || 'OpenAI analysis failed.')
   }
 
   const raw = data.choices?.[0]?.message?.content || ''
