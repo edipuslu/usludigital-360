@@ -115,10 +115,14 @@ export function getBackendAiConfig(companyId) {
   return request(`/api/companies/${encodeURIComponent(companyId)}/ai-config`)
 }
 
-export function testBackendAiReply(companyId, text) {
+export function testBackendAiReply(companyId, text, options = {}) {
   return request(`/api/companies/${encodeURIComponent(companyId)}/ai-test`, {
     method: 'POST',
-    body: JSON.stringify({ text }),
+    body: JSON.stringify({
+      text,
+      type: options.type || 'dm',
+      platform: options.platform || 'instagram',
+    }),
   })
 }
 

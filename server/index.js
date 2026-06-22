@@ -1883,6 +1883,8 @@ function systemPromptFor(company, item) {
     training.description ? `Business context: ${training.description}` : '',
     `Incoming ${item.type} on ${item.platform}: "${item.text || ''}"`,
     `Tone: ${automation.tone || training.tone || 'professional'}.`,
+    item.type === 'comment' && training.commentInstructions ? `Comment reply instructions: ${training.commentInstructions}` : '',
+    item.type === 'dm' && training.dmInstructions ? `DM reply instructions: ${training.dmInstructions}` : '',
     item.type === 'comment' ? 'Write a public comment reply that directly reacts to this specific comment. Do not sound copied or generic.' : '',
     item.type === 'dm' ? 'Write a private DM reply that answers the customer naturally and moves the conversation forward.' : '',
     company?.goal === 'push_to_whatsapp' && company?.whatsappLink ? `Include this WhatsApp link naturally when helpful: ${company.whatsappLink}` : '',
@@ -2644,9 +2646,11 @@ export async function appHandler(req, res) {
       const company = store.companies[aiTestParams.companyId]
       if (!company) return json(res, 404, { error: 'Company not found.' })
       if (!String(body.text || '').trim()) return json(res, 400, { error: 'text is required.' })
+      const type = ['comment', 'dm'].includes(String(body.type || '').toLowerCase()) ? String(body.type).toLowerCase() : 'dm'
+      const platform = ['instagram', 'facebook', 'youtube', 'whatsapp', 'tiktok'].includes(String(body.platform || '').toLowerCase()) ? String(body.platform).toLowerCase() : 'instagram'
       const result = await generateAiReply(company, {
-        platform: 'instagram',
-        type: 'dm',
+        platform,
+        type,
         text: String(body.text || '').trim(),
       }, { force: true })
       if (result.error) return json(res, result.status === 'needs_openai_key' ? 400 : 502, { error: result.error, status: result.status })

@@ -299,17 +299,86 @@ function OpenAIKeySection({ apiKey, hasSavedKey, onKeyChange }) {
   )
 }
 
+function ReplyTestCard({
+  title,
+  description,
+  icon: Icon,
+  input,
+  response,
+  error,
+  loading,
+  disabled,
+  placeholder,
+  onInputChange,
+  onTest,
+}) {
+  return (
+    <div className="rounded-xl border border-slate-200 bg-white p-4">
+      <div className="mb-3 flex items-start gap-3">
+        <div className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-lg bg-blue-50 text-blue-600">
+          <Icon size={16} />
+        </div>
+        <div>
+          <h4 className="text-sm font-extrabold text-slate-950">{title}</h4>
+          <p className="mt-1 text-xs leading-relaxed text-slate-500">{description}</p>
+        </div>
+      </div>
+      <div className="space-y-3">
+        <textarea
+          value={input}
+          onChange={e => onInputChange(e.target.value)}
+          rows={3}
+          disabled={disabled}
+          className="input-field resize-none disabled:cursor-not-allowed disabled:opacity-50"
+          placeholder={disabled ? 'Add OpenAI API key first...' : placeholder}
+        />
+        <button
+          onClick={onTest}
+          disabled={!input.trim() || loading || disabled}
+          className="btn-primary w-full justify-center disabled:cursor-not-allowed disabled:opacity-50"
+        >
+          {loading ? <><UsluLoader size="xs" />Generating...</> : <><Brain size={14} />Generate Reply</>}
+        </button>
+        {error && (
+          <div className="flex items-start gap-2 rounded-xl border border-red-200 bg-red-50 p-3">
+            <AlertCircle size={14} className="mt-0.5 flex-shrink-0 text-red-500" />
+            <span className="text-sm text-red-700">{error}</span>
+          </div>
+        )}
+        {response && (
+          <div className="animate-fade-in rounded-xl border border-slate-200 bg-slate-50 p-4">
+            <div className="mb-2 flex items-center gap-2">
+              <div className="flex h-6 w-6 items-center justify-center rounded-full bg-blue-600">
+                <Brain size={12} className="text-white" />
+              </div>
+              <span className="text-xs font-semibold text-slate-700">AI Reply</span>
+              <span className="ml-auto text-xs text-slate-400">Live response</span>
+            </div>
+            <p className="text-sm leading-relaxed text-slate-700">{response}</p>
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}
+
 export default function AITrainingTab({ company, onUpdate, onNotify, isAdmin = true }) {
   const [docs, setDocs] = useState(company.aiTraining.documents)
   const [guardrails, setGuardrails] = useState(company.aiTraining.guardrails)
   const [description, setDescription] = useState(company.aiTraining.description)
+  const [commentInstructions, setCommentInstructions] = useState(company.aiTraining.commentInstructions || '')
+  const [dmInstructions, setDmInstructions] = useState(company.aiTraining.dmInstructions || '')
   const [websiteUrl, setWebsiteUrl] = useState(company.aiTraining.websiteUrl)
   const [fallback, setFallback] = useState(company.aiTraining.fallbackMessage)
   const [selectedTone, setSelectedTone] = useState(company.aiTraining.tone || 'professional')
-  const [testInput, setTestInput] = useState('')
-  const [testResponse, setTestResponse] = useState('')
-  const [testing, setTesting] = useState(false)
-  const [testError, setTestError] = useState('')
+  const [commentTestInput, setCommentTestInput] = useState('')
+  const [commentTestResponse, setCommentTestResponse] = useState('')
+  const [commentTesting, setCommentTesting] = useState(false)
+  const [commentTestError, setCommentTestError] = useState('')
+  const [dmTestInput, setDmTestInput] = useState('')
+  const [dmTestResponse, setDmTestResponse] = useState('')
+  const [dmTesting, setDmTesting] = useState(false)
+  const [dmTestError, setDmTestError] = useState('')
   const [hasSavedApiKey, setHasSavedApiKey] = useState(() => Boolean(company.hasOpenaiKey))
   const [setupOpen, setSetupOpen] = useState(() => Boolean(company.aiTraining.description || company.aiTraining.websiteUrl || company.aiTraining.documents?.length || company.hasOpenaiKey))
   const [focusSection, setFocusSection] = useState('knowledge')
@@ -361,6 +430,8 @@ export default function AITrainingTab({ company, onUpdate, onNotify, isAdmin = t
         guardrails,
         fallbackMessage: fallback,
         description,
+        commentInstructions,
+        dmInstructions,
         tone: selectedTone,
       },
     }
@@ -378,23 +449,38 @@ export default function AITrainingTab({ company, onUpdate, onNotify, isAdmin = t
     }
   }
 
-  const handleTest = async () => {
-    if (!testInput.trim()) return
+  const handleTest = async (kind) => {
+    const isComment = kind === 'comment'
+    const input = isComment ? commentTestInput : dmTestInput
+    if (!input.trim()) return
     if (!hasSavedApiKey) {
-      setTestError('Add the shared OpenAI API key in Settings > API Keys first.')
+      if (isComment) setCommentTestError('Add the shared OpenAI API key in Settings > API Keys first.')
+      else setDmTestError('Add the shared OpenAI API key in Settings > API Keys first.')
       return
     }
-    setTesting(true)
-    setTestError('')
-    setTestResponse('')
+    if (isComment) {
+      setCommentTesting(true)
+      setCommentTestError('')
+      setCommentTestResponse('')
+    } else {
+      setDmTesting(true)
+      setDmTestError('')
+      setDmTestResponse('')
+    }
 
     try {
-      const data = await testBackendAiReply(company.id, testInput)
-      setTestResponse(data.reply)
+      const data = await testBackendAiReply(company.id, input, {
+        type: isComment ? 'comment' : 'dm',
+        platform: 'instagram',
+      })
+      if (isComment) setCommentTestResponse(data.reply)
+      else setDmTestResponse(data.reply)
     } catch (err) {
-      setTestError(err.message)
+      if (isComment) setCommentTestError(err.message)
+      else setDmTestError(err.message)
     } finally {
-      setTesting(false)
+      if (isComment) setCommentTesting(false)
+      else setDmTesting(false)
     }
   }
 
@@ -605,48 +691,78 @@ export default function AITrainingTab({ company, onUpdate, onNotify, isAdmin = t
             </div>
           </div>
 
+          {/* Reply Type Training */}
+          <div className={clsx('card p-5', focusSection === 'behavior' && 'ring-2 ring-blue-200')}>
+            <h3 className="text-slate-900 font-bold text-base flex items-center gap-2 mb-1">
+              <MessageSquare size={15} className="text-slate-400" /> Reply Training
+            </h3>
+            <p className="mb-4 text-sm text-slate-500">Train comments and DMs separately so public replies and private sales conversations do not sound the same.</p>
+            <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+              <div>
+                <label className="block text-sm font-semibold text-slate-700 mb-1.5">Comment Reply Training</label>
+                <textarea
+                  value={commentInstructions}
+                  onChange={e => setCommentInstructions(e.target.value)}
+                  disabled={!isAdmin}
+                  rows={5}
+                  className="input-field resize-none disabled:opacity-60 disabled:cursor-not-allowed"
+                  placeholder="Example: Keep public replies short, warm, and specific. Thank the person, answer directly, and invite them to DM or WhatsApp only when useful."
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-semibold text-slate-700 mb-1.5">DM Reply Training</label>
+                <textarea
+                  value={dmInstructions}
+                  onChange={e => setDmInstructions(e.target.value)}
+                  disabled={!isAdmin}
+                  rows={5}
+                  className="input-field resize-none disabled:opacity-60 disabled:cursor-not-allowed"
+                  placeholder="Example: Ask helpful follow-up questions, collect the customer need, explain next steps, and move them toward booking or WhatsApp naturally."
+                />
+              </div>
+            </div>
+            {isAdmin && (
+              <button onClick={() => saveTraining('training')} className="btn-secondary mt-4">
+                <RefreshCw size={14} /> Save Reply Training
+              </button>
+            )}
+          </div>
+
           {/* AI Test Console */}
           {isAdmin && <div className={clsx('card p-5', focusSection === 'test' && 'ring-2 ring-blue-200')}>
             <h3 className="text-slate-900 font-bold text-base flex items-center gap-2 mb-1">
               <Brain size={15} className="text-slate-400" /> Test AI Responses
             </h3>
             <p className="text-slate-400 text-sm mb-4">
-              {hasSavedApiKey ? 'Powered by the cheapest available OpenAI model — type any question a customer might ask' : 'Add your shared OpenAI API key in Settings > API Keys to test real AI responses'}
+              {hasSavedApiKey ? 'Test public comment replies and private DM replies separately.' : 'Add your shared OpenAI API key in Settings > API Keys to test real AI responses'}
             </p>
-            <div className="space-y-3">
-              <textarea
-                value={testInput}
-                onChange={e => setTestInput(e.target.value)}
-                rows={2}
+            <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
+              <ReplyTestCard
+                title="Comment Reply Test"
+                description="Use this to preview how AI answers public Instagram/Facebook comments."
+                icon={MessageSquare}
+                input={commentTestInput}
+                response={commentTestResponse}
+                error={commentTestError}
+                loading={commentTesting}
                 disabled={!hasSavedApiKey}
-                className="input-field resize-none disabled:opacity-50 disabled:cursor-not-allowed"
-                placeholder={hasSavedApiKey ? 'e.g. How much does the Luna Sofa cost? Do you deliver to Ankara?' : 'Add OpenAI API key first...'}
+                placeholder="Example comment: Price? Is this course online?"
+                onInputChange={setCommentTestInput}
+                onTest={() => handleTest('comment')}
               />
-              <button
-                onClick={handleTest}
-                disabled={!testInput.trim() || testing || !hasSavedApiKey}
-                className="btn-primary disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                {testing ? <><UsluLoader size="xs" />Generating...</> : <><Brain size={14} />Generate AI Reply</>}
-              </button>
-              {testError && (
-                <div className="bg-red-50 border border-red-200 rounded-xl p-3 flex items-start gap-2">
-                  <AlertCircle size={14} className="text-red-500 mt-0.5 flex-shrink-0" />
-                  <span className="text-red-700 text-sm">{testError}</span>
-                </div>
-              )}
-              {testResponse && (
-                <div className="bg-slate-50 border border-slate-200 rounded-xl p-4 animate-fade-in">
-                  <div className="flex items-center gap-2 mb-2">
-                    <div className="w-6 h-6 rounded-full bg-blue-600 flex items-center justify-center">
-                      <Brain size={12} className="text-white" />
-                    </div>
-                    <span className="text-slate-700 text-xs font-semibold">AI Reply</span>
-                    <span className="text-slate-400 text-xs ml-auto">Live response</span>
-                  </div>
-                  <p className="text-slate-700 text-sm leading-relaxed">{testResponse}</p>
-                </div>
-              )}
+              <ReplyTestCard
+                title="DM Reply Test"
+                description="Use this to preview how AI answers private inbox conversations."
+                icon={Send}
+                input={dmTestInput}
+                response={dmTestResponse}
+                error={dmTestError}
+                loading={dmTesting}
+                disabled={!hasSavedApiKey}
+                placeholder="Example DM: Hi, I want to know the price and how to register."
+                onInputChange={setDmTestInput}
+                onTest={() => handleTest('dm')}
+              />
             </div>
           </div>}
         </div>
@@ -715,6 +831,8 @@ export default function AITrainingTab({ company, onUpdate, onNotify, isAdmin = t
               {[
                 ...(isAdmin ? [{ label: 'OpenAI API key added', done: hasSavedApiKey }] : []),
                 { label: 'Business description written', done: !!description.trim() },
+                { label: 'Comment reply training written', done: !!commentInstructions.trim() },
+                { label: 'DM reply training written', done: !!dmInstructions.trim() },
                 { label: 'Training documents uploaded', done: docs.length > 0 },
                 { label: 'Fallback message set', done: !!fallback.trim() },
                 { label: 'Reply tone selected', done: !!selectedTone },
