@@ -256,9 +256,9 @@ function reportEmailHtml({ company, report }) {
         <div style="background:#ffffff;border:1px solid #e2e8f0;border-radius:18px;overflow:hidden;">
           <div style="background:#030918;color:#ffffff;padding:28px;">
             <div style="display:flex;align-items:center;gap:12px;margin-bottom:22px;">
-              <div style="width:44px;height:44px;border-radius:12px;background:#ffffff;display:flex;align-items:center;justify-content:center;">
+              <div style="width:44px;height:44px;border-radius:12px;background:#030918;border:1px solid rgba(255,255,255,.18);display:flex;align-items:center;justify-content:center;">
                 <svg width="24" height="24" viewBox="0 0 64 64" aria-hidden="true">
-                  <path d="M37 7 17 35h14l-4 22 20-29H34l3-21Z" fill="#030918"></path>
+                  <path d="M37 7 17 35h14l-4 22 20-29H34l3-21Z" fill="#ffffff"></path>
                 </svg>
               </div>
               <div>
@@ -308,8 +308,16 @@ function createReportPdfBuffer({ company, report }) {
     doc.on('error', reject)
 
     doc.rect(0, 0, doc.page.width, 142).fill('#030918')
-    doc.fillColor('#ffffff').fontSize(24).font('Helvetica-Bold').text('Uslu360Digital', 48, 42)
-    doc.fillColor('#94a3b8').fontSize(9).font('Helvetica-Bold').text('MONTHLY PERFORMANCE REPORT', 48, 74, { characterSpacing: 1 })
+    doc.roundedRect(48, 34, 44, 44, 12).fill('#030918').strokeColor('#1e293b').lineWidth(1).stroke()
+    doc
+      .save()
+      .translate(58, 43)
+      .scale(0.42)
+      .path('M37 7 17 35h14l-4 22 20-29H34l3-21Z')
+      .fill('#ffffff')
+      .restore()
+    doc.fillColor('#ffffff').fontSize(24).font('Helvetica-Bold').text('Uslu360Digital', 108, 38)
+    doc.fillColor('#94a3b8').fontSize(9).font('Helvetica-Bold').text('MONTHLY PERFORMANCE REPORT', 108, 70, { characterSpacing: 1 })
     doc.fillColor('#ffffff').fontSize(34).font('Helvetica-Bold').text(month, 48, 100, { width: 500 })
 
     doc.fillColor('#0f172a')
