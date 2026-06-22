@@ -98,6 +98,8 @@ export function saveBackendAiConfig(company, openaiKey) {
       whatsappLink: company.whatsappLink,
       aiTraining: company.aiTraining,
       automation: company.automation,
+      automationFlows: company.automationFlows,
+      automationFolders: company.automationFolders,
     },
   }
 

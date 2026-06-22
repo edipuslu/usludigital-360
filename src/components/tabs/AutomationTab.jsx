@@ -1,12 +1,28 @@
-import { useState } from 'react'
-import { Save, Plus, X, Zap, MessageSquare, Link2, Volume2, ShieldOff } from 'lucide-react'
-import { PlatformIcon, Toggle, UsluLoader } from '../ui/UIKit'
+import { useMemo, useState } from 'react'
+import {
+  ArrowLeft,
+  Bot,
+  Check,
+  Eye,
+  FastForward,
+  FolderPlus,
+  MessageCircle,
+  Plus,
+  Redo2,
+  Save,
+  Search,
+  Send,
+  Trash2,
+  Triangle,
+  Undo2,
+  Workflow,
+  X,
+  Zap,
+} from 'lucide-react'
+import { PlatformIcon, UsluLoader } from '../ui/UIKit'
 import { saveBackendAiConfig } from '../../lib/backendApi'
 import clsx from 'clsx'
 
-const PLATFORMS = ['instagram', 'facebook', 'youtube', 'whatsapp']
-const PLATFORM_LABELS = { instagram: 'Instagram', facebook: 'Facebook', youtube: 'YouTube', whatsapp: 'WhatsApp Business' }
-const TONES = ['professional', 'friendly', 'luxury', 'casual']
 const DEFAULT_SCHEDULE = { enabled: true, startAt: '', endAt: '', timezone: 'Africa/Casablanca' }
 const DEFAULT_AUTOMATION = {
   schedule: DEFAULT_SCHEDULE,
@@ -15,286 +31,664 @@ const DEFAULT_AUTOMATION = {
   youtube: { dmReply: false, commentReply: false, tone: 'professional', blacklist: [] },
   whatsapp: { dmReply: true, commentReply: false, tone: 'professional', blacklist: [] },
 }
-const GOALS = [
-  { value: 'push_to_whatsapp', label: 'Push to WhatsApp', description: 'Every AI reply includes a WhatsApp CTA link' },
-  { value: 'grow_followers', label: 'Grow Followers', description: 'Encourage following and sharing content' },
-  { value: 'reply_everyone', label: 'Reply Everyone', description: 'Engage with all comments and messages' },
-  { value: 'custom', label: 'Custom', description: 'Define a custom goal and CTA strategy' },
+
+const TRIGGERS = [
+  { id: 'instagram_comment', platform: 'instagram', type: 'comment', title: 'Instagram Comment', description: 'Starts when someone comments on a post or reel.' },
+  { id: 'instagram_dm', platform: 'instagram', type: 'dm', title: 'Instagram DM', description: 'Starts when someone sends a direct message.' },
+  { id: 'facebook_comment', platform: 'facebook', type: 'comment', title: 'Facebook Comment', description: 'Starts when someone comments on a Page post.' },
+  { id: 'facebook_dm', platform: 'facebook', type: 'dm', title: 'Messenger DM', description: 'Starts when someone messages the Page.' },
+  { id: 'youtube_comment', platform: 'youtube', type: 'comment', title: 'YouTube Comment', description: 'Starts when someone comments on a video.' },
+  { id: 'whatsapp_dm', platform: 'whatsapp', type: 'dm', title: 'WhatsApp Message', description: 'Starts when someone sends a WhatsApp message.' },
 ]
 
-function PlatformAutomation({ platform, settings, onChange }) {
-  const [newBlack, setNewBlack] = useState('')
+const ACTIONS = [
+  { id: 'ai_reply', title: 'AI Reply', description: 'Use AI Training to write a natural answer.', icon: Bot },
+  { id: 'send_message', title: 'Send Message', description: 'Send the exact text you write below.', icon: Send },
+  { id: 'handoff', title: 'Human Handoff', description: 'Save the message and wait for a person.', icon: MessageCircle },
+]
 
-  const addBlacklist = () => {
-    if (!newBlack.trim()) return
-    onChange({ ...settings, blacklist: [...settings.blacklist, newBlack.trim().toLowerCase()] })
-    setNewBlack('')
+const SECTION_ITEMS = [
+  { id: 'my', label: 'My Automations', icon: Workflow },
+  { id: 'basic', label: 'Basic', icon: Triangle },
+  { id: 'sequences', label: 'Sequences', icon: FastForward },
+]
+
+function makeFlow(overrides = {}) {
+  const trigger = overrides.trigger || TRIGGERS[0]
+  return {
+    id: overrides.id || `automation-${Date.now()}`,
+    name: overrides.name || 'New Instagram automation',
+    folderId: overrides.folderId || null,
+    triggerId: trigger.id,
+    platform: trigger.platform,
+    triggerType: trigger.type,
+    triggerTitle: trigger.title,
+    actionType: overrides.actionType || 'ai_reply',
+    message: overrides.message || 'Use the AI Training knowledge and reply in the brand tone.',
+    status: overrides.status || 'draft',
+    updatedAt: overrides.updatedAt || new Date().toISOString(),
   }
+}
 
-  const removeBlacklist = word => {
-    onChange({ ...settings, blacklist: settings.blacklist.filter(w => w !== word) })
+function normalizeFlow(flow) {
+  const trigger = TRIGGERS.find(item => item.id === flow.triggerId) || TRIGGERS[0]
+  return makeFlow({
+    ...flow,
+    trigger,
+    id: flow.id,
+    name: flow.name,
+    folderId: flow.folderId || null,
+    actionType: flow.actionType || 'ai_reply',
+    message: flow.message || 'Use the AI Training knowledge and reply in the brand tone.',
+    status: flow.status || 'draft',
+    updatedAt: flow.updatedAt,
+  })
+}
+
+function toAutomationSettings(current, flow) {
+  const next = {
+    ...DEFAULT_AUTOMATION,
+    ...(current || {}),
+    schedule: { ...DEFAULT_SCHEDULE, ...(current?.schedule || {}) },
   }
+  const existing = next[flow.platform] || DEFAULT_AUTOMATION[flow.platform] || {}
+  next[flow.platform] = {
+    ...existing,
+    dmReply: flow.triggerType === 'dm' ? true : Boolean(existing.dmReply),
+    commentReply: flow.triggerType === 'comment' ? true : Boolean(existing.commentReply),
+  }
+  return next
+}
 
+function AutomationSideNav({ activeSection, onSectionChange }) {
   return (
-    <div className="overflow-hidden rounded-xl border border-slate-200 bg-white">
-      <div className="flex items-center justify-between gap-4 border-b border-slate-200 px-6 py-5">
-        <div className="flex items-center gap-3">
-          <div className="flex h-10 w-10 items-center justify-center rounded-lg border border-slate-200 bg-slate-50">
-            <PlatformIcon platform={platform} size={19} connected={true} />
-          </div>
-          <div>
-            <div className="text-lg font-extrabold text-slate-950">{PLATFORM_LABELS[platform]}</div>
-            <div className="text-sm text-slate-500">Reply controls, tone, and blocked words.</div>
-          </div>
-        </div>
-        <div className="hidden rounded-full bg-slate-100 px-3 py-1 text-xs font-bold text-slate-500 sm:block">
-          {settings.dmReply || settings.commentReply ? 'Enabled' : 'Paused'}
+    <aside className="w-full border-r border-slate-200 bg-[#f6f6f6] px-4 py-8 lg:w-[280px]">
+      <div className="mb-8 px-3">
+        <h2 className="text-4xl font-extrabold tracking-tight text-[#2b2b2b]">Automation</h2>
+      </div>
+      <div className="space-y-2">
+        {SECTION_ITEMS.map(item => {
+          const Icon = item.icon
+          return (
+            <button
+              key={item.id}
+              onClick={() => onSectionChange(item.id)}
+              className={clsx(
+                'flex w-full items-center gap-4 rounded-lg px-4 py-3 text-left text-xl font-semibold transition-colors',
+                activeSection === item.id
+                  ? 'bg-[#d9d9d9] text-[#2b2b2b]'
+                  : 'text-[#3e3e3e] hover:bg-white'
+              )}
+            >
+              <Icon size={20} className="text-[#777]" />
+              {item.label}
+            </button>
+          )
+        })}
+      </div>
+    </aside>
+  )
+}
+
+function EmptyAutomationState({ onNewAutomation }) {
+  return (
+    <div className="mt-16 rounded-lg bg-white px-6 py-20 text-center">
+      <div className="mx-auto mb-6 flex h-28 w-28 items-center justify-center rounded-[34px] bg-blue-50">
+        <div className="relative h-20 w-20">
+          <div className="absolute left-2 top-3 h-14 w-14 rounded-full bg-[#8bd7df]" />
+          <div className="absolute right-2 top-7 h-12 w-12 rounded-full bg-[#4251d6]" />
+          <div className="absolute left-4 top-10 h-9 w-16 rotate-[-24deg] rounded-full bg-[#ffea00]" />
+          <Zap size={34} className="absolute right-2 top-1 fill-[#ffea00] text-[#ffea00]" />
         </div>
       </div>
+      <h3 className="text-2xl font-extrabold text-[#2b2b2b]">Create your first Automation</h3>
+      <p className="mx-auto mt-4 max-w-md text-lg leading-relaxed text-[#777]">
+        Automations are where you create chat replies in an easy visual format.
+        Start with a trigger, then choose what should happen next.
+      </p>
+      <button onClick={onNewAutomation} className="mt-8 inline-flex h-12 items-center gap-3 rounded-lg bg-[#255ff4] px-6 text-lg font-bold text-white hover:bg-[#1f50d0]">
+        <Plus size={22} />
+        New Automation
+      </button>
+    </div>
+  )
+}
 
-      <div className="divide-y divide-slate-200">
-        <div className="grid grid-cols-1 gap-6 px-6 py-5 lg:grid-cols-[220px_1fr]">
-          <div>
-            <div className="flex items-center gap-2 text-sm font-extrabold text-slate-950">
-              <Volume2 size={15} className="text-blue-600" />
-              Reply tone
-            </div>
-            <p className="mt-1 text-xs leading-relaxed text-slate-500">Set the voice customers will receive.</p>
+function FlowRow({ flow, onOpen, onDelete }) {
+  return (
+    <div className="grid grid-cols-[1fr_auto] gap-4 rounded-lg border border-slate-200 bg-white px-5 py-4">
+      <button onClick={onOpen} className="min-w-0 text-left">
+        <div className="flex items-center gap-3">
+          <div className="flex h-11 w-11 items-center justify-center rounded-lg border border-slate-200 bg-slate-50">
+            <PlatformIcon platform={flow.platform} size={20} connected />
           </div>
-          <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
-            {TONES.map(tone => (
+          <div className="min-w-0">
+            <div className="truncate text-lg font-extrabold text-slate-950">{flow.name}</div>
+            <div className="mt-0.5 truncate text-sm font-medium text-slate-500">
+              {flow.triggerTitle} {'->'} {ACTIONS.find(action => action.id === flow.actionType)?.title || 'Action'}
+            </div>
+          </div>
+        </div>
+      </button>
+      <div className="flex items-center gap-3">
+        <span className={clsx(
+          'rounded-full px-3 py-1 text-xs font-extrabold uppercase',
+          flow.status === 'live' ? 'bg-emerald-50 text-emerald-700' : 'bg-slate-100 text-slate-500'
+        )}>
+          {flow.status}
+        </span>
+        <button onClick={onDelete} className="rounded-lg p-2 text-slate-400 hover:bg-red-50 hover:text-[#f42f25]" aria-label={`Delete ${flow.name}`}>
+          <Trash2 size={18} />
+        </button>
+      </div>
+    </div>
+  )
+}
+
+function AutomationList({
+  activeSection,
+  flows,
+  folders,
+  search,
+  onSearch,
+  onNewFolder,
+  onNewAutomation,
+  onOpenFlow,
+  onDeleteFlow,
+}) {
+  if (activeSection !== 'my') {
+    const isBasic = activeSection === 'basic'
+    return (
+      <main className="flex-1 bg-[#f6f6f6] px-8 py-12">
+        <div className="mx-auto max-w-6xl">
+          <h1 className="text-4xl font-extrabold text-[#2b2b2b]">{isBasic ? 'Basic' : 'Sequences'}</h1>
+          <div className="mt-10 grid gap-4 md:grid-cols-3">
+            {(isBasic ? TRIGGERS.slice(0, 3) : TRIGGERS.slice(3)).map(trigger => (
               <button
-                key={tone}
-                onClick={() => onChange({ ...settings, tone })}
-                className={clsx(
-                  'h-10 rounded-lg border px-3 text-sm font-bold capitalize cursor-pointer transition-colors',
-                  settings.tone === tone
-                    ? 'border-blue-600 bg-blue-600 text-white'
-                    : 'border-slate-200 bg-white text-slate-600 hover:border-blue-200 hover:bg-blue-50'
-                )}
+                key={trigger.id}
+                onClick={() => onNewAutomation(trigger)}
+                className="rounded-lg border border-slate-200 bg-white p-5 text-left transition hover:border-[#255ff4] hover:shadow-sm"
               >
-                {tone}
+                <PlatformIcon platform={trigger.platform} size={24} connected />
+                <div className="mt-4 text-lg font-extrabold text-slate-950">{trigger.title}</div>
+                <p className="mt-2 text-sm leading-relaxed text-slate-500">{trigger.description}</p>
               </button>
             ))}
           </div>
         </div>
+      </main>
+    )
+  }
 
-        <div className="grid grid-cols-1 gap-6 px-6 py-5 lg:grid-cols-[220px_1fr]">
-          <div>
-            <div className="flex items-center gap-2 text-sm font-extrabold text-slate-950">
-              <ShieldOff size={15} className="text-blue-600" />
-              Blocked words
-            </div>
-            <p className="mt-1 text-xs leading-relaxed text-slate-500">AI will not reply when these words appear.</p>
-          </div>
-          <div>
-            {settings.blacklist.length > 0 && (
-              <div className="mb-3 flex flex-wrap gap-1.5">
-                {settings.blacklist.map(word => (
-                  <span key={word} className="flex items-center gap-1 rounded-full border border-red-200 bg-red-50 px-2.5 py-1 text-xs font-bold text-red-700">
-                    {word}
-                    <button type="button" onClick={() => removeBlacklist(word)} className="cursor-pointer hover:text-red-900" aria-label={`Remove ${word}`}>
-                      <X size={10} />
-                    </button>
-                  </span>
-                ))}
+  return (
+    <main className="flex-1 bg-[#f6f6f6] px-8 py-12">
+      <div className="mx-auto max-w-7xl">
+        <div className="flex flex-col gap-5 md:flex-row md:items-center md:justify-between">
+          <h1 className="text-4xl font-extrabold text-[#2b2b2b]">My Automations</h1>
+          <button onClick={() => onNewAutomation()} className="inline-flex h-12 items-center justify-center gap-3 rounded-lg bg-[#255ff4] px-5 text-lg font-bold text-white hover:bg-[#1f50d0]">
+            <Plus size={22} />
+            New Automation
+          </button>
+        </div>
+
+        <div className="mt-10 flex flex-col gap-5 lg:flex-row lg:items-center lg:justify-between">
+          <label className="relative block w-full max-w-md">
+            <Search size={24} className="absolute left-4 top-1/2 -translate-y-1/2 text-[#777]" />
+            <input
+              value={search}
+              onChange={event => onSearch(event.target.value)}
+              placeholder="Search all Automations"
+              className="h-14 w-full rounded-lg border border-slate-300 bg-white pl-14 pr-4 text-xl text-slate-900 outline-none focus:border-[#255ff4] focus:ring-4 focus:ring-blue-100"
+            />
+          </label>
+          <button type="button" className="inline-flex items-center gap-2 text-lg font-bold text-[#255ff4] hover:text-[#1f50d0]">
+            <Trash2 size={18} />
+            Trash
+          </button>
+        </div>
+
+        <button
+          onClick={onNewFolder}
+          className="mt-9 inline-flex h-14 min-w-[360px] items-center gap-4 rounded-lg border border-dashed border-[#255ff4] bg-white px-6 text-xl font-bold text-[#255ff4] hover:bg-blue-50"
+        >
+          <Plus size={26} />
+          New Folder
+        </button>
+
+        {folders.length > 0 && (
+          <div className="mt-6 grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+            {folders.map(folder => (
+              <div key={folder.id} className="flex items-center gap-3 rounded-lg border border-slate-200 bg-white px-4 py-3">
+                <FolderPlus size={18} className="text-[#255ff4]" />
+                <span className="font-bold text-slate-800">{folder.name}</span>
               </div>
-            )}
-            <div className="flex gap-2">
-              <input
-                value={newBlack}
-                onChange={e => setNewBlack(e.target.value)}
-                onKeyDown={e => e.key === 'Enter' && addBlacklist()}
-                placeholder="Add word"
-                className="input-field text-xs flex-1"
+            ))}
+          </div>
+        )}
+
+        {flows.length === 0 ? (
+          <EmptyAutomationState onNewAutomation={() => onNewAutomation()} />
+        ) : (
+          <div className="mt-10 space-y-3">
+            {flows.map(flow => (
+              <FlowRow
+                key={flow.id}
+                flow={flow}
+                onOpen={() => onOpenFlow(flow)}
+                onDelete={() => onDeleteFlow(flow.id)}
               />
-              <button onClick={addBlacklist} className="btn-secondary text-xs py-2">
-                <Plus size={12} /> Add
-              </button>
+            ))}
+          </div>
+        )}
+      </div>
+    </main>
+  )
+}
+
+function TriggerPicker({ selectedId, onSelect }) {
+  return (
+    <div className="space-y-2">
+      {TRIGGERS.map(trigger => (
+        <button
+          key={trigger.id}
+          onClick={() => onSelect(trigger)}
+          className={clsx(
+            'w-full rounded-lg border p-3 text-left transition',
+            selectedId === trigger.id
+              ? 'border-[#255ff4] bg-blue-50'
+              : 'border-slate-200 bg-white hover:border-[#255ff4]'
+          )}
+        >
+          <div className="flex items-center gap-3">
+            <PlatformIcon platform={trigger.platform} size={20} connected />
+            <div>
+              <div className="font-extrabold text-slate-950">{trigger.title}</div>
+              <div className="mt-0.5 text-xs leading-relaxed text-slate-500">{trigger.description}</div>
             </div>
           </div>
+        </button>
+      ))}
+    </div>
+  )
+}
+
+function FlowNode({ type, title, description, platform, selected, onClick, children }) {
+  return (
+    <button
+      onClick={onClick}
+      className={clsx(
+        'w-[320px] rounded-xl border bg-white p-4 text-left shadow-sm transition',
+        selected ? 'border-emerald-500 ring-2 ring-emerald-100' : 'border-slate-200 hover:border-[#255ff4]'
+      )}
+    >
+      <div className="flex items-start gap-3">
+        <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-slate-50">
+          {platform ? <PlatformIcon platform={platform} size={21} connected /> : <Zap size={20} className="text-[#255ff4]" />}
+        </div>
+        <div className="min-w-0">
+          <div className="text-xs font-extrabold uppercase text-slate-500">{type}</div>
+          <div className="mt-1 text-base font-extrabold text-slate-950">{title}</div>
+          <p className="mt-1 text-xs leading-relaxed text-slate-500">{description}</p>
+        </div>
+      </div>
+      {children}
+    </button>
+  )
+}
+
+function PreviewPanel({ flow, onClose }) {
+  const action = ACTIONS.find(item => item.id === flow.actionType)
+  return (
+    <div className="absolute right-8 top-24 z-20 w-[360px] rounded-xl border border-slate-200 bg-white p-5 shadow-2xl">
+      <div className="flex items-center justify-between">
+        <h3 className="text-lg font-extrabold text-slate-950">Preview</h3>
+        <button onClick={onClose} className="rounded-lg p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-900">
+          <X size={18} />
+        </button>
+      </div>
+      <div className="mt-5 rounded-xl bg-slate-50 p-4">
+        <div className="flex items-center gap-2 text-sm font-bold text-slate-500">
+          <PlatformIcon platform={flow.platform} size={16} connected />
+          {flow.triggerTitle}
+        </div>
+        <div className="mt-4 rounded-2xl bg-[#255ff4] px-4 py-3 text-sm font-semibold text-white">
+          {action?.id === 'ai_reply' ? 'AI will generate a different reply using the training context.' : flow.message}
         </div>
       </div>
     </div>
   )
 }
 
-export default function AutomationTab({ company, onUpdate, onNotify }) {
-  const [activeP, setActiveP] = useState('instagram')
-  const initialAutomation = {
-    ...DEFAULT_AUTOMATION,
-    ...(company.automation || {}),
-    schedule: { ...DEFAULT_SCHEDULE, ...(company.automation?.schedule || {}) },
+function FlowEditor({ flow, onChange, onBack, onSave, saving, saved }) {
+  const [selectedPanel, setSelectedPanel] = useState('trigger')
+  const [previewOpen, setPreviewOpen] = useState(false)
+  const [zoom, setZoom] = useState(100)
+  const selectedTrigger = TRIGGERS.find(item => item.id === flow.triggerId) || TRIGGERS[0]
+  const selectedAction = ACTIONS.find(item => item.id === flow.actionType) || ACTIONS[0]
+  const ActionIcon = selectedAction.icon
+
+  const updateTrigger = trigger => {
+    onChange({
+      ...flow,
+      triggerId: trigger.id,
+      platform: trigger.platform,
+      triggerType: trigger.type,
+      triggerTitle: trigger.title,
+      updatedAt: new Date().toISOString(),
+    })
   }
-  const [settings, setSettings] = useState(initialAutomation)
-  const [goal, setGoal] = useState(company.goal)
-  const [waLink, setWaLink] = useState(company.whatsappLink)
+
+  return (
+    <div className="relative flex min-h-[calc(100vh-120px)] flex-col bg-[#f6f6f6]">
+      <div className="flex min-h-[82px] items-center justify-between border-b border-slate-200 bg-white px-6">
+        <div className="flex items-center gap-4">
+          <button onClick={onBack} className="rounded-lg p-2 text-slate-500 hover:bg-slate-100 hover:text-slate-950" aria-label="Back to automations">
+            <ArrowLeft size={22} />
+          </button>
+          <input
+            value={flow.name}
+            onChange={event => onChange({ ...flow, name: event.target.value, updatedAt: new Date().toISOString() })}
+            className="w-[360px] border-none bg-transparent text-4xl font-extrabold text-[#2b2b2b] outline-none"
+          />
+        </div>
+        <div className="flex items-center gap-4">
+          <span className="inline-flex items-center gap-2 text-lg font-semibold text-slate-500">
+            <Check size={22} />
+            {saved ? 'Saved' : 'Draft'}
+          </span>
+          <button disabled className="rounded-lg p-2 text-slate-300">
+            <Undo2 size={22} />
+          </button>
+          <button disabled className="rounded-lg p-2 text-slate-300">
+            <Redo2 size={22} />
+          </button>
+          <button onClick={() => setPreviewOpen(true)} className="inline-flex h-12 items-center gap-2 rounded-lg border border-slate-300 bg-white px-5 text-lg font-bold text-[#2b2b2b] hover:bg-slate-50">
+            <Eye size={20} />
+            Preview
+          </button>
+          <button onClick={onSave} className="inline-flex h-12 items-center gap-3 rounded-lg bg-[#255ff4] px-8 text-lg font-bold text-white hover:bg-[#1f50d0]">
+            {saving ? <UsluLoader size="xs" /> : <Save size={20} />}
+            Set Live
+          </button>
+        </div>
+      </div>
+
+      <div className="grid flex-1 lg:grid-cols-[420px_1fr]">
+        <aside className="border-r border-slate-200 bg-white">
+          <section className="border-b border-slate-200 bg-emerald-50/70 p-6">
+            <h2 className="text-2xl font-extrabold text-[#2b2b2b]">When...</h2>
+            <button
+              onClick={() => setSelectedPanel('trigger')}
+              className="mt-6 flex h-16 w-full items-center justify-center gap-2 rounded-lg border border-dashed border-slate-400 bg-white text-lg font-bold text-[#255ff4] hover:border-[#255ff4]"
+            >
+              <Plus size={20} />
+              New Trigger
+            </button>
+          </section>
+
+          <section className="p-6">
+            <h2 className="text-2xl font-extrabold text-[#2b2b2b]">Then...</h2>
+            <div className="mt-5 rounded-xl border border-slate-300 bg-white">
+              <button
+                onClick={() => setSelectedPanel('action')}
+                className={clsx(
+                  'flex w-full items-center gap-4 p-4 text-left',
+                  selectedPanel === 'action' && 'bg-blue-50'
+                )}
+              >
+                <PlatformIcon platform={flow.platform} size={28} connected />
+                <div className="min-w-0 flex-1">
+                  <div className="truncate text-lg font-extrabold text-[#2b2b2b]">{selectedAction.title}</div>
+                  <div className="truncate text-sm font-semibold text-slate-500">{flow.message}</div>
+                </div>
+                <X size={22} className="text-slate-400" />
+              </button>
+            </div>
+          </section>
+
+          <section className="border-t border-slate-200 p-6">
+            {selectedPanel === 'trigger' ? (
+              <>
+                <h3 className="text-sm font-extrabold uppercase tracking-wide text-slate-500">Choose trigger</h3>
+                <div className="mt-4">
+                  <TriggerPicker selectedId={flow.triggerId} onSelect={updateTrigger} />
+                </div>
+              </>
+            ) : (
+              <>
+                <h3 className="text-sm font-extrabold uppercase tracking-wide text-slate-500">Choose action</h3>
+                <div className="mt-4 grid gap-2">
+                  {ACTIONS.map(action => {
+                    const Icon = action.icon
+                    return (
+                      <button
+                        key={action.id}
+                        onClick={() => onChange({ ...flow, actionType: action.id, updatedAt: new Date().toISOString() })}
+                        className={clsx(
+                          'rounded-lg border p-3 text-left transition',
+                          flow.actionType === action.id ? 'border-[#255ff4] bg-blue-50' : 'border-slate-200 hover:border-[#255ff4]'
+                        )}
+                      >
+                        <div className="flex items-start gap-3">
+                          <Icon size={20} className="mt-0.5 text-[#255ff4]" />
+                          <div>
+                            <div className="font-extrabold text-slate-950">{action.title}</div>
+                            <p className="mt-0.5 text-xs leading-relaxed text-slate-500">{action.description}</p>
+                          </div>
+                        </div>
+                      </button>
+                    )
+                  })}
+                </div>
+                <label className="mt-5 block text-sm font-extrabold uppercase tracking-wide text-slate-500">
+                  Message or instruction
+                </label>
+                <textarea
+                  value={flow.message}
+                  onChange={event => onChange({ ...flow, message: event.target.value, updatedAt: new Date().toISOString() })}
+                  rows={5}
+                  className="mt-2 w-full rounded-lg border border-slate-300 p-3 text-sm font-medium text-slate-900 outline-none focus:border-[#255ff4] focus:ring-4 focus:ring-blue-100"
+                />
+              </>
+            )}
+          </section>
+        </aside>
+
+        <main className="relative overflow-hidden bg-[#f8f8f8]">
+          {previewOpen && <PreviewPanel flow={flow} onClose={() => setPreviewOpen(false)} />}
+          <div className="absolute left-1/2 top-4 z-10 -translate-x-1/2 rounded-lg border border-slate-200 bg-slate-100 px-5 py-2 text-lg font-semibold text-slate-500">
+            Edit step in sidebar
+          </div>
+
+          <div className="flex h-full min-h-[720px] items-center justify-center">
+            <div
+              className="relative flex items-center gap-36 transition-transform"
+              style={{ transform: `scale(${zoom / 100})` }}
+            >
+              <FlowNode
+                type="When..."
+                title={selectedTrigger.title}
+                description={selectedTrigger.description}
+                selected={selectedPanel === 'trigger'}
+                onClick={() => setSelectedPanel('trigger')}
+              >
+                <div className="mt-4 rounded-lg border border-dashed border-[#255ff4] px-4 py-3 text-center text-sm font-extrabold text-[#255ff4]">
+                  + New Trigger
+                </div>
+                <div className="mt-4 flex justify-end text-xs font-bold text-slate-400">Then</div>
+              </FlowNode>
+
+              <svg className="absolute left-[305px] top-1/2 h-28 w-40 -translate-y-1/2 overflow-visible" viewBox="0 0 160 112" aria-hidden="true">
+                <path d="M4 58 C 46 58, 58 4, 104 42 S 116 58, 156 58" fill="none" stroke="#94a3b8" strokeWidth="3" />
+                <circle cx="4" cy="58" r="5" fill="#94a3b8" />
+                <circle cx="156" cy="58" r="5" fill="#94a3b8" />
+              </svg>
+
+              <FlowNode
+                type={selectedAction.title}
+                title={`${selectedTrigger.platform === 'facebook' ? 'Messenger' : selectedTrigger.title.split(' ')[0]} ${selectedAction.title}`}
+                description={selectedAction.description}
+                platform={flow.platform}
+                selected={selectedPanel === 'action'}
+                onClick={() => setSelectedPanel('action')}
+              >
+                <div className="mt-4 rounded-lg border border-dashed border-slate-300 px-4 py-3 text-center text-xs font-semibold text-slate-500">
+                  {flow.actionType === 'ai_reply' ? 'AI writes from training' : flow.message || 'Add text'}
+                </div>
+                <div className="mt-4 flex items-center justify-between text-xs font-bold text-slate-400">
+                  <span className="inline-flex items-center gap-1">
+                    <ActionIcon size={13} />
+                    Action
+                  </span>
+                  <span>Next Step</span>
+                </div>
+              </FlowNode>
+            </div>
+          </div>
+
+          <div className="absolute right-6 top-28 flex flex-col overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
+            <button onClick={() => setZoom(value => Math.min(value + 10, 140))} className="h-14 w-14 text-2xl font-bold text-[#255ff4] hover:bg-blue-50">+</button>
+            <button onClick={() => setZoom(value => Math.max(value - 10, 70))} className="h-14 w-14 border-t border-slate-200 text-2xl font-bold text-[#255ff4] hover:bg-blue-50">-</button>
+            <button onClick={() => setZoom(100)} className="h-14 w-14 border-t border-slate-200 text-sm font-bold text-slate-500 hover:bg-slate-50">{zoom}%</button>
+          </div>
+        </main>
+      </div>
+    </div>
+  )
+}
+
+export default function AutomationTab({ company, onUpdate, onNotify }) {
+  const initialFlows = useMemo(
+    () => Array.isArray(company.automationFlows) ? company.automationFlows.map(normalizeFlow) : [],
+    [company.automationFlows]
+  )
+  const initialFolders = useMemo(
+    () => Array.isArray(company.automationFolders) ? company.automationFolders : [],
+    [company.automationFolders]
+  )
+  const [view, setView] = useState('list')
+  const [activeSection, setActiveSection] = useState('my')
+  const [search, setSearch] = useState('')
+  const [flows, setFlows] = useState(initialFlows)
+  const [folders, setFolders] = useState(initialFolders)
+  const [draft, setDraft] = useState(initialFlows[0] || makeFlow())
+  const [saving, setSaving] = useState(false)
   const [saved, setSaved] = useState(false)
 
-  const handleSave = async () => {
+  const visibleFlows = flows.filter(flow => {
+    const term = search.trim().toLowerCase()
+    if (!term) return flow.status !== 'deleted'
+    return flow.status !== 'deleted' && `${flow.name} ${flow.triggerTitle} ${flow.platform}`.toLowerCase().includes(term)
+  })
+
+  const saveCompany = async (nextFlows, nextFolders, options = {}) => {
+    const liveFlow = options.liveFlow
+    const nextAutomation = liveFlow ? toAutomationSettings(company.automation, liveFlow) : company.automation
     const nextCompany = {
       ...company,
-      goal,
-      whatsappLink: waLink,
-      automation: settings,
+      automation: nextAutomation,
+      automationFlows: nextFlows,
+      automationFolders: nextFolders,
     }
 
     onUpdate?.(current => ({
       ...current,
-      goal,
-      whatsappLink: waLink,
-      automation: settings,
+      automation: nextAutomation,
+      automationFlows: nextFlows,
+      automationFolders: nextFolders,
     }))
-    try {
-      await saveBackendAiConfig(nextCompany)
-      onNotify?.('Automation settings saved and synced to backend.', 'success')
-    } catch (err) {
-      onNotify?.(`Automation saved locally, but backend sync failed: ${err.message}`, 'warning')
-    }
-    setSaved(true)
-    await new Promise(r => setTimeout(r, 1500))
+
+    await saveBackendAiConfig(nextCompany)
+  }
+
+  const handleNewAutomation = trigger => {
+    setDraft(makeFlow({ trigger }))
     setSaved(false)
+    setView('editor')
+  }
+
+  const handleOpenFlow = flow => {
+    setDraft(normalizeFlow(flow))
+    setSaved(flow.status === 'live')
+    setView('editor')
+  }
+
+  const handleNewFolder = async () => {
+    const nextFolders = [
+      ...folders,
+      { id: `folder-${Date.now()}`, name: `Folder ${folders.length + 1}`, createdAt: new Date().toISOString() },
+    ]
+    setFolders(nextFolders)
+    try {
+      await saveCompany(flows, nextFolders)
+      onNotify?.('Folder saved.', 'success')
+    } catch (error) {
+      onNotify?.(`Folder saved locally, but backend sync failed: ${error.message}`, 'warning')
+    }
+  }
+
+  const handleDeleteFlow = async flowId => {
+    const nextFlows = flows.filter(flow => flow.id !== flowId)
+    setFlows(nextFlows)
+    try {
+      await saveCompany(nextFlows, folders)
+      onNotify?.('Automation moved out of the list.', 'success')
+    } catch (error) {
+      onNotify?.(`Automation removed locally, but backend sync failed: ${error.message}`, 'warning')
+    }
+  }
+
+  const handleSetLive = async () => {
+    const liveDraft = { ...draft, status: 'live', updatedAt: new Date().toISOString() }
+    const exists = flows.some(flow => flow.id === liveDraft.id)
+    const nextFlows = exists
+      ? flows.map(flow => flow.id === liveDraft.id ? liveDraft : flow)
+      : [liveDraft, ...flows]
+
+    setSaving(true)
+    setFlows(nextFlows)
+    setDraft(liveDraft)
+    try {
+      await saveCompany(nextFlows, folders, { liveFlow: liveDraft })
+      setSaved(true)
+      onNotify?.('Automation is live and synced to the company.', 'success')
+    } catch (error) {
+      onNotify?.(`Automation saved locally, but backend sync failed: ${error.message}`, 'warning')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  if (view === 'editor') {
+    return (
+      <FlowEditor
+        flow={draft}
+        onChange={nextDraft => {
+          setDraft(nextDraft)
+          setSaved(false)
+        }}
+        onBack={() => setView('list')}
+        onSave={handleSetLive}
+        saving={saving}
+        saved={saved}
+      />
+    )
   }
 
   return (
-    <div className="space-y-6 animate-slide-in">
-      <div className="flex flex-col gap-5 rounded-xl border border-slate-200 bg-white p-6 lg:flex-row lg:items-center lg:justify-between">
-        <div className="flex items-start gap-4">
-          <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-slate-950 text-white">
-            <Zap size={22} fill="white" />
-          </div>
-          <div>
-            <h1 className="text-3xl font-extrabold tracking-tight text-slate-950">Automation</h1>
-            <p className="mt-1 max-w-2xl text-sm font-medium text-slate-500">
-              Control when AI replies, what goal it follows, and how each platform behaves.
-            </p>
-          </div>
-        </div>
-        <button onClick={handleSave} className="btn-primary h-11 justify-center">
-          {saved ? <><UsluLoader size="xs" />Saving...</> : <><Save size={14} />Save Changes</>}
-        </button>
-      </div>
-
-      <div className="grid grid-cols-1 gap-4 xl:grid-cols-3">
-        <section className="rounded-xl border border-slate-200 bg-white p-5">
-          <div className="mb-4 flex items-center gap-2">
-            <Zap size={16} className="text-blue-600" />
-            <h3 className="text-base font-extrabold text-slate-950">1. Business Goal</h3>
-          </div>
-          <p className="mb-4 text-sm text-slate-500">Choose what AI should optimize for.</p>
-          <div className="space-y-2">
-            {GOALS.map(g => (
-              <button
-                key={g.value}
-                onClick={() => setGoal(g.value)}
-                className={clsx(
-                  'w-full rounded-lg border p-3 text-left transition-all cursor-pointer',
-                  goal === g.value
-                    ? 'border-blue-300 bg-blue-50 shadow-sm'
-                    : 'border-slate-200 hover:border-blue-200 hover:bg-blue-50/30'
-                )}
-              >
-                <div className="flex items-center gap-2">
-                  <div className={clsx('w-3.5 h-3.5 rounded-full border-2 flex-shrink-0', goal === g.value ? 'border-blue-600 bg-blue-600' : 'border-slate-300')}>
-                    {goal === g.value && <div className="w-1.5 h-1.5 bg-white rounded-full m-auto" />}
-                  </div>
-                  <span className="text-sm font-bold text-slate-900">{g.label}</span>
-                </div>
-              </button>
-            ))}
-          </div>
-          {goal === 'push_to_whatsapp' && (
-            <div className="mt-4 border-t border-slate-200 pt-4">
-              <label className="mb-1.5 block text-sm font-semibold text-slate-700">
-                <Link2 size={13} className="inline mr-1.5 text-slate-400" />
-                WhatsApp Link
-              </label>
-              <input
-                value={waLink}
-                onChange={e => setWaLink(e.target.value)}
-                placeholder="https://wa.me/90XXXXXXXXXX"
-                className="input-field"
-              />
-            </div>
-          )}
-        </section>
-
-        <section className="rounded-xl border border-slate-200 bg-white p-5">
-          <div className="mb-4 flex items-center gap-2">
-            <MessageSquare size={16} className="text-blue-600" />
-            <h3 className="text-base font-extrabold text-slate-950">2. Comment Replies</h3>
-          </div>
-          <p className="mb-4 text-sm text-slate-500">Turn public comment replies on or off per channel.</p>
-          <div className="space-y-2">
-            {PLATFORMS.map(p => (
-              <Toggle
-                key={p}
-                checked={Boolean(settings[p]?.commentReply)}
-                onChange={v => setSettings(prev => ({ ...prev, [p]: { ...(prev[p] || DEFAULT_AUTOMATION[p]), commentReply: v } }))}
-                label={PLATFORM_LABELS[p]}
-                description={p === 'whatsapp' ? 'WhatsApp comments are not available' : 'AI can answer public comments'}
-              />
-            ))}
-          </div>
-        </section>
-
-        <section className="rounded-xl border border-slate-200 bg-white p-5">
-          <div className="mb-4 flex items-center gap-2">
-            <MessageSquare size={16} className="text-blue-600" />
-            <h3 className="text-base font-extrabold text-slate-950">3. DM Replies</h3>
-          </div>
-          <p className="mb-4 text-sm text-slate-500">Turn private inbox replies on or off per channel.</p>
-          <div className="space-y-2">
-            {PLATFORMS.map(p => (
-              <Toggle
-                key={p}
-                checked={Boolean(settings[p]?.dmReply)}
-                onChange={v => setSettings(prev => ({ ...prev, [p]: { ...(prev[p] || DEFAULT_AUTOMATION[p]), dmReply: v } }))}
-                label={PLATFORM_LABELS[p]}
-                description={p === 'youtube' ? 'YouTube has no DMs' : 'AI can answer private messages'}
-              />
-            ))}
-          </div>
-        </section>
-      </div>
-
-      {/* Platform tabs */}
-      <div className="grid grid-cols-1 gap-5 lg:grid-cols-[260px_1fr]">
-        <aside className="rounded-xl border border-slate-200 bg-white p-3">
-          <div className="px-3 py-2 text-xs font-bold uppercase text-slate-400">Channels</div>
-          <div className="space-y-1">
-            {PLATFORMS.map(p => {
-              const enabled = settings[p]?.dmReply || settings[p]?.commentReply
-              return (
-                <button
-                  key={p}
-                  onClick={() => setActiveP(p)}
-                  className={clsx(
-                    'flex w-full items-center justify-between gap-3 rounded-lg px-3 py-3 text-left text-sm font-bold cursor-pointer transition-colors',
-                    activeP === p
-                      ? 'bg-slate-950 text-white'
-                      : 'text-slate-600 hover:bg-slate-50 hover:text-slate-950'
-                  )}
-                >
-                  <span className="flex min-w-0 items-center gap-2">
-                    <PlatformIcon platform={p} size={16} connected={company.platforms[p]?.connected} />
-                    <span className="truncate">{PLATFORM_LABELS[p]}</span>
-                  </span>
-                  <span className={clsx('h-2 w-2 rounded-full', enabled ? 'bg-emerald-500' : 'bg-slate-300')} />
-                </button>
-              )
-            })}
-          </div>
-        </aside>
-        <div className="min-w-0">
-          <PlatformAutomation
-            key={activeP}
-            platform={activeP}
-            settings={settings[activeP] || DEFAULT_AUTOMATION[activeP]}
-            onChange={s => setSettings(prev => ({ ...prev, [activeP]: s }))}
-          />
-        </div>
-      </div>
+    <div className="min-h-[calc(100vh-120px)] overflow-hidden border-t border-slate-200 bg-[#f6f6f6] lg:flex">
+      <AutomationSideNav activeSection={activeSection} onSectionChange={setActiveSection} />
+      <AutomationList
+        activeSection={activeSection}
+        flows={visibleFlows}
+        folders={folders}
+        search={search}
+        onSearch={setSearch}
+        onNewFolder={handleNewFolder}
+        onNewAutomation={handleNewAutomation}
+        onOpenFlow={handleOpenFlow}
+        onDeleteFlow={handleDeleteFlow}
+      />
     </div>
   )
 }
