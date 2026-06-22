@@ -26,6 +26,8 @@ function ReportCard({ report, isAdmin, company, onNotify, onDelete }) {
   const [sending, setSending] = useState(false)
   const [sent, setSent] = useState(false)
   const [deleting, setDeleting] = useState(false)
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false)
+  const [deleteText, setDeleteText] = useState('')
   const [showEmailDialog, setShowEmailDialog] = useState(false)
   const [emailStatus, setEmailStatus] = useState({ loading: false, configured: false, provider: 'none', sender: '' })
   const [emailForm, setEmailForm] = useState({
@@ -83,10 +85,14 @@ function ReportCard({ report, isAdmin, company, onNotify, onDelete }) {
   }
 
   const handleDelete = async () => {
+    if (deleteText !== 'DELETE') return
     setDeleting(true)
     await new Promise(r => setTimeout(r, 400))
     onDelete?.(report.id)
     onNotify?.('Report deleted.', 'success')
+    setShowDeleteDialog(false)
+    setDeleteText('')
+    setDeleting(false)
   }
 
   const handleDownload = () => {
@@ -269,9 +275,13 @@ function ReportCard({ report, isAdmin, company, onNotify, onDelete }) {
             </button>
             {isAdmin && (
               <button
-                onClick={handleDelete}
+                onClick={event => {
+                  event.stopPropagation()
+                  setShowDeleteDialog(true)
+                }}
                 disabled={deleting}
                 className="p-2 hover:bg-red-50 rounded-lg cursor-pointer transition-colors text-red-500 disabled:opacity-50"
+                aria-label="Delete report"
               >
                 <Trash2 size={16} />
               </button>
@@ -337,6 +347,53 @@ function ReportCard({ report, isAdmin, company, onNotify, onDelete }) {
                 ) : (
                   <><Send size={14} />Send Report</>
                 )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Delete Dialog */}
+      {showDeleteDialog && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-xl shadow-2xl max-w-md w-full p-6 space-y-5">
+            <div>
+              <h3 className="text-slate-900 font-bold text-lg">Delete Report</h3>
+              <p className="text-slate-500 text-sm mt-1">
+                This report stays saved until you delete it. Type <strong>DELETE</strong> to confirm removal.
+              </p>
+            </div>
+
+            <div className="rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-800">
+              You are deleting {report.month} Report{report.sequence ? ` #${report.sequence}` : ''}.
+            </div>
+
+            <div>
+              <label className="block text-sm font-semibold text-slate-700 mb-2">Confirmation</label>
+              <input
+                value={deleteText}
+                onChange={e => setDeleteText(e.target.value)}
+                placeholder="DELETE"
+                className="input-field w-full"
+              />
+            </div>
+
+            <div className="flex gap-3 pt-3">
+              <button
+                onClick={() => {
+                  setShowDeleteDialog(false)
+                  setDeleteText('')
+                }}
+                className="flex-1 px-4 py-2.5 rounded-lg border border-slate-200 text-slate-700 font-semibold hover:bg-slate-50 transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleDelete}
+                disabled={deleting || deleteText !== 'DELETE'}
+                className={clsx('flex-1 btn-danger justify-center', (deleting || deleteText !== 'DELETE') && 'opacity-50 cursor-not-allowed')}
+              >
+                {deleting ? <><UsluLoader size="xs" />Deleting...</> : <><Trash2 size={14} />Delete Report</>}
               </button>
             </div>
           </div>
