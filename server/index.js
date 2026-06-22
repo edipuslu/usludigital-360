@@ -162,6 +162,21 @@ function openaiKeyKind(value) {
   return 'unknown'
 }
 
+function extractWebsiteText(html) {
+  return String(html || '')
+    .replace(/<script[\s\S]*?<\/script>/gi, ' ')
+    .replace(/<style[\s\S]*?<\/style>/gi, ' ')
+    .replace(/<noscript[\s\S]*?<\/noscript>/gi, ' ')
+    .replace(/<[^>]+>/g, ' ')
+    .replace(/&nbsp;/g, ' ')
+    .replace(/&amp;/g, '&')
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;/g, "'")
+    .replace(/\s+/g, ' ')
+    .trim()
+    .slice(0, 12000)
+}
+
 function json(res, status, body) {
   res.writeHead(status, {
     'Content-Type': 'application/json',
@@ -1881,6 +1896,9 @@ function systemPromptFor(company, item) {
   return [
     `You are replying for ${company?.name || 'this company'}.`,
     training.description ? `Business context: ${training.description}` : '',
+    training.websiteSummary ? `Website summary: ${training.websiteSummary}` : '',
+    training.websiteServices ? `Services/products: ${training.websiteServices}` : '',
+    training.businessGoal ? `Main business goal: ${training.businessGoal}` : '',
     `Incoming ${item.type} on ${item.platform}: "${item.text || ''}"`,
     `Tone: ${automation.tone || training.tone || 'professional'}.`,
     item.type === 'comment' && training.commentInstructions ? `Comment reply instructions: ${training.commentInstructions}` : '',
@@ -1995,6 +2013,77 @@ async function generateAiReply(company, item, options = {}) {
   }
 
   return { reply: '', status: 'ai_error', error: lastError || 'OpenAI request failed.' }
+}
+
+async function analyzeWebsiteWithAi(company, websiteUrl) {
+  const apiKey = process.env.OPENAI_API_KEY || company?.openaiKey
+  if (!apiKey) throw new Error('OpenAI key is missing on the backend.')
+
+  let parsedUrl
+  try {
+    parsedUrl = new URL(websiteUrl)
+  } catch {
+    throw new Error('Enter a valid website URL, including https://')
+  }
+  if (!['http:', 'https:'].includes(parsedUrl.protocol)) {
+    throw new Error('Website URL must start with http:// or https://')
+  }
+
+  const websiteResponse = await fetch(parsedUrl.toString(), {
+    headers: {
+      'User-Agent': 'Uslu360DigitalBot/1.0 (+https://360.usludigital.com)',
+      Accept: 'text/html,application/xhtml+xml',
+    },
+  })
+  if (!websiteResponse.ok) {
+    throw new Error(`Website could not be analyzed. HTTP ${websiteResponse.status}`)
+  }
+
+  const websiteText = extractWebsiteText(await websiteResponse.text())
+  if (!websiteText || websiteText.length < 80) {
+    throw new Error('Website text is too short to analyze.')
+  }
+
+  const response = await fetch('https://api.openai.com/v1/chat/completions', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${apiKey}`,
+    },
+    body: JSON.stringify({
+      model: OPENAI_MODEL_FALLBACKS[0] || OPENAI_MODEL,
+      messages: [
+        {
+          role: 'system',
+          content: 'Analyze this business website for an AI customer-reply system. Return only valid JSON with keys summary, audience, services, suggestedGoal, commentGuidance, dmGuidance. Keep each value concise and practical.',
+        },
+        {
+          role: 'user',
+          content: `Company: ${company?.name || 'Company'}\nWebsite: ${parsedUrl.toString()}\nWebsite text:\n${websiteText}`,
+        },
+      ],
+      temperature: 0.35,
+      max_tokens: 600,
+    }),
+  })
+  const data = await response.json().catch(() => ({}))
+  if (!response.ok) {
+    throw new Error(data?.error?.message || `OpenAI analysis failed with HTTP ${response.status}`)
+  }
+
+  const raw = data.choices?.[0]?.message?.content || ''
+  try {
+    return JSON.parse(raw)
+  } catch {
+    return {
+      summary: raw,
+      audience: '',
+      services: '',
+      suggestedGoal: '',
+      commentGuidance: '',
+      dmGuidance: '',
+    }
+  }
 }
 
 async function graphPost(pathname, token, body) {
@@ -2638,6 +2727,35 @@ export async function appHandler(req, res) {
       }
       await saveStore(store)
       return json(res, 200, { ok: true, appliedToAllCompanies: hasOpenaiKeyChange, hasOpenaiKey: Boolean(nextOpenaiKey) })
+    }
+
+    const analyzeWebsiteParams = routeParams(url.pathname, '/api/companies/:companyId/analyze-website')
+    if (req.method === 'POST' && analyzeWebsiteParams) {
+      const body = await readBody(req)
+      const company = store.companies[analyzeWebsiteParams.companyId]
+      if (!company) return json(res, 404, { error: 'Company not found.' })
+      const websiteUrl = String(body.websiteUrl || company.aiTraining?.websiteUrl || '').trim()
+      if (!websiteUrl) return json(res, 400, { error: 'websiteUrl is required.' })
+
+      const analysis = await analyzeWebsiteWithAi(company, websiteUrl)
+      const nextTraining = {
+        ...(company.aiTraining || {}),
+        websiteUrl,
+        websiteSummary: analysis.summary || '',
+        websiteAudience: analysis.audience || '',
+        websiteServices: analysis.services || '',
+        businessGoal: company.aiTraining?.businessGoal || analysis.suggestedGoal || '',
+        commentInstructions: company.aiTraining?.commentInstructions || analysis.commentGuidance || '',
+        dmInstructions: company.aiTraining?.dmInstructions || analysis.dmGuidance || '',
+        status: 'training',
+      }
+      store.companies[analyzeWebsiteParams.companyId] = {
+        ...company,
+        aiTraining: nextTraining,
+        updatedAt: new Date().toISOString(),
+      }
+      await saveStore(store)
+      return json(res, 200, { ok: true, analysis, aiTraining: nextTraining })
     }
 
     const aiTestParams = routeParams(url.pathname, '/api/companies/:companyId/ai-test')

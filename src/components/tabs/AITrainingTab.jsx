@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Upload, FileText, Trash2, CheckCircle2, RefreshCw, Brain, Shield, Globe, MessageSquare, Plus, Eye, EyeOff, ExternalLink, AlertCircle, Zap, Key, Sparkles, Send } from 'lucide-react'
 import { StatusBadge, Toggle, UsluLoader } from '../ui/UIKit'
-import { getBackendAiConfig, saveBackendAiConfig, testBackendAiReply } from '../../lib/backendApi'
+import { analyzeBackendWebsite, getBackendAiConfig, saveBackendAiConfig, testBackendAiReply } from '../../lib/backendApi'
 import clsx from 'clsx'
 
 const TONES = [
@@ -366,6 +366,8 @@ export default function AITrainingTab({ company, onUpdate, onNotify, isAdmin = t
   const [docs, setDocs] = useState(company.aiTraining.documents)
   const [guardrails, setGuardrails] = useState(company.aiTraining.guardrails)
   const [description, setDescription] = useState(company.aiTraining.description)
+  const [websiteSummary, setWebsiteSummary] = useState(company.aiTraining.websiteSummary || '')
+  const [businessGoal, setBusinessGoal] = useState(company.aiTraining.businessGoal || company.goal || '')
   const [commentInstructions, setCommentInstructions] = useState(company.aiTraining.commentInstructions || '')
   const [dmInstructions, setDmInstructions] = useState(company.aiTraining.dmInstructions || '')
   const [websiteUrl, setWebsiteUrl] = useState(company.aiTraining.websiteUrl)
@@ -379,8 +381,10 @@ export default function AITrainingTab({ company, onUpdate, onNotify, isAdmin = t
   const [dmTestResponse, setDmTestResponse] = useState('')
   const [dmTesting, setDmTesting] = useState(false)
   const [dmTestError, setDmTestError] = useState('')
+  const [analyzingWebsite, setAnalyzingWebsite] = useState(false)
+  const [analysisError, setAnalysisError] = useState('')
   const [hasSavedApiKey, setHasSavedApiKey] = useState(() => Boolean(company.hasOpenaiKey))
-  const [setupOpen, setSetupOpen] = useState(() => Boolean(company.aiTraining.description || company.aiTraining.websiteUrl || company.aiTraining.documents?.length || company.hasOpenaiKey))
+  const [setupOpen, setSetupOpen] = useState(true)
   const [focusSection, setFocusSection] = useState('knowledge')
 
   useEffect(() => {
@@ -427,6 +431,8 @@ export default function AITrainingTab({ company, onUpdate, onNotify, isAdmin = t
         progress: status === 'active' ? 100 : company.aiTraining.progress,
         documents: docs,
         websiteUrl,
+        websiteSummary,
+        businessGoal,
         guardrails,
         fallbackMessage: fallback,
         description,
@@ -446,6 +452,39 @@ export default function AITrainingTab({ company, onUpdate, onNotify, isAdmin = t
       onNotify?.('AI training synced to backend.', 'success')
     } catch (err) {
       onNotify?.(`AI saved locally, but backend sync failed: ${err.message}`, 'warning')
+    }
+  }
+
+  const handleAnalyzeWebsite = async () => {
+    if (!websiteUrl.trim()) {
+      setAnalysisError('Add a website URL first.')
+      return
+    }
+    if (!hasSavedApiKey) {
+      setAnalysisError('Add the shared OpenAI API key first.')
+      return
+    }
+    setAnalyzingWebsite(true)
+    setAnalysisError('')
+    try {
+      const data = await analyzeBackendWebsite(company.id, websiteUrl.trim())
+      const training = data.aiTraining || {}
+      setWebsiteSummary(training.websiteSummary || data.analysis?.summary || '')
+      setBusinessGoal(training.businessGoal || data.analysis?.suggestedGoal || businessGoal)
+      setCommentInstructions(training.commentInstructions || data.analysis?.commentGuidance || commentInstructions)
+      setDmInstructions(training.dmInstructions || data.analysis?.dmGuidance || dmInstructions)
+      onUpdate?.(current => ({
+        ...current,
+        aiTraining: {
+          ...current.aiTraining,
+          ...training,
+        },
+      }))
+      onNotify?.('Website analyzed and saved to AI training.', 'success')
+    } catch (err) {
+      setAnalysisError(err.message)
+    } finally {
+      setAnalyzingWebsite(false)
     }
   }
 
@@ -554,30 +593,12 @@ export default function AITrainingTab({ company, onUpdate, onNotify, isAdmin = t
       <div className="-mx-8 -mt-8 flex flex-col gap-5 border-b border-slate-200 bg-slate-50 px-8 py-6 lg:flex-row lg:items-center lg:justify-between">
         <div>
           <div className="flex flex-wrap items-center gap-3">
-            <h1 className="text-3xl font-extrabold tracking-tight text-slate-950">Usludigital AI</h1>
-            <span className="text-lg font-semibold text-slate-400">BETA for Instagram</span>
+            <h1 className="text-3xl font-extrabold tracking-tight text-slate-950">AI Training Center</h1>
             <StatusBadge status={isAdmin ? (hasSavedApiKey ? 'active' : 'needs_update') : company.aiTraining.status} />
           </div>
-          <div className="mt-4 flex flex-wrap gap-2">
-            {[
-              ['knowledge', 'Knowledge'],
-              ['behavior', 'Behavior'],
-              ['goals', 'Goals'],
-              ...(isAdmin ? [['test', 'Test AI']] : []),
-            ].map(([key, label]) => (
-              <button
-                key={key}
-                type="button"
-                onClick={() => setFocusSection(key)}
-                className={clsx(
-                  'h-10 rounded-lg px-4 text-sm font-bold transition-colors',
-                  focusSection === key ? 'bg-slate-950 text-white' : 'bg-white text-slate-600 hover:bg-slate-100'
-                )}
-              >
-                {label}
-              </button>
-            ))}
-          </div>
+          <p className="mt-2 max-w-3xl text-sm font-medium text-slate-500">
+            First analyze the business, then set the main goal, then test comments and DMs separately.
+          </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
           {isAdmin && docs.length > 0 && (
@@ -588,7 +609,7 @@ export default function AITrainingTab({ company, onUpdate, onNotify, isAdmin = t
           {isAdmin && (
             <button
               type="button"
-              onClick={() => setFocusSection('test')}
+              onClick={() => document.getElementById('ai-comment-test')?.scrollIntoView({ behavior: 'smooth', block: 'start' })}
               className="inline-flex h-11 items-center gap-2 rounded-lg bg-slate-950 px-5 text-sm font-bold text-white hover:bg-slate-800"
             >
               <Sparkles size={16} /> Test AI
@@ -597,9 +618,9 @@ export default function AITrainingTab({ company, onUpdate, onNotify, isAdmin = t
         </div>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+      <div className="space-y-5">
         {/* Left — provider status + documents */}
-        <div className="lg:col-span-2 space-y-5">
+        <div className="space-y-5">
           {isAdmin ? (
             <div className="rounded-lg border border-slate-200 bg-white p-5">
               <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
@@ -666,57 +687,96 @@ export default function AITrainingTab({ company, onUpdate, onNotify, isAdmin = t
           {/* Website + Description */}
           <div className={clsx('card p-5', focusSection === 'knowledge' && 'ring-2 ring-blue-200')}>
             <h3 className="text-slate-900 font-bold text-base flex items-center gap-2 mb-4">
-              <Globe size={15} className="text-slate-400" /> Business Context
+              <Globe size={15} className="text-slate-400" /> 1. Business Website and Goal
             </h3>
             <div className="space-y-4">
               <div>
                 <label className="block text-sm font-semibold text-slate-700 mb-1.5">Website URL</label>
                 <div className="flex gap-2">
                   <input value={websiteUrl} onChange={e => setWebsiteUrl(e.target.value)} disabled={!isAdmin} className="input-field flex-1 disabled:opacity-60 disabled:cursor-not-allowed" placeholder="https://yourbusiness.com" />
-                  {isAdmin && <button onClick={() => saveTraining('training')} className="btn-secondary flex-shrink-0">Crawl</button>}
+                  {isAdmin && (
+                    <button onClick={handleAnalyzeWebsite} disabled={analyzingWebsite || !hasSavedApiKey} className="btn-primary flex-shrink-0 disabled:cursor-not-allowed disabled:opacity-50">
+                      {analyzingWebsite ? <><UsluLoader size="xs" />Analyzing...</> : <><Sparkles size={14} />Analyze</>}
+                    </button>
+                  )}
                 </div>
-                <p className="text-slate-400 text-xs mt-1.5">AI will use your website content as additional context</p>
+                <p className="text-slate-400 text-xs mt-1.5">AI reads the website and creates a summary for this business.</p>
+                {analysisError && (
+                  <div className="mt-2 flex items-start gap-2 rounded-xl border border-red-200 bg-red-50 p-3">
+                    <AlertCircle size={14} className="mt-0.5 flex-shrink-0 text-red-500" />
+                    <span className="text-sm text-red-700">{analysisError}</span>
+                  </div>
+                )}
               </div>
               <div>
-                <label className="block text-sm font-semibold text-slate-700 mb-1.5">Business Description</label>
+                <label className="block text-sm font-semibold text-slate-700 mb-1.5">AI Website Summary</label>
+                <textarea
+                  value={websiteSummary}
+                  onChange={e => setWebsiteSummary(e.target.value)}
+                  disabled={!isAdmin}
+                  rows={5}
+                  className="input-field resize-none disabled:opacity-60 disabled:cursor-not-allowed"
+                  placeholder="Click Analyze and AI will summarize what this business does, who it serves, and what it offers."
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-semibold text-slate-700 mb-1.5">What is the main goal of this business?</label>
+                <textarea
+                  value={businessGoal}
+                  onChange={e => setBusinessGoal(e.target.value)}
+                  disabled={!isAdmin}
+                  rows={3}
+                  className="input-field resize-none disabled:opacity-60 disabled:cursor-not-allowed"
+                  placeholder="Example: Book more consultation calls, sell more courses, collect qualified leads, send people to WhatsApp, increase store visits..."
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-semibold text-slate-700 mb-1.5">Extra Business Notes</label>
                 <textarea
                   value={description}
                   onChange={e => setDescription(e.target.value)}
                   disabled={!isAdmin}
-                  rows={4}
+                  rows={3}
                   className="input-field resize-none disabled:opacity-60 disabled:cursor-not-allowed"
-                  placeholder="Describe this business: what it sells, who the customers are, location, unique selling points, anything the AI needs to know to reply correctly…"
+                  placeholder="Add anything the website does not explain clearly: prices, locations, offers, rules, sales style..."
                 />
               </div>
+              {isAdmin && (
+                <button onClick={() => saveTraining('training')} className="btn-secondary">
+                  <RefreshCw size={14} /> Save Business Training
+                </button>
+              )}
             </div>
           </div>
 
           {/* Reply Type Training */}
           <div className={clsx('card p-5', focusSection === 'behavior' && 'ring-2 ring-blue-200')}>
             <h3 className="text-slate-900 font-bold text-base flex items-center gap-2 mb-1">
-              <MessageSquare size={15} className="text-slate-400" /> Reply Training
+              <MessageSquare size={15} className="text-slate-400" /> 2. Comment and DM Training
             </h3>
-            <p className="mb-4 text-sm text-slate-500">Train comments and DMs separately so public replies and private sales conversations do not sound the same.</p>
-            <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-              <div>
-                <label className="block text-sm font-semibold text-slate-700 mb-1.5">Comment Reply Training</label>
+            <p className="mb-4 text-sm text-slate-500">Comments are public and should usually be shorter. DMs are private and can ask follow-up questions.</p>
+            <div className="space-y-4">
+              <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
+                <label className="block text-sm font-extrabold text-slate-900 mb-1.5">Comment Reply Training</label>
+                <p className="mb-3 text-xs leading-relaxed text-slate-500">Tell AI how to reply under public Instagram/Facebook comments.</p>
                 <textarea
                   value={commentInstructions}
                   onChange={e => setCommentInstructions(e.target.value)}
                   disabled={!isAdmin}
-                  rows={5}
-                  className="input-field resize-none disabled:opacity-60 disabled:cursor-not-allowed"
+                  rows={4}
+                  className="input-field resize-none bg-white disabled:opacity-60 disabled:cursor-not-allowed"
                   placeholder="Example: Keep public replies short, warm, and specific. Thank the person, answer directly, and invite them to DM or WhatsApp only when useful."
                 />
               </div>
-              <div>
-                <label className="block text-sm font-semibold text-slate-700 mb-1.5">DM Reply Training</label>
+              <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
+                <label className="block text-sm font-extrabold text-slate-900 mb-1.5">DM Reply Training</label>
+                <p className="mb-3 text-xs leading-relaxed text-slate-500">Tell AI how to handle private customer messages and sales conversations.</p>
                 <textarea
                   value={dmInstructions}
                   onChange={e => setDmInstructions(e.target.value)}
                   disabled={!isAdmin}
-                  rows={5}
-                  className="input-field resize-none disabled:opacity-60 disabled:cursor-not-allowed"
+                  rows={4}
+                  className="input-field resize-none bg-white disabled:opacity-60 disabled:cursor-not-allowed"
                   placeholder="Example: Ask helpful follow-up questions, collect the customer need, explain next steps, and move them toward booking or WhatsApp naturally."
                 />
               </div>
@@ -729,14 +789,14 @@ export default function AITrainingTab({ company, onUpdate, onNotify, isAdmin = t
           </div>
 
           {/* AI Test Console */}
-          {isAdmin && <div className={clsx('card p-5', focusSection === 'test' && 'ring-2 ring-blue-200')}>
+          {isAdmin && <div id="ai-comment-test" className={clsx('card p-5', focusSection === 'test' && 'ring-2 ring-blue-200')}>
             <h3 className="text-slate-900 font-bold text-base flex items-center gap-2 mb-1">
-              <Brain size={15} className="text-slate-400" /> Test AI Responses
+              <Brain size={15} className="text-slate-400" /> 3. Test AI Responses
             </h3>
             <p className="text-slate-400 text-sm mb-4">
               {hasSavedApiKey ? 'Test public comment replies and private DM replies separately.' : 'Add your shared OpenAI API key in Settings > API Keys to test real AI responses'}
             </p>
-            <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
+            <div className="space-y-4">
               <ReplyTestCard
                 title="Comment Reply Test"
                 description="Use this to preview how AI answers public Instagram/Facebook comments."
@@ -830,7 +890,8 @@ export default function AITrainingTab({ company, onUpdate, onNotify, isAdmin = t
             <ul className="space-y-2">
               {[
                 ...(isAdmin ? [{ label: 'OpenAI API key added', done: hasSavedApiKey }] : []),
-                { label: 'Business description written', done: !!description.trim() },
+                { label: 'Website summary added', done: !!websiteSummary.trim() },
+                { label: 'Business goal written', done: !!businessGoal.trim() },
                 { label: 'Comment reply training written', done: !!commentInstructions.trim() },
                 { label: 'DM reply training written', done: !!dmInstructions.trim() },
                 { label: 'Training documents uploaded', done: docs.length > 0 },

@@ -115,6 +115,13 @@ export function getBackendAiConfig(companyId) {
   return request(`/api/companies/${encodeURIComponent(companyId)}/ai-config`)
 }
 
+export function analyzeBackendWebsite(companyId, websiteUrl) {
+  return request(`/api/companies/${encodeURIComponent(companyId)}/analyze-website`, {
+    method: 'POST',
+    body: JSON.stringify({ websiteUrl }),
+  })
+}
+
 export function testBackendAiReply(companyId, text, options = {}) {
   return request(`/api/companies/${encodeURIComponent(companyId)}/ai-test`, {
     method: 'POST',
