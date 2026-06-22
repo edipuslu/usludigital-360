@@ -57,14 +57,14 @@ function makeFlow(overrides = {}) {
   const trigger = overrides.trigger || TRIGGERS[0]
   return {
     id: overrides.id || `automation-${Date.now()}`,
-    name: overrides.name || 'New Instagram automation',
+    name: overrides.name || 'Untitled automation',
     folderId: overrides.folderId || null,
     triggerId: trigger.id,
     platform: trigger.platform,
     triggerType: trigger.type,
     triggerTitle: trigger.title,
     actionType: overrides.actionType || 'ai_reply',
-    message: overrides.message || 'Use the AI Training knowledge and reply in the brand tone.',
+    message: overrides.message ?? '',
     status: overrides.status || 'draft',
     updatedAt: overrides.updatedAt || new Date().toISOString(),
   }
@@ -79,7 +79,7 @@ function normalizeFlow(flow) {
     name: flow.name,
     folderId: flow.folderId || null,
     actionType: flow.actionType || 'ai_reply',
-    message: flow.message || 'Use the AI Training knowledge and reply in the brand tone.',
+    message: flow.message ?? '',
     status: flow.status || 'draft',
     updatedAt: flow.updatedAt,
   })
@@ -533,7 +533,7 @@ function FlowEditor({ flow, onChange, onBack, onSave, saving, saved }) {
                 onClick={() => setSelectedPanel('action')}
               >
                 <div className="mt-4 rounded-lg border border-dashed border-slate-300 px-4 py-3 text-center text-xs font-semibold text-slate-500">
-                  {flow.actionType === 'ai_reply' ? 'AI writes from training' : flow.message || 'Add text'}
+                  {flow.message || 'Add text'}
                 </div>
                 <div className="mt-4 flex items-center justify-between text-xs font-bold text-slate-400">
                   <span className="inline-flex items-center gap-1">
