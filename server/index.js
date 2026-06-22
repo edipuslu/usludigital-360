@@ -929,7 +929,6 @@ async function saveBranchesToSupabase(base, headers, companies = [], options = {
         company_id: company.id,
         name: branch.name || 'Branch',
         created_at: branch.createdAt || new Date().toISOString(),
-        updated_at: new Date().toISOString(),
       }))),
     })
     if (!insertResponse.ok && insertResponse.status !== 404) {
