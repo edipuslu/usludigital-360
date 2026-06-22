@@ -908,11 +908,13 @@ async function saveBranchesToSupabase(base, headers, companies = [], options = {
     const branches = Array.isArray(company.branches) ? company.branches : []
     if (!branches.length && !replaceCompanyIds.has(company.id)) continue
 
-    const deleteResponse = await fetch(`${base}/rest/v1/branches?company_id=eq.${encodeURIComponent(company.id)}`, {
-      method: 'DELETE',
-      headers,
-    })
-    if (!deleteResponse.ok && deleteResponse.status !== 404) continue
+    if (replaceCompanyIds.has(company.id)) {
+      const deleteResponse = await fetch(`${base}/rest/v1/branches?company_id=eq.${encodeURIComponent(company.id)}`, {
+        method: 'DELETE',
+        headers,
+      })
+      if (!deleteResponse.ok && deleteResponse.status !== 404) continue
+    }
 
     if (!branches.length) continue
 
@@ -926,7 +928,6 @@ async function saveBranchesToSupabase(base, headers, companies = [], options = {
         id: branch.id,
         company_id: company.id,
         name: branch.name || 'Branch',
-        status: branch.status || 'active',
         created_at: branch.createdAt || new Date().toISOString(),
         updated_at: new Date().toISOString(),
       }))),
