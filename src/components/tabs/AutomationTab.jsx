@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Save, Plus, X, Zap, MessageSquare, Link2, Volume2, ShieldOff, CheckCircle2 } from 'lucide-react'
+import { Save, Plus, X, Zap, MessageSquare, Link2, Volume2, ShieldOff } from 'lucide-react'
 import { PlatformIcon, Toggle, UsluLoader } from '../ui/UIKit'
 import { saveBackendAiConfig } from '../../lib/backendApi'
 import clsx from 'clsx'
@@ -24,7 +24,6 @@ const GOALS = [
 
 function PlatformAutomation({ platform, settings, onChange }) {
   const [newBlack, setNewBlack] = useState('')
-  const isYoutube = platform === 'youtube'
 
   const addBlacklist = () => {
     if (!newBlack.trim()) return
@@ -54,32 +53,6 @@ function PlatformAutomation({ platform, settings, onChange }) {
       </div>
 
       <div className="divide-y divide-slate-200">
-        <div className="grid grid-cols-1 gap-6 px-6 py-5 lg:grid-cols-[220px_1fr]">
-          <div>
-            <div className="flex items-center gap-2 text-sm font-extrabold text-slate-950">
-              <MessageSquare size={15} className="text-blue-600" />
-              Auto-reply
-            </div>
-            <p className="mt-1 text-xs leading-relaxed text-slate-500">Choose where AI can answer for this channel.</p>
-          </div>
-          <div className="space-y-4">
-            {!isYoutube && (
-              <Toggle
-                checked={settings.dmReply}
-                onChange={v => onChange({ ...settings, dmReply: v })}
-                label="DM Auto-Reply"
-                description="AI automatically replies to direct messages"
-              />
-            )}
-            <Toggle
-              checked={settings.commentReply}
-              onChange={v => onChange({ ...settings, commentReply: v })}
-              label="Comment Auto-Reply"
-              description={isYoutube ? 'AI replies to video comments' : 'AI replies to post comments publicly'}
-            />
-          </div>
-        </div>
-
         <div className="grid grid-cols-1 gap-6 px-6 py-5 lg:grid-cols-[220px_1fr]">
           <div>
             <div className="flex items-center gap-2 text-sm font-extrabold text-slate-950">
@@ -202,71 +175,87 @@ export default function AutomationTab({ company, onUpdate, onNotify }) {
         </button>
       </div>
 
-      <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
-        {[
-          ['Goal', GOALS.find(g => g.value === goal)?.label || 'Custom', Zap],
-          ['Channels', `${PLATFORMS.filter(p => settings[p]?.dmReply || settings[p]?.commentReply).length}/${PLATFORMS.length} enabled`, CheckCircle2],
-        ].map(([label, value, Icon]) => (
-          <div key={label} className="rounded-xl border border-slate-200 bg-white p-4">
-            <div className="flex items-center justify-between gap-3">
-              <div>
-                <div className="text-xs font-bold uppercase text-slate-400">{label}</div>
-                <div className="mt-1 text-lg font-extrabold text-slate-950">{value}</div>
-              </div>
-              <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-blue-50 text-blue-600">
-                <Icon size={18} />
-              </div>
-            </div>
-          </div>
-        ))}
-      </div>
-
-      {/* Business Goal */}
-      <div className="overflow-hidden rounded-xl border border-slate-200 bg-white">
-        <div className="border-b border-slate-200 px-6 py-5">
-          <div className="flex items-center gap-2">
+      <div className="grid grid-cols-1 gap-4 xl:grid-cols-3">
+        <section className="rounded-xl border border-slate-200 bg-white p-5">
+          <div className="mb-4 flex items-center gap-2">
             <Zap size={16} className="text-blue-600" />
-            <h3 className="text-lg font-extrabold text-slate-950">Business Goal</h3>
+            <h3 className="text-base font-extrabold text-slate-950">1. Business Goal</h3>
           </div>
-          <p className="mt-1 text-sm text-slate-500">Choose what the automation should optimize for.</p>
-        </div>
-        <div className="grid grid-cols-1 gap-3 p-6 sm:grid-cols-2">
-          {GOALS.map(g => (
-            <button
-              key={g.value}
-              onClick={() => setGoal(g.value)}
-              className={clsx(
-                'text-left p-4 rounded-xl border transition-all cursor-pointer',
-                goal === g.value
-                  ? 'border-blue-300 bg-blue-50 shadow-sm'
-                  : 'border-slate-200 hover:border-blue-200 hover:bg-blue-50/30'
-              )}
-            >
-              <div className="flex items-center gap-2 mb-1">
-                <div className={clsx('w-3.5 h-3.5 rounded-full border-2 flex-shrink-0', goal === g.value ? 'border-blue-600 bg-blue-600' : 'border-slate-300')}>
-                  {goal === g.value && <div className="w-1.5 h-1.5 bg-white rounded-full m-auto" />}
+          <p className="mb-4 text-sm text-slate-500">Choose what AI should optimize for.</p>
+          <div className="space-y-2">
+            {GOALS.map(g => (
+              <button
+                key={g.value}
+                onClick={() => setGoal(g.value)}
+                className={clsx(
+                  'w-full rounded-lg border p-3 text-left transition-all cursor-pointer',
+                  goal === g.value
+                    ? 'border-blue-300 bg-blue-50 shadow-sm'
+                    : 'border-slate-200 hover:border-blue-200 hover:bg-blue-50/30'
+                )}
+              >
+                <div className="flex items-center gap-2">
+                  <div className={clsx('w-3.5 h-3.5 rounded-full border-2 flex-shrink-0', goal === g.value ? 'border-blue-600 bg-blue-600' : 'border-slate-300')}>
+                    {goal === g.value && <div className="w-1.5 h-1.5 bg-white rounded-full m-auto" />}
+                  </div>
+                  <span className="text-sm font-bold text-slate-900">{g.label}</span>
                 </div>
-                <span className="text-slate-900 text-sm font-semibold">{g.label}</span>
-              </div>
-              <p className="text-slate-500 text-xs pl-5">{g.description}</p>
-            </button>
-          ))}
-        </div>
-        {goal === 'push_to_whatsapp' && (
-          <div className="border-t border-slate-200 px-6 py-5">
-            <label className="block text-sm font-semibold text-slate-700 mb-1.5">
-              <Link2 size={13} className="inline mr-1.5 text-slate-400" />
-              WhatsApp Redirect Link
-            </label>
-            <input
-              value={waLink}
-              onChange={e => setWaLink(e.target.value)}
-              placeholder="https://wa.me/90XXXXXXXXXX"
-              className="input-field"
-            />
-            <p className="text-slate-400 text-xs mt-1.5">This link will be included in every AI reply across all platforms</p>
+              </button>
+            ))}
           </div>
-        )}
+          {goal === 'push_to_whatsapp' && (
+            <div className="mt-4 border-t border-slate-200 pt-4">
+              <label className="mb-1.5 block text-sm font-semibold text-slate-700">
+                <Link2 size={13} className="inline mr-1.5 text-slate-400" />
+                WhatsApp Link
+              </label>
+              <input
+                value={waLink}
+                onChange={e => setWaLink(e.target.value)}
+                placeholder="https://wa.me/90XXXXXXXXXX"
+                className="input-field"
+              />
+            </div>
+          )}
+        </section>
+
+        <section className="rounded-xl border border-slate-200 bg-white p-5">
+          <div className="mb-4 flex items-center gap-2">
+            <MessageSquare size={16} className="text-blue-600" />
+            <h3 className="text-base font-extrabold text-slate-950">2. Comment Replies</h3>
+          </div>
+          <p className="mb-4 text-sm text-slate-500">Turn public comment replies on or off per channel.</p>
+          <div className="space-y-2">
+            {PLATFORMS.map(p => (
+              <Toggle
+                key={p}
+                checked={Boolean(settings[p]?.commentReply)}
+                onChange={v => setSettings(prev => ({ ...prev, [p]: { ...(prev[p] || DEFAULT_AUTOMATION[p]), commentReply: v } }))}
+                label={PLATFORM_LABELS[p]}
+                description={p === 'whatsapp' ? 'WhatsApp comments are not available' : 'AI can answer public comments'}
+              />
+            ))}
+          </div>
+        </section>
+
+        <section className="rounded-xl border border-slate-200 bg-white p-5">
+          <div className="mb-4 flex items-center gap-2">
+            <MessageSquare size={16} className="text-blue-600" />
+            <h3 className="text-base font-extrabold text-slate-950">3. DM Replies</h3>
+          </div>
+          <p className="mb-4 text-sm text-slate-500">Turn private inbox replies on or off per channel.</p>
+          <div className="space-y-2">
+            {PLATFORMS.map(p => (
+              <Toggle
+                key={p}
+                checked={Boolean(settings[p]?.dmReply)}
+                onChange={v => setSettings(prev => ({ ...prev, [p]: { ...(prev[p] || DEFAULT_AUTOMATION[p]), dmReply: v } }))}
+                label={PLATFORM_LABELS[p]}
+                description={p === 'youtube' ? 'YouTube has no DMs' : 'AI can answer private messages'}
+              />
+            ))}
+          </div>
+        </section>
       </div>
 
       {/* Platform tabs */}
