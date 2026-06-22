@@ -192,10 +192,56 @@ function AutomationList({
   search,
   onSearch,
   onNewFolder,
+  onRenameFolder,
+  onDeleteFolder,
   onNewAutomation,
   onOpenFlow,
   onDeleteFlow,
+  onRestoreFlow,
+  onDeleteForever,
+  onOpenTrash,
 }) {
+  if (activeSection === 'trash') {
+    return (
+      <main className="flex-1 bg-[#f6f6f6] px-8 py-12">
+        <div className="mx-auto max-w-7xl">
+          <div className="flex flex-col gap-5 md:flex-row md:items-center md:justify-between">
+            <h1 className="text-4xl font-extrabold text-[#2b2b2b]">Trash</h1>
+            <button onClick={() => onOpenTrash(false)} className="inline-flex h-12 items-center justify-center rounded-lg border border-slate-300 bg-white px-5 text-lg font-bold text-[#2b2b2b] hover:bg-slate-50">
+              Back to My Automations
+            </button>
+          </div>
+          {flows.length === 0 ? (
+            <div className="mt-16 rounded-lg bg-white px-6 py-20 text-center">
+              <Trash2 size={42} className="mx-auto text-slate-300" />
+              <h3 className="mt-5 text-2xl font-extrabold text-slate-950">Trash is empty</h3>
+              <p className="mt-2 text-slate-500">Deleted automations will appear here before permanent removal.</p>
+            </div>
+          ) : (
+            <div className="mt-10 space-y-3">
+              {flows.map(flow => (
+                <div key={flow.id} className="flex items-center justify-between gap-4 rounded-lg border border-slate-200 bg-white px-5 py-4">
+                  <div className="min-w-0">
+                    <div className="truncate text-lg font-extrabold text-slate-950">{flow.name}</div>
+                    <div className="mt-0.5 text-sm font-medium text-slate-500">{flow.triggerTitle}</div>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <button onClick={() => onRestoreFlow(flow.id)} className="rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-bold text-slate-700 hover:bg-slate-50">
+                      Restore
+                    </button>
+                    <button onClick={() => onDeleteForever(flow.id)} className="rounded-lg bg-[#f42f25] px-4 py-2 text-sm font-bold text-white hover:bg-red-700">
+                      Delete Forever
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      </main>
+    )
+  }
+
   if (activeSection !== 'my') {
     const isBasic = activeSection === 'basic'
     return (
@@ -241,7 +287,7 @@ function AutomationList({
               className="h-14 w-full rounded-lg border border-slate-300 bg-white pl-14 pr-4 text-xl text-slate-900 outline-none focus:border-[#255ff4] focus:ring-4 focus:ring-blue-100"
             />
           </label>
-          <button type="button" className="inline-flex items-center gap-2 text-lg font-bold text-[#255ff4] hover:text-[#1f50d0]">
+          <button type="button" onClick={() => onOpenTrash(true)} className="inline-flex items-center gap-2 text-lg font-bold text-[#255ff4] hover:text-[#1f50d0]">
             <Trash2 size={18} />
             Trash
           </button>
@@ -260,7 +306,15 @@ function AutomationList({
             {folders.map(folder => (
               <div key={folder.id} className="flex items-center gap-3 rounded-lg border border-slate-200 bg-white px-4 py-3">
                 <FolderPlus size={18} className="text-[#255ff4]" />
-                <span className="font-bold text-slate-800">{folder.name}</span>
+                <input
+                  value={folder.name}
+                  onChange={event => onRenameFolder(folder.id, event.target.value)}
+                  className="min-w-0 flex-1 border-none bg-transparent font-bold text-slate-800 outline-none"
+                  aria-label="Folder name"
+                />
+                <button onClick={() => onDeleteFolder(folder.id)} className="rounded-md p-1 text-slate-400 hover:bg-red-50 hover:text-[#f42f25]" aria-label={`Delete ${folder.name}`}>
+                  <X size={15} />
+                </button>
               </div>
             ))}
           </div>
@@ -359,7 +413,19 @@ function PreviewPanel({ flow, onClose }) {
   )
 }
 
-function FlowEditor({ flow, onChange, onBack, onSave, saving, saved }) {
+function FlowEditor({
+  flow,
+  onChange,
+  onBack,
+  onSaveDraft,
+  onSave,
+  onUndo,
+  onRedo,
+  canUndo,
+  canRedo,
+  saving,
+  saved,
+}) {
   const [selectedPanel, setSelectedPanel] = useState('trigger')
   const [previewOpen, setPreviewOpen] = useState(false)
   const [zoom, setZoom] = useState(100)
@@ -396,11 +462,25 @@ function FlowEditor({ flow, onChange, onBack, onSave, saving, saved }) {
             <Check size={22} />
             {saved ? 'Saved' : 'Draft'}
           </span>
-          <button disabled className="rounded-lg p-2 text-slate-300">
+          <button
+            onClick={onUndo}
+            disabled={!canUndo}
+            className={clsx('rounded-lg p-2', canUndo ? 'text-slate-500 hover:bg-slate-100 hover:text-slate-950' : 'text-slate-300')}
+            aria-label="Undo"
+          >
             <Undo2 size={22} />
           </button>
-          <button disabled className="rounded-lg p-2 text-slate-300">
+          <button
+            onClick={onRedo}
+            disabled={!canRedo}
+            className={clsx('rounded-lg p-2', canRedo ? 'text-slate-500 hover:bg-slate-100 hover:text-slate-950' : 'text-slate-300')}
+            aria-label="Redo"
+          >
             <Redo2 size={22} />
+          </button>
+          <button onClick={onSaveDraft} className="inline-flex h-12 items-center gap-2 rounded-lg border border-slate-300 bg-white px-5 text-lg font-bold text-[#2b2b2b] hover:bg-slate-50">
+            <Save size={20} />
+            Save Draft
           </button>
           <button onClick={() => setPreviewOpen(true)} className="inline-flex h-12 items-center gap-2 rounded-lg border border-slate-300 bg-white px-5 text-lg font-bold text-[#2b2b2b] hover:bg-slate-50">
             <Eye size={20} />
@@ -439,9 +519,27 @@ function FlowEditor({ flow, onChange, onBack, onSave, saving, saved }) {
                 <PlatformIcon platform={flow.platform} size={28} connected />
                 <div className="min-w-0 flex-1">
                   <div className="truncate text-lg font-extrabold text-[#2b2b2b]">{selectedAction.title}</div>
-                  <div className="truncate text-sm font-semibold text-slate-500">{flow.message}</div>
+                  <div className="truncate text-sm font-semibold text-slate-500">{flow.message || 'No text added yet'}</div>
                 </div>
-                <X size={22} className="text-slate-400" />
+                <span
+                  role="button"
+                  tabIndex={0}
+                  onClick={event => {
+                    event.stopPropagation()
+                    onChange({ ...flow, actionType: 'ai_reply', message: '', updatedAt: new Date().toISOString() })
+                  }}
+                  onKeyDown={event => {
+                    if (event.key === 'Enter' || event.key === ' ') {
+                      event.preventDefault()
+                      event.stopPropagation()
+                      onChange({ ...flow, actionType: 'ai_reply', message: '', updatedAt: new Date().toISOString() })
+                    }
+                  }}
+                  className="rounded-lg p-1 text-slate-400 hover:bg-red-50 hover:text-[#f42f25]"
+                  aria-label="Clear action"
+                >
+                  <X size={22} />
+                </span>
               </button>
             </div>
           </section>
@@ -572,11 +670,14 @@ export default function AutomationTab({ company, onUpdate, onNotify }) {
   const [flows, setFlows] = useState(initialFlows)
   const [folders, setFolders] = useState(initialFolders)
   const [draft, setDraft] = useState(initialFlows[0] || makeFlow())
+  const [pastDrafts, setPastDrafts] = useState([])
+  const [futureDrafts, setFutureDrafts] = useState([])
   const [saving, setSaving] = useState(false)
   const [saved, setSaved] = useState(false)
 
   const visibleFlows = flows.filter(flow => {
     const term = search.trim().toLowerCase()
+    if (activeSection === 'trash') return flow.status === 'deleted'
     if (!term) return flow.status !== 'deleted'
     return flow.status !== 'deleted' && `${flow.name} ${flow.triggerTitle} ${flow.platform}`.toLowerCase().includes(term)
   })
@@ -601,14 +702,47 @@ export default function AutomationTab({ company, onUpdate, onNotify }) {
     await saveBackendAiConfig(nextCompany)
   }
 
+  const updateDraft = nextDraft => {
+    setPastDrafts(history => [...history.slice(-19), draft])
+    setFutureDrafts([])
+    setDraft(nextDraft)
+    setSaved(false)
+  }
+
+  const handleUndo = () => {
+    setPastDrafts(history => {
+      if (!history.length) return history
+      const previous = history[history.length - 1]
+      setFutureDrafts(future => [draft, ...future].slice(0, 20))
+      setDraft(previous)
+      setSaved(false)
+      return history.slice(0, -1)
+    })
+  }
+
+  const handleRedo = () => {
+    setFutureDrafts(future => {
+      if (!future.length) return future
+      const next = future[0]
+      setPastDrafts(history => [...history.slice(-19), draft])
+      setDraft(next)
+      setSaved(false)
+      return future.slice(1)
+    })
+  }
+
   const handleNewAutomation = trigger => {
     setDraft(makeFlow({ trigger }))
+    setPastDrafts([])
+    setFutureDrafts([])
     setSaved(false)
     setView('editor')
   }
 
   const handleOpenFlow = flow => {
     setDraft(normalizeFlow(flow))
+    setPastDrafts([])
+    setFutureDrafts([])
     setSaved(flow.status === 'live')
     setView('editor')
   }
@@ -627,14 +761,80 @@ export default function AutomationTab({ company, onUpdate, onNotify }) {
     }
   }
 
+  const handleRenameFolder = async (folderId, name) => {
+    const nextFolders = folders.map(folder => folder.id === folderId ? { ...folder, name } : folder)
+    setFolders(nextFolders)
+    try {
+      await saveCompany(flows, nextFolders)
+    } catch (error) {
+      onNotify?.(`Folder rename saved locally, but backend sync failed: ${error.message}`, 'warning')
+    }
+  }
+
+  const handleDeleteFolder = async folderId => {
+    const nextFolders = folders.filter(folder => folder.id !== folderId)
+    const nextFlows = flows.map(flow => flow.folderId === folderId ? { ...flow, folderId: null } : flow)
+    setFolders(nextFolders)
+    setFlows(nextFlows)
+    try {
+      await saveCompany(nextFlows, nextFolders)
+      onNotify?.('Folder deleted.', 'success')
+    } catch (error) {
+      onNotify?.(`Folder deleted locally, but backend sync failed: ${error.message}`, 'warning')
+    }
+  }
+
   const handleDeleteFlow = async flowId => {
+    const nextFlows = flows.map(flow => flow.id === flowId ? { ...flow, status: 'deleted', updatedAt: new Date().toISOString() } : flow)
+    setFlows(nextFlows)
+    try {
+      await saveCompany(nextFlows, folders)
+      onNotify?.('Automation moved to trash.', 'success')
+    } catch (error) {
+      onNotify?.(`Automation moved locally, but backend sync failed: ${error.message}`, 'warning')
+    }
+  }
+
+  const handleRestoreFlow = async flowId => {
+    const nextFlows = flows.map(flow => flow.id === flowId ? { ...flow, status: 'draft', updatedAt: new Date().toISOString() } : flow)
+    setFlows(nextFlows)
+    try {
+      await saveCompany(nextFlows, folders)
+      onNotify?.('Automation restored as draft.', 'success')
+    } catch (error) {
+      onNotify?.(`Automation restored locally, but backend sync failed: ${error.message}`, 'warning')
+    }
+  }
+
+  const handleDeleteForever = async flowId => {
     const nextFlows = flows.filter(flow => flow.id !== flowId)
     setFlows(nextFlows)
     try {
       await saveCompany(nextFlows, folders)
-      onNotify?.('Automation moved out of the list.', 'success')
+      onNotify?.('Automation permanently deleted.', 'success')
     } catch (error) {
-      onNotify?.(`Automation removed locally, but backend sync failed: ${error.message}`, 'warning')
+      onNotify?.(`Automation deleted locally, but backend sync failed: ${error.message}`, 'warning')
+    }
+  }
+
+  const handleSaveDraft = async () => {
+    const draftFlow = { ...draft, status: draft.status === 'live' ? 'live' : 'draft', updatedAt: new Date().toISOString() }
+    const exists = flows.some(flow => flow.id === draftFlow.id)
+    const nextFlows = exists
+      ? flows.map(flow => flow.id === draftFlow.id ? draftFlow : flow)
+      : [draftFlow, ...flows]
+
+    setSaving(true)
+    setFlows(nextFlows)
+    setDraft(draftFlow)
+    try {
+      await saveCompany(nextFlows, folders)
+      setSaved(true)
+      onNotify?.('Automation draft saved.', 'success')
+    } catch (error) {
+      onNotify?.(`Automation saved locally, but backend sync failed: ${error.message}`, 'warning')
+    } finally {
+      setSaving(false)
     }
   }
 
@@ -664,11 +864,15 @@ export default function AutomationTab({ company, onUpdate, onNotify }) {
       <FlowEditor
         flow={draft}
         onChange={nextDraft => {
-          setDraft(nextDraft)
-          setSaved(false)
+          updateDraft(nextDraft)
         }}
         onBack={() => setView('list')}
+        onSaveDraft={handleSaveDraft}
         onSave={handleSetLive}
+        onUndo={handleUndo}
+        onRedo={handleRedo}
+        canUndo={pastDrafts.length > 0}
+        canRedo={futureDrafts.length > 0}
         saving={saving}
         saved={saved}
       />
@@ -685,9 +889,14 @@ export default function AutomationTab({ company, onUpdate, onNotify }) {
         search={search}
         onSearch={setSearch}
         onNewFolder={handleNewFolder}
+        onRenameFolder={handleRenameFolder}
+        onDeleteFolder={handleDeleteFolder}
         onNewAutomation={handleNewAutomation}
         onOpenFlow={handleOpenFlow}
         onDeleteFlow={handleDeleteFlow}
+        onRestoreFlow={handleRestoreFlow}
+        onDeleteForever={handleDeleteForever}
+        onOpenTrash={open => setActiveSection(open ? 'trash' : 'my')}
       />
     </div>
   )
