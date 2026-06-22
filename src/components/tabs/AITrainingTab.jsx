@@ -384,8 +384,7 @@ export default function AITrainingTab({ company, onUpdate, onNotify, isAdmin = t
   const [analyzingWebsite, setAnalyzingWebsite] = useState(false)
   const [analysisError, setAnalysisError] = useState('')
   const [hasSavedApiKey, setHasSavedApiKey] = useState(() => Boolean(company.hasOpenaiKey))
-  const [setupOpen, setSetupOpen] = useState(true)
-  const [focusSection, setFocusSection] = useState('knowledge')
+  const [activeTrainingPage, setActiveTrainingPage] = useState('website')
 
   useEffect(() => {
     let alive = true
@@ -523,67 +522,293 @@ export default function AITrainingTab({ company, onUpdate, onNotify, isAdmin = t
     }
   }
 
-  const openSetup = section => {
-    setFocusSection(section)
-    setSetupOpen(true)
-  }
+  const trainingPages = [
+    { id: 'website', label: 'Website', icon: Globe, done: !!websiteSummary.trim() },
+    { id: 'business', label: 'Business Questions', icon: Brain, done: !!businessGoal.trim() && !!description.trim() },
+    { id: 'documents', label: 'Documents', icon: FileText, done: docs.length > 0 },
+    { id: 'comments', label: 'Comment Training', icon: MessageSquare, done: !!commentInstructions.trim() },
+    { id: 'dms', label: 'DM Training', icon: Send, done: !!dmInstructions.trim() },
+  ]
 
-  if (!setupOpen) {
-    return (
-      <div className="animate-slide-in">
-        <div className="-mx-8 -mt-8 flex items-center justify-between border-b border-slate-200 bg-slate-50 px-8 py-6">
-          <div className="flex items-center gap-3">
-            <h1 className="text-3xl font-extrabold tracking-tight text-slate-950">Usludigital AI</h1>
-            <span className="text-lg font-semibold text-slate-400">BETA for Instagram</span>
+  const renderProviderStatus = () => (
+    isAdmin ? (
+      <div className="rounded-lg border border-slate-200 bg-white p-5">
+        <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+          <div className="flex items-center gap-4">
+            <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-slate-950 text-white">
+              <Key size={20} />
+            </div>
+            <div>
+              <h3 className="text-base font-extrabold text-slate-950">Shared AI Provider</h3>
+              <p className="text-sm font-medium text-slate-500">The OpenAI key is managed once in Settings and applies to every company.</p>
+            </div>
+          </div>
+          <span className={clsx('inline-flex w-fit rounded-full px-3 py-1 text-xs font-extrabold', hasSavedApiKey ? 'bg-emerald-50 text-emerald-700' : 'bg-orange-50 text-orange-700')}>
+            {hasSavedApiKey ? 'Ready for testing' : 'Needs key'}
+          </span>
+        </div>
+      </div>
+    ) : (
+      <div className="rounded-lg border border-slate-200 bg-white p-5">
+        <div className="flex items-center gap-2 mb-2">
+          <Shield size={15} className="text-slate-400" />
+          <h3 className="text-slate-900 font-bold text-base">AI Connection</h3>
+        </div>
+        <p className="text-slate-500 text-sm leading-relaxed">
+          OpenAI API keys and platform credentials are managed only by the admin workspace.
+        </p>
+      </div>
+    )
+  )
+
+  const renderActivePage = () => {
+    if (activeTrainingPage === 'website') {
+      return (
+        <div className="space-y-5">
+          {renderProviderStatus()}
+          <div className="rounded-lg border border-slate-200 bg-white p-6">
+            <h2 className="text-2xl font-extrabold text-slate-950">Website Training</h2>
+            <p className="mt-1 text-sm font-medium text-slate-500">Analyze the business website and save the summary AI should understand.</p>
+            <div className="mt-6 space-y-4">
+              <div>
+                <label className="block text-sm font-semibold text-slate-700 mb-1.5">Website URL</label>
+                <div className="flex flex-col gap-2 sm:flex-row">
+                  <input value={websiteUrl} onChange={e => setWebsiteUrl(e.target.value)} disabled={!isAdmin} className="input-field flex-1 disabled:opacity-60 disabled:cursor-not-allowed" placeholder="https://yourbusiness.com" />
+                  {isAdmin && (
+                    <button onClick={handleAnalyzeWebsite} disabled={analyzingWebsite || !hasSavedApiKey} className="btn-primary justify-center disabled:cursor-not-allowed disabled:opacity-50">
+                      {analyzingWebsite ? <><UsluLoader size="xs" />Analyzing...</> : <><Sparkles size={14} />Analyze</>}
+                    </button>
+                  )}
+                </div>
+                {analysisError && (
+                  <div className="mt-2 flex items-start gap-2 rounded-xl border border-red-200 bg-red-50 p-3">
+                    <AlertCircle size={14} className="mt-0.5 flex-shrink-0 text-red-500" />
+                    <span className="text-sm text-red-700">{analysisError}</span>
+                  </div>
+                )}
+              </div>
+              <div>
+                <label className="block text-sm font-semibold text-slate-700 mb-1.5">AI Website Summary</label>
+                <textarea
+                  value={websiteSummary}
+                  onChange={e => setWebsiteSummary(e.target.value)}
+                  disabled={!isAdmin}
+                  rows={8}
+                  className="input-field resize-none disabled:opacity-60 disabled:cursor-not-allowed"
+                  placeholder="Click Analyze, or write the website summary manually."
+                />
+              </div>
+              {isAdmin && (
+                <button onClick={() => saveTraining('training')} className="btn-secondary">
+                  <RefreshCw size={14} /> Save Website Training
+                </button>
+              )}
+            </div>
+          </div>
+        </div>
+      )
+    }
+
+    if (activeTrainingPage === 'business') {
+      return (
+        <div className="space-y-5">
+          <div className="rounded-lg border border-slate-200 bg-white p-6">
+            <h2 className="text-2xl font-extrabold text-slate-950">Business Questions</h2>
+            <p className="mt-1 text-sm font-medium text-slate-500">This is the general knowledge AI uses before comment or DM testing.</p>
+            <div className="mt-6 space-y-4">
+              <div>
+                <label className="block text-sm font-semibold text-slate-700 mb-1.5">What is the main goal of this business?</label>
+                <textarea
+                  value={businessGoal}
+                  onChange={e => setBusinessGoal(e.target.value)}
+                  disabled={!isAdmin}
+                  rows={4}
+                  className="input-field resize-none disabled:opacity-60 disabled:cursor-not-allowed"
+                  placeholder="Example: Book more calls, sell courses, collect leads, send people to WhatsApp, increase store visits..."
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-semibold text-slate-700 mb-1.5">Extra Business Notes</label>
+                <textarea
+                  value={description}
+                  onChange={e => setDescription(e.target.value)}
+                  disabled={!isAdmin}
+                  rows={5}
+                  className="input-field resize-none disabled:opacity-60 disabled:cursor-not-allowed"
+                  placeholder="Add prices, offers, locations, rules, sales style, products, services, and anything the website does not explain clearly."
+                />
+              </div>
+              <div className="grid gap-5 xl:grid-cols-2">
+                <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
+                  <h3 className="text-sm font-extrabold text-slate-950 mb-3">Default Reply Tone</h3>
+                  <div className="space-y-2">
+                    {TONES.map(tone => (
+                      <button
+                        key={tone.value}
+                        onClick={() => setSelectedTone(tone.value)}
+                        disabled={!isAdmin}
+                        className={clsx(
+                          'w-full flex items-center gap-3 p-3 rounded-lg border bg-white transition-all text-left disabled:cursor-not-allowed disabled:opacity-70',
+                          isAdmin && 'cursor-pointer',
+                          selectedTone === tone.value ? 'border-blue-300 bg-blue-50' : 'border-slate-100 hover:border-slate-200'
+                        )}
+                      >
+                        <div className={clsx('w-4 h-4 rounded-full border-2 flex items-center justify-center flex-shrink-0', selectedTone === tone.value ? 'border-blue-600 bg-blue-600' : 'border-slate-300')}>
+                          {selectedTone === tone.value && <div className="w-1.5 h-1.5 bg-white rounded-full" />}
+                        </div>
+                        <div>
+                          <div className="text-slate-900 text-sm font-semibold">{tone.label}</div>
+                          <div className="text-slate-400 text-xs">{tone.desc}</div>
+                        </div>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+                <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
+                  <h3 className="text-sm font-extrabold text-slate-950 mb-3">AI Guardrails</h3>
+                  <div className="space-y-4">
+                    <Toggle
+                      checked={guardrails}
+                      onChange={setGuardrails}
+                      label="Strict Mode"
+                      description="AI only replies based on trained context. Never invents prices or products."
+                    />
+                    <div className="border-t border-slate-200 pt-4">
+                      <label className="block text-sm font-semibold text-slate-700 mb-1.5">Fallback Message</label>
+                      <textarea
+                        value={fallback}
+                        onChange={e => setFallback(e.target.value)}
+                        disabled={!isAdmin}
+                        rows={4}
+                        className="input-field resize-none bg-white text-sm disabled:opacity-60 disabled:cursor-not-allowed"
+                      />
+                    </div>
+                  </div>
+                </div>
+              </div>
+              {isAdmin && (
+                <button onClick={() => saveTraining('training')} className="btn-secondary">
+                  <RefreshCw size={14} /> Save Business Questions
+                </button>
+              )}
+            </div>
+          </div>
+        </div>
+      )
+    }
+
+    if (activeTrainingPage === 'documents') {
+      return (
+        <div className="rounded-lg border border-slate-200 bg-white p-6">
+          <div className="flex items-center justify-between gap-4">
+            <div>
+              <h2 className="text-2xl font-extrabold text-slate-950">Documents</h2>
+              <p className="mt-1 text-sm font-medium text-slate-500">Upload product catalogs, price files, FAQs, and brand documents.</p>
+            </div>
+            <span className="text-slate-400 text-xs">{docs.length} file{docs.length !== 1 ? 's' : ''}</span>
+          </div>
+          <div className="mt-6">
+            {isAdmin ? (
+              <DropZone onFileDrop={handleFileDrop} />
+            ) : (
+              <div className="rounded-xl border border-slate-200 bg-slate-50 p-4 text-sm text-slate-500">
+                Training files are managed by the admin workspace.
+              </div>
+            )}
+            {docs.length > 0 && (
+              <div className="mt-4">
+                {docs.map(doc => <DocumentRow key={doc.id} doc={doc} onRemove={isAdmin ? handleRemove : undefined} />)}
+              </div>
+            )}
+            {isAdmin && (
+              <button onClick={() => saveTraining('training')} className="btn-secondary mt-5">
+                <RefreshCw size={14} /> Save Documents
+              </button>
+            )}
+          </div>
+        </div>
+      )
+    }
+
+    if (activeTrainingPage === 'comments') {
+      return (
+        <div className="space-y-5">
+          <div className="rounded-lg border border-slate-200 bg-white p-6">
+            <h2 className="text-2xl font-extrabold text-slate-950">Comment Training</h2>
+            <p className="mt-1 text-sm font-medium text-slate-500">Public comments should usually be short, specific, and natural.</p>
+            <div className="mt-6">
+              <label className="block text-sm font-extrabold text-slate-900 mb-1.5">How should AI reply to comments?</label>
+              <textarea
+                value={commentInstructions}
+                onChange={e => setCommentInstructions(e.target.value)}
+                disabled={!isAdmin}
+                rows={7}
+                className="input-field resize-none disabled:opacity-60 disabled:cursor-not-allowed"
+                placeholder="Example: Keep public replies short, warm, and specific. Thank the person, answer directly, and invite them to DM or WhatsApp only when useful."
+              />
+              {isAdmin && (
+                <button onClick={() => saveTraining('training')} className="btn-secondary mt-4">
+                  <RefreshCw size={14} /> Save Comment Training
+                </button>
+              )}
+            </div>
           </div>
           {isAdmin && (
-            <button
-              type="button"
-              onClick={() => openSetup('test')}
-              className="inline-flex h-11 items-center gap-2 rounded-lg bg-slate-950 px-5 text-sm font-bold text-white hover:bg-slate-800"
-            >
-              <Sparkles size={16} /> Test AI
-            </button>
+            <ReplyTestCard
+              title="Comment Reply Test"
+              description="Preview how AI answers public Instagram/Facebook comments."
+              icon={MessageSquare}
+              input={commentTestInput}
+              response={commentTestResponse}
+              error={commentTestError}
+              loading={commentTesting}
+              disabled={!hasSavedApiKey}
+              placeholder="Example comment: Price? Is this course online?"
+              onInputChange={setCommentTestInput}
+              onTest={() => handleTest('comment')}
+            />
           )}
         </div>
+      )
+    }
 
-        <section className="mx-auto max-w-5xl px-2 py-16 text-center">
-          <p className="text-sm font-semibold text-slate-500">Welcome to Usludigital AI</p>
-          <h2 className="mt-6 text-4xl font-extrabold tracking-tight text-slate-950">Meet your new social media assistant</h2>
-
-          <div className="mt-10 grid grid-cols-1 gap-8 text-left md:grid-cols-3">
-            <AiPreviewCard
-              type="replies"
-              title="AI Replies"
-              description="Share your business knowledge, then AI uses it to reply around the clock."
-              onClick={() => openSetup('knowledge')}
+    return (
+      <div className="space-y-5">
+        <div className="rounded-lg border border-slate-200 bg-white p-6">
+          <h2 className="text-2xl font-extrabold text-slate-950">DM Training</h2>
+          <p className="mt-1 text-sm font-medium text-slate-500">DMs can be longer and can ask follow-up questions to move the customer forward.</p>
+          <div className="mt-6">
+            <label className="block text-sm font-extrabold text-slate-900 mb-1.5">How should AI reply in DMs?</label>
+            <textarea
+              value={dmInstructions}
+              onChange={e => setDmInstructions(e.target.value)}
+              disabled={!isAdmin}
+              rows={7}
+              className="input-field resize-none disabled:opacity-60 disabled:cursor-not-allowed"
+              placeholder="Example: Ask helpful follow-up questions, collect the customer need, explain next steps, and move them toward booking or WhatsApp naturally."
             />
-            <AiPreviewCard
-              type="comments"
-              title="AI Comments"
-              description="Set your brand tone, then AI replies to comments in the style you choose."
-              onClick={() => openSetup('behavior')}
-            />
-            <AiPreviewCard
-              type="goals"
-              title="AI Goals"
-              description="Guide replies toward leads, clicks, bookings, or whichever result matters most."
-              onClick={() => openSetup('goals')}
-            />
+            {isAdmin && (
+              <button onClick={() => saveTraining('training')} className="btn-secondary mt-4">
+                <RefreshCw size={14} /> Save DM Training
+              </button>
+            )}
           </div>
-
-          <button
-            type="button"
-            onClick={() => openSetup('knowledge')}
-            className="mt-10 inline-flex h-12 items-center justify-center rounded-lg bg-blue-600 px-7 text-base font-bold text-white hover:bg-blue-700"
-          >
-            Set Up Usludigital AI
-          </button>
-
-          <p className="mx-auto mt-28 max-w-2xl text-sm font-medium text-slate-500">
-            AI is not human and may need review. Replies use the business context, tone, guardrails, and fallback message you configure here.
-          </p>
-        </section>
+        </div>
+        {isAdmin && (
+          <ReplyTestCard
+            title="DM Reply Test"
+            description="Preview how AI answers private inbox conversations."
+            icon={Send}
+            input={dmTestInput}
+            response={dmTestResponse}
+            error={dmTestError}
+            loading={dmTesting}
+            disabled={!hasSavedApiKey}
+            placeholder="Example DM: Hi, I want to know the price and how to register."
+            onInputChange={setDmTestInput}
+            onTest={() => handleTest('dm')}
+          />
+        )}
       </div>
     )
   }
@@ -618,296 +843,46 @@ export default function AITrainingTab({ company, onUpdate, onNotify, isAdmin = t
         </div>
       </div>
 
-      <div className="space-y-5">
-        {/* Left — provider status + documents */}
-        <div className="space-y-5">
-          {isAdmin ? (
-            <div className="rounded-lg border border-slate-200 bg-white p-5">
-              <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-                <div className="flex items-center gap-4">
-                  <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-slate-950 text-white">
-                    <Key size={20} />
-                  </div>
-                  <div>
-                    <h3 className="text-base font-extrabold text-slate-950">Shared AI Provider</h3>
-                    <p className="text-sm font-medium text-slate-500">The OpenAI key is managed once in Settings and applies to every company.</p>
-                  </div>
-                </div>
-                <span className={clsx('inline-flex w-fit rounded-full px-3 py-1 text-xs font-extrabold', hasSavedApiKey ? 'bg-emerald-50 text-emerald-700' : 'bg-orange-50 text-orange-700')}>
-                  {hasSavedApiKey ? 'Ready for testing' : 'Needs key'}
-                </span>
-              </div>
-              <div className="mt-5 grid grid-cols-1 gap-3 sm:grid-cols-3">
-                {[
-                  ['Scope', 'All companies'],
-                  ['Replies', 'Comments and DMs'],
-                  ['Manage', 'Settings > API Keys'],
-                ].map(([label, value]) => (
-                  <div key={label} className="rounded-lg border border-slate-100 bg-slate-50 p-4">
-                    <div className="text-xs font-extrabold uppercase tracking-wide text-slate-400">{label}</div>
-                    <div className="mt-1 text-sm font-bold text-slate-800">{value}</div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          ) : (
-            <div className="card p-5">
-              <div className="flex items-center gap-2 mb-2">
-                <Shield size={15} className="text-slate-400" />
-                <h3 className="text-slate-900 font-bold text-base">AI Connection</h3>
-              </div>
-              <p className="text-slate-500 text-sm leading-relaxed">
-                OpenAI API keys and platform credentials are managed only by the admin workspace.
-              </p>
-            </div>
-          )}
-
-          {/* Documents */}
-          <div className={clsx('card p-5', focusSection === 'knowledge' && 'ring-2 ring-blue-200')}>
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="text-slate-900 font-bold text-base flex items-center gap-2">
-                <FileText size={15} className="text-slate-400" /> Training Documents
-              </h3>
-              <span className="text-slate-400 text-xs">{docs.length} file{docs.length !== 1 ? 's' : ''}</span>
-            </div>
-            {isAdmin ? (
-              <DropZone onFileDrop={handleFileDrop} />
-            ) : (
-              <div className="rounded-xl border border-slate-200 bg-slate-50 p-4 text-sm text-slate-500">
-                Training files are managed by the admin workspace.
-              </div>
-            )}
-            {docs.length > 0 && (
-              <div className="mt-4">
-                {docs.map(doc => <DocumentRow key={doc.id} doc={doc} onRemove={isAdmin ? handleRemove : undefined} />)}
-              </div>
-            )}
+      <div className="grid gap-6 lg:grid-cols-[280px_1fr]">
+        <aside className="rounded-lg border border-slate-200 bg-white p-3">
+          <div className="px-3 py-3">
+            <div className="text-xs font-extrabold uppercase tracking-wide text-slate-400">AI Training Center</div>
           </div>
-
-          {/* Website + Description */}
-          <div className={clsx('card p-5', focusSection === 'knowledge' && 'ring-2 ring-blue-200')}>
-            <h3 className="text-slate-900 font-bold text-base flex items-center gap-2 mb-4">
-              <Globe size={15} className="text-slate-400" /> 1. Business Website and Goal
-            </h3>
-            <div className="space-y-4">
-              <div>
-                <label className="block text-sm font-semibold text-slate-700 mb-1.5">Website URL</label>
-                <div className="flex gap-2">
-                  <input value={websiteUrl} onChange={e => setWebsiteUrl(e.target.value)} disabled={!isAdmin} className="input-field flex-1 disabled:opacity-60 disabled:cursor-not-allowed" placeholder="https://yourbusiness.com" />
-                  {isAdmin && (
-                    <button onClick={handleAnalyzeWebsite} disabled={analyzingWebsite || !hasSavedApiKey} className="btn-primary flex-shrink-0 disabled:cursor-not-allowed disabled:opacity-50">
-                      {analyzingWebsite ? <><UsluLoader size="xs" />Analyzing...</> : <><Sparkles size={14} />Analyze</>}
-                    </button>
-                  )}
-                </div>
-                <p className="text-slate-400 text-xs mt-1.5">AI reads the website and creates a summary for this business.</p>
-                {analysisError && (
-                  <div className="mt-2 flex items-start gap-2 rounded-xl border border-red-200 bg-red-50 p-3">
-                    <AlertCircle size={14} className="mt-0.5 flex-shrink-0 text-red-500" />
-                    <span className="text-sm text-red-700">{analysisError}</span>
-                  </div>
-                )}
-              </div>
-              <div>
-                <label className="block text-sm font-semibold text-slate-700 mb-1.5">AI Website Summary</label>
-                <textarea
-                  value={websiteSummary}
-                  onChange={e => setWebsiteSummary(e.target.value)}
-                  disabled={!isAdmin}
-                  rows={5}
-                  className="input-field resize-none disabled:opacity-60 disabled:cursor-not-allowed"
-                  placeholder="Click Analyze and AI will summarize what this business does, who it serves, and what it offers."
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-semibold text-slate-700 mb-1.5">What is the main goal of this business?</label>
-                <textarea
-                  value={businessGoal}
-                  onChange={e => setBusinessGoal(e.target.value)}
-                  disabled={!isAdmin}
-                  rows={3}
-                  className="input-field resize-none disabled:opacity-60 disabled:cursor-not-allowed"
-                  placeholder="Example: Book more consultation calls, sell more courses, collect qualified leads, send people to WhatsApp, increase store visits..."
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-semibold text-slate-700 mb-1.5">Extra Business Notes</label>
-                <textarea
-                  value={description}
-                  onChange={e => setDescription(e.target.value)}
-                  disabled={!isAdmin}
-                  rows={3}
-                  className="input-field resize-none disabled:opacity-60 disabled:cursor-not-allowed"
-                  placeholder="Add anything the website does not explain clearly: prices, locations, offers, rules, sales style..."
-                />
-              </div>
-              {isAdmin && (
-                <button onClick={() => saveTraining('training')} className="btn-secondary">
-                  <RefreshCw size={14} /> Save Business Training
-                </button>
-              )}
-            </div>
-          </div>
-
-          {/* Reply Type Training */}
-          <div className={clsx('card p-5', focusSection === 'behavior' && 'ring-2 ring-blue-200')}>
-            <h3 className="text-slate-900 font-bold text-base flex items-center gap-2 mb-1">
-              <MessageSquare size={15} className="text-slate-400" /> 2. Comment and DM Training
-            </h3>
-            <p className="mb-4 text-sm text-slate-500">Comments are public and should usually be shorter. DMs are private and can ask follow-up questions.</p>
-            <div className="space-y-4">
-              <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
-                <label className="block text-sm font-extrabold text-slate-900 mb-1.5">Comment Reply Training</label>
-                <p className="mb-3 text-xs leading-relaxed text-slate-500">Tell AI how to reply under public Instagram/Facebook comments.</p>
-                <textarea
-                  value={commentInstructions}
-                  onChange={e => setCommentInstructions(e.target.value)}
-                  disabled={!isAdmin}
-                  rows={4}
-                  className="input-field resize-none bg-white disabled:opacity-60 disabled:cursor-not-allowed"
-                  placeholder="Example: Keep public replies short, warm, and specific. Thank the person, answer directly, and invite them to DM or WhatsApp only when useful."
-                />
-              </div>
-              <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
-                <label className="block text-sm font-extrabold text-slate-900 mb-1.5">DM Reply Training</label>
-                <p className="mb-3 text-xs leading-relaxed text-slate-500">Tell AI how to handle private customer messages and sales conversations.</p>
-                <textarea
-                  value={dmInstructions}
-                  onChange={e => setDmInstructions(e.target.value)}
-                  disabled={!isAdmin}
-                  rows={4}
-                  className="input-field resize-none bg-white disabled:opacity-60 disabled:cursor-not-allowed"
-                  placeholder="Example: Ask helpful follow-up questions, collect the customer need, explain next steps, and move them toward booking or WhatsApp naturally."
-                />
-              </div>
-            </div>
-            {isAdmin && (
-              <button onClick={() => saveTraining('training')} className="btn-secondary mt-4">
-                <RefreshCw size={14} /> Save Reply Training
-              </button>
-            )}
-          </div>
-
-          {/* AI Test Console */}
-          {isAdmin && <div id="ai-comment-test" className={clsx('card p-5', focusSection === 'test' && 'ring-2 ring-blue-200')}>
-            <h3 className="text-slate-900 font-bold text-base flex items-center gap-2 mb-1">
-              <Brain size={15} className="text-slate-400" /> 3. Test AI Responses
-            </h3>
-            <p className="text-slate-400 text-sm mb-4">
-              {hasSavedApiKey ? 'Test public comment replies and private DM replies separately.' : 'Add your shared OpenAI API key in Settings > API Keys to test real AI responses'}
-            </p>
-            <div className="space-y-4">
-              <ReplyTestCard
-                title="Comment Reply Test"
-                description="Use this to preview how AI answers public Instagram/Facebook comments."
-                icon={MessageSquare}
-                input={commentTestInput}
-                response={commentTestResponse}
-                error={commentTestError}
-                loading={commentTesting}
-                disabled={!hasSavedApiKey}
-                placeholder="Example comment: Price? Is this course online?"
-                onInputChange={setCommentTestInput}
-                onTest={() => handleTest('comment')}
-              />
-              <ReplyTestCard
-                title="DM Reply Test"
-                description="Use this to preview how AI answers private inbox conversations."
-                icon={Send}
-                input={dmTestInput}
-                response={dmTestResponse}
-                error={dmTestError}
-                loading={dmTesting}
-                disabled={!hasSavedApiKey}
-                placeholder="Example DM: Hi, I want to know the price and how to register."
-                onInputChange={setDmTestInput}
-                onTest={() => handleTest('dm')}
-              />
-            </div>
-          </div>}
-        </div>
-
-        {/* Right — settings */}
-        <div className="space-y-5">
-          <div className={clsx('card p-5', focusSection === 'behavior' && 'ring-2 ring-blue-200')}>
-            <h3 className="text-slate-900 font-bold text-base flex items-center gap-2 mb-4">
-              <Shield size={15} className="text-slate-400" /> AI Guardrails
-            </h3>
-            <div className="space-y-4">
-              <Toggle
-                checked={guardrails}
-                onChange={setGuardrails}
-                label="Strict Mode"
-                description="AI only replies based on trained context. Never invents prices or products."
-              />
-              <div className="border-t border-slate-100 pt-4">
-                <label className="block text-sm font-semibold text-slate-700 mb-1.5">Fallback Message</label>
-                <p className="text-slate-400 text-xs mb-2">What to say when AI is not confident</p>
-                <textarea
-                  value={fallback}
-                  onChange={e => setFallback(e.target.value)}
-                  disabled={!isAdmin}
-                  rows={3}
-                  className="input-field resize-none text-xs disabled:opacity-60 disabled:cursor-not-allowed"
-                />
-              </div>
-            </div>
-          </div>
-
-          <div className={clsx('card p-5', focusSection === 'behavior' && 'ring-2 ring-blue-200')}>
-            <h3 className="text-slate-900 font-bold text-base flex items-center gap-2 mb-4">
-              <MessageSquare size={15} className="text-slate-400" /> Default Reply Tone
-            </h3>
-            <div className="space-y-2">
-              {TONES.map(tone => (
+          <div className="space-y-1">
+            {trainingPages.map(page => {
+              const Icon = page.icon
+              return (
                 <button
-                  key={tone.value}
-                  onClick={() => setSelectedTone(tone.value)}
-                  disabled={!isAdmin}
+                  key={page.id}
+                  onClick={() => setActiveTrainingPage(page.id)}
                   className={clsx(
-                    'w-full flex items-center gap-3 p-3 rounded-lg border transition-all text-left disabled:cursor-not-allowed disabled:opacity-70',
-                    isAdmin && 'cursor-pointer',
-                    selectedTone === tone.value ? 'border-blue-300 bg-blue-50' : 'border-slate-100 hover:border-slate-200 hover:bg-slate-50'
+                    'flex w-full items-center gap-3 rounded-lg px-3 py-3 text-left text-sm font-bold transition-colors',
+                    activeTrainingPage === page.id ? 'bg-slate-950 text-white' : 'text-slate-600 hover:bg-slate-50 hover:text-slate-950'
                   )}
                 >
-                  <div className={clsx('w-4 h-4 rounded-full border-2 flex items-center justify-center flex-shrink-0', selectedTone === tone.value ? 'border-blue-600 bg-blue-600' : 'border-slate-300')}>
-                    {selectedTone === tone.value && <div className="w-1.5 h-1.5 bg-white rounded-full" />}
-                  </div>
-                  <div>
-                    <div className="text-slate-900 text-sm font-semibold">{tone.label}</div>
-                    <div className="text-slate-400 text-xs">{tone.desc}</div>
-                  </div>
+                  <Icon size={17} className={activeTrainingPage === page.id ? 'text-white' : 'text-slate-400'} />
+                  <span className="min-w-0 flex-1 truncate">{page.label}</span>
+                  <span className={clsx('h-2 w-2 rounded-full', page.done ? 'bg-emerald-500' : 'bg-slate-300')} />
                 </button>
-              ))}
+              )
+            })}
+          </div>
+          <div className="mt-5 rounded-lg border border-slate-100 bg-slate-50 p-4">
+            <div className="mb-3 flex items-center gap-2">
+              <CheckCircle2 size={15} className="text-[#255ff4]" />
+              <span className="text-sm font-extrabold text-slate-900">Setup Status</span>
+            </div>
+            <div className="space-y-2 text-xs font-semibold text-slate-500">
+              <div className="flex justify-between gap-3"><span>AI key</span><span className={hasSavedApiKey ? 'text-emerald-600' : 'text-[#f49725]'}>{hasSavedApiKey ? 'Ready' : 'Missing'}</span></div>
+              <div className="flex justify-between gap-3"><span>Website</span><span>{websiteSummary.trim() ? 'Done' : 'Empty'}</span></div>
+              <div className="flex justify-between gap-3"><span>Comments</span><span>{commentInstructions.trim() ? 'Done' : 'Empty'}</span></div>
+              <div className="flex justify-between gap-3"><span>DMs</span><span>{dmInstructions.trim() ? 'Done' : 'Empty'}</span></div>
             </div>
           </div>
-
-          <div className={clsx('card p-5 bg-gradient-to-br from-blue-50 to-indigo-50 border-blue-100', focusSection === 'goals' && 'ring-2 ring-blue-200')}>
-            <div className="flex items-center gap-2 mb-3">
-              <CheckCircle2 size={16} className="text-blue-600" />
-              <span className="text-blue-900 font-bold text-sm">Setup Checklist</span>
-            </div>
-            <ul className="space-y-2">
-              {[
-                ...(isAdmin ? [{ label: 'OpenAI API key added', done: hasSavedApiKey }] : []),
-                { label: 'Website summary added', done: !!websiteSummary.trim() },
-                { label: 'Business goal written', done: !!businessGoal.trim() },
-                { label: 'Comment reply training written', done: !!commentInstructions.trim() },
-                { label: 'DM reply training written', done: !!dmInstructions.trim() },
-                { label: 'Training documents uploaded', done: docs.length > 0 },
-                { label: 'Fallback message set', done: !!fallback.trim() },
-                { label: 'Reply tone selected', done: !!selectedTone },
-              ].map(item => (
-                <li key={item.label} className="flex items-center gap-2 text-sm">
-                  <div className={clsx('w-4 h-4 rounded-full flex items-center justify-center flex-shrink-0', item.done ? 'bg-emerald-500' : 'bg-slate-200')}>
-                    {item.done && <CheckCircle2 size={10} className="text-white" strokeWidth={3} />}
-                  </div>
-                  <span className={item.done ? 'text-slate-700' : 'text-slate-400'}>{item.label}</span>
-                </li>
-              ))}
-            </ul>
-          </div>
-        </div>
+        </aside>
+        <main className="min-w-0">
+          {renderActivePage()}
+        </main>
       </div>
     </div>
   )
